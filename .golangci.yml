@@ -1,0 +1,34 @@
+linters-settings:
+  dupl:
+    threshold: 95
+  funlen:
+    lines: 65
+    statements: 40
+  gocognit:
+    min-complexity: 25
+  goconst:
+    min-occurrences: 4
+  lll:
+    line-length: 120
+
+
+linters:
+  disable-all: true
+  enable:
+    - revive
+    - ifshort
+    - staticcheck
+    - depguard
+    - dogsled
+    - godox
+    - megacheck
+    - govet
+    - gocyclo
+    - lll
+    - funlen
+    - gofmt
+    - gocognit
+    - dupl
+    - whitespace
+    - goconst
+    - unconvert

@@ -9,5 +9,5 @@ setup(
     author_email="use.my.github@for.contact",
     packages=find_packages(),
     python_requires=">=3.10.0",
-    install_requires=["retry==0.9.2", "pytest==6.2.5", "requests==2.26.00"],
+    install_requires=["retry==0.9.2", "pytest==6.2.5", "requests==2.26.00", "pylama==7.7.1"],
 )

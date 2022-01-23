@@ -1,5 +1,4 @@
 import requests
-import pytest
 
 from .fixtures import launched_in_background, Client, MockServer
 
@@ -43,7 +42,6 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
                 )
 
 
-# @pytest.mark.skip(reason="Not yet implemented")
 def test_peer_disappears_from_api_when_client_disconnects(
     executable, server, mock_server
 ):
