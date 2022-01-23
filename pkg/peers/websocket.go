@@ -120,8 +120,21 @@ func (wt *websocketPeer) Receive() (chan messages.Message, error) {
 	return theChannel, nil
 }
 
-func (wt *websocketPeer) Apps() ([]App, error) {
-	return wt.theApps, nil
+func (wt *websocketPeer) AppStatusChanges() chan AppStatus {
+	appsChan := make(chan AppStatus)
+	go func() {
+		defer func() {
+			// Closing appsChan makes this goroutine panic
+			recover()
+		}()
+		for _, theApp := range wt.theApps {
+			appsChan <- AppStatus{
+				Name: AppStatusAdded,
+				App:  theApp,
+			}
+		}
+	}()
+	return appsChan
 }
 
 func (wt *websocketPeer) WhenClosed(cb func()) {

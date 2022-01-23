@@ -84,14 +84,18 @@ func main() {
 							if factoryErr != nil {
 								logrus.Fatal(factoryErr)
 							}
-							factory := peers.NewUniquePeerFactory(wsFactory)
+							appExposer := server.NewDefaultAppExposer(server.RandomPortAllocator{})
 							transportServer := server.NewServer(
-								factory,
-								server.RandomPortAllocator{},
+								peers.AutoCloseAppsChan(
+									peers.AllowOnlyUniquePeers(
+										wsFactory,
+									),
+								),
+								appExposer,
 							)
 							adminServer := admin.NewWormholeAdminServer(
 								":8081",
-								server.NewServerAppsListAdapter(transportServer),
+								server.NewServerAppsListAdapter(appExposer),
 							)
 							go adminServer.Listen()
 							return transportServer.Start()

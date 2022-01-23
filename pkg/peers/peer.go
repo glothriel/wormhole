@@ -10,7 +10,7 @@ type Peer interface {
 	Send(messages.Message) error
 	Receive() (chan messages.Message, error)
 	WhenClosed(func())
-	Apps() ([]App, error)
+	AppStatusChanges() chan AppStatus
 	Close() error
 }
 
@@ -18,6 +18,14 @@ type Peer interface {
 type App struct {
 	Name    string
 	Address string
+}
+
+const AppStatusAdded = "added"
+const AppStatusWithdrawn = "withdrawn"
+
+type AppStatus struct {
+	Name string
+	App  App
 }
 
 // PeerFactory is responsible for creating new peers

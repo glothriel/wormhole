@@ -7,7 +7,7 @@ def test_hello_world_is_returned_via_tunnel(mock_server, client, server):
     apps = requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
     assert len(apps) == 1, "One app should be registered"
     assert (
-        requests.get(f'http://localhost:{apps[0]["port"]}', timeout=2).text
+        requests.get(f'http://{apps[0]["endpoint"]}', timeout=2).text
         == "Hello world!"
     )
 
@@ -32,7 +32,7 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
                 ], "Exactly two clients should be connected, each with one distinct app"
 
                 assert [
-                    requests.get(f'http://localhost:{app["port"]}', timeout=2).text for app in api_response
+                    requests.get(f'http://{app["endpoint"]}', timeout=2).text for app in api_response
                 ] == [
                     "Hello world!",
                     "Bla!"
