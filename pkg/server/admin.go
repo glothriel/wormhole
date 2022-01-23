@@ -1,27 +1,30 @@
 package server
 
-import "github.com/glothriel/wormhole/pkg/apps"
+import (
+	"github.com/glothriel/wormhole/pkg/admin"
+)
 
 // AppListerAdapter implements admin.appLister
 type AppListerAdapter struct {
-	server *Server
+	appExposer AppExposer
 }
 
 // Apps returns a list of apps
-func (adapter *AppListerAdapter) Apps() ([]apps.App, error) {
-	var allApps []apps.App
-	for _, sessionManager := range adapter.server.portExposers {
-		allApps = append(allApps, apps.App{
-			Port: sessionManager.port,
-			Name: sessionManager.appName,
+func (adapter *AppListerAdapter) Apps() ([]admin.AppListEntry, error) {
+	allApps := []admin.AppListEntry{}
+	for _, theApp := range adapter.appExposer.Apps() {
+		allApps = append(allApps, admin.AppListEntry{
+			Endpoint: theApp.App.Address,
+			App:      theApp.App.Name,
+			Peer:     theApp.Peer.Name(),
 		})
 	}
 	return allApps, nil
 }
 
 // NewServerAppsListAdapter creates ServerAppsListAdapter instances
-func NewServerAppsListAdapter(server *Server) *AppListerAdapter {
+func NewServerAppsListAdapter(exposer AppExposer) *AppListerAdapter {
 	return &AppListerAdapter{
-		server: server,
+		appExposer: exposer,
 	}
 }

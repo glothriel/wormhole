@@ -40,8 +40,8 @@ func (uniq *uniquePeerFactory) Peers() (chan Peer, error) {
 	return proxyChannel, nil
 }
 
-// NewUniquePeerFactory creates uniquePeerFactory instances
-func NewUniquePeerFactory(child PeerFactory) PeerFactory {
+// AllowOnlyUniquePeers creates uniquePeerFactory instances
+func AllowOnlyUniquePeers(child PeerFactory) PeerFactory {
 	return &uniquePeerFactory{
 		child: child,
 	}

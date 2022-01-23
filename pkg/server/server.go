@@ -8,12 +8,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AppExposer is responsible for keeping track of which apps are registered and their endpoints exported
+type AppExposer interface {
+	Register(peer peers.Peer, app peers.App, router messageRouter) error
+	Unregister(peer peers.Peer, app peers.App) error
+	Apps() []ExposedApp
+}
+
 // Server accepts Peers and opens ports for all the apps connected peers expose
 type Server struct {
-	peerFactory   peers.PeerFactory
-	portAllocator PortAllocator
-
-	portExposers map[string]*perAppPortExposer
+	peerFactory peers.PeerFactory
+	appExposer  AppExposer
 }
 
 // Start launches the server
@@ -23,56 +28,41 @@ func (l *Server) Start() error {
 		return fmt.Errorf("Failed to initialize new Peer: %w", peerErr)
 	}
 	for peer := range peersChan {
-		theApps, appsErr := peer.Apps()
-		if appsErr != nil {
-			logrus.Error(appsErr)
-			continue
-		}
-
-		msgs, receiveErr := peer.Receive()
-		if receiveErr != nil {
-			return receiveErr
-		}
-		messageRouter := router.NewMessageRouter(msgs)
-
-		for _, app := range theApps {
-			portExposer, portExposerErr := newPerAppPortExposer(app.Name, l.portAllocator)
-			if portExposerErr != nil {
-				return portExposerErr
-			}
-			peer.WhenClosed(func() {
-				portExposer.terminate()
-			})
-			l.portExposers[fmt.Sprintf("%s-%s", peer.Name(), app.Name)] = portExposer
-			doneChan := make(chan bool)
-			go func(upstream peers.App, peer peers.Peer, portExposer *perAppPortExposer, done chan bool) {
-				connections, connectionErr := portExposer.connections()
-				if connectionErr != nil {
-					logrus.Error(connectionErr)
-					return
-				}
-				for connection := range connections {
-					handler := newSessionHandler(
-						peer,
-						connection,
-						upstream.Name,
-					)
-					go handler.Handle(messageRouter)
-				}
-				delete(l.portExposers, fmt.Sprintf("%s-%s", peer.Name(), upstream.Name))
-			}(app, peer, portExposer, doneChan)
-		}
+		l.handlePeer(peer)
 	}
 	return nil
 }
 
-// NewServer creates Server instances
-func NewServer(peerFactory peers.PeerFactory, portAllocator PortAllocator) *Server {
-	listener := &Server{
-		peerFactory:   peerFactory,
-		portAllocator: portAllocator,
+// Start launches the server
+func (l *Server) handlePeer(peer peers.Peer) error {
+	msgs, receiveErr := peer.Receive()
+	if receiveErr != nil {
+		return receiveErr
+	}
+	messageRouter := router.NewMessageRouter(msgs)
+	go func(peer peers.Peer) {
+		for appStatus := range peer.AppStatusChanges() {
+			if appStatus.Name == peers.AppStatusAdded {
+				if registerErr := l.appExposer.Register(peer, appStatus.App, messageRouter); registerErr != nil {
+					logrus.Error(registerErr)
+					return
+				}
+			} else if appStatus.Name == peers.AppStatusWithdrawn {
+				if registerErr := l.appExposer.Unregister(peer, appStatus.App); registerErr != nil {
+					logrus.Error(registerErr)
+					return
+				}
+			}
+		}
+	}(peer)
+	return nil
+}
 
-		portExposers: make(map[string]*perAppPortExposer),
+// NewServer creates Server instances
+func NewServer(peerFactory peers.PeerFactory, appExposer AppExposer) *Server {
+	listener := &Server{
+		peerFactory: peerFactory,
+		appExposer:  appExposer,
 	}
 	return listener
 }
