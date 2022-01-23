@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import os
 import signal
 import subprocess
+import uuid
 
 import socket
 from retry import retry
@@ -52,7 +53,7 @@ class Client:
         self.process = None
 
     def start(self):
-        command = [self.executable, "mesh", "join"]
+        command = [self.executable, "mesh", "join", "--name", uuid.uuid4().hex]
         for expose in self.exposes:
             if type(expose) == str:
                 command += ["--expose", expose]
