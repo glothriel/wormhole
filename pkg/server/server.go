@@ -8,13 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// AppExposer is responsible for keeping track of which apps are registered and their endpoints exported
-type AppExposer interface {
-	Register(peer peers.Peer, app peers.App, router messageRouter) error
-	Unregister(peer peers.Peer, app peers.App) error
-	Apps() []ExposedApp
-}
-
 // Server accepts Peers and opens ports for all the apps connected peers expose
 type Server struct {
 	peerFactory peers.PeerFactory
@@ -36,12 +29,12 @@ func (l *Server) Start() error {
 		go func(peer peers.Peer) {
 			for appEvent := range peer.AppEvents() {
 				if appEvent.Type == peers.EventAppAdded {
-					if registerErr := l.appExposer.Register(peer, appEvent.App, messageRouter); registerErr != nil {
+					if registerErr := l.appExposer.Expose(peer, appEvent.App, messageRouter); registerErr != nil {
 						logrus.Error(registerErr)
 						return
 					}
 				} else if appEvent.Type == peers.EventAppWithdrawn {
-					if unregisterErr := l.appExposer.Unregister(peer, appEvent.App); unregisterErr != nil {
+					if unregisterErr := l.appExposer.Unexpose(peer, appEvent.App); unregisterErr != nil {
 						logrus.Error(unregisterErr)
 						return
 					}
