@@ -14,31 +14,30 @@ type defaultAppExposer struct {
 }
 
 func (exposer *defaultAppExposer) Register(peer peers.Peer, app peers.App, router messageRouter) error {
-	portListener, portExposerErr := newPerAppPortExposer(app.Name, exposer.portAllocator)
+	portExposer, portExposerErr := newPerAppPortExposer(app.Name, exposer.portAllocator)
 	if portExposerErr != nil {
 		return portExposerErr
 	}
 	peer.WhenClosed(func() {
-		portListener.terminate()
+		portExposer.terminate()
 	})
-	exposer.registry.store(peer, app, portListener)
-	doneChan := make(chan bool)
-	go func(upstream peers.App, peer peers.Peer, portExposer *perAppPortExposer, done chan bool) {
+	exposer.registry.store(peer, app, portExposer)
+	go func() {
 		connections, connectionErr := portExposer.connections()
 		if connectionErr != nil {
 			logrus.Error(connectionErr)
 			return
 		}
 		for connection := range connections {
-			handler := newSessionHandler(
+			handler := newAppConnectionHandler(
 				peer,
+				app,
 				connection,
-				upstream.Name,
 			)
 			go handler.Handle(router)
 		}
 		exposer.registry.delete(peer, app)
-	}(app, peer, portListener, doneChan)
+	}()
 	return nil
 }
 

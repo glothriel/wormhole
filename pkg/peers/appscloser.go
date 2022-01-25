@@ -17,7 +17,7 @@ func (uniq *autoClosingAppsChanPeerFactory) Peers() (chan Peer, error) {
 		defer close(proxyChannel)
 		for peer := range childResult {
 			peer.WhenClosed(func() {
-				close(peer.AppStatusChanges())
+				close(peer.AppEvents())
 			})
 			proxyChannel <- peer
 		}

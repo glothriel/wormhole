@@ -25,36 +25,30 @@ type Server struct {
 func (l *Server) Start() error {
 	peersChan, peerErr := l.peerFactory.Peers()
 	if peerErr != nil {
-		return fmt.Errorf("Failed to initialize new Peer: %w", peerErr)
+		return fmt.Errorf("Failed to start Peer factory %w", peerErr)
 	}
 	for peer := range peersChan {
-		l.handlePeer(peer)
-	}
-	return nil
-}
-
-// Start launches the server
-func (l *Server) handlePeer(peer peers.Peer) error {
-	msgs, receiveErr := peer.Receive()
-	if receiveErr != nil {
-		return receiveErr
-	}
-	messageRouter := router.NewMessageRouter(msgs)
-	go func(peer peers.Peer) {
-		for appStatus := range peer.AppStatusChanges() {
-			if appStatus.Name == peers.AppStatusAdded {
-				if registerErr := l.appExposer.Register(peer, appStatus.App, messageRouter); registerErr != nil {
-					logrus.Error(registerErr)
-					return
-				}
-			} else if appStatus.Name == peers.AppStatusWithdrawn {
-				if registerErr := l.appExposer.Unregister(peer, appStatus.App); registerErr != nil {
-					logrus.Error(registerErr)
-					return
+		msgs, receiveErr := peer.Receive()
+		if receiveErr != nil {
+			return receiveErr
+		}
+		messageRouter := router.NewMessageRouter(msgs)
+		go func(peer peers.Peer) {
+			for appEvent := range peer.AppEvents() {
+				if appEvent.Type == peers.EventAppAdded {
+					if registerErr := l.appExposer.Register(peer, appEvent.App, messageRouter); registerErr != nil {
+						logrus.Error(registerErr)
+						return
+					}
+				} else if appEvent.Type == peers.EventAppWithdrawn {
+					if unregisterErr := l.appExposer.Unregister(peer, appEvent.App); unregisterErr != nil {
+						logrus.Error(unregisterErr)
+						return
+					}
 				}
 			}
-		}
-	}(peer)
+		}(peer)
+	}
 	return nil
 }
 
