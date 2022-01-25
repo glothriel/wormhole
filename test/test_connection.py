@@ -31,13 +31,14 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
                     "localhost:1234",
                 ], "Exactly two clients should be connected, each with one distinct app"
 
-                assert [
+                assert list(sorted([
                     requests.get(f'http://{app["endpoint"]}', timeout=2).text for app in api_response
-                ] == [
+                ])) == [
+                    "Bla!",
                     "Hello world!",
-                    "Bla!"
                 ], (
-                    "There are two distinct apps (mock servers), each of them having a separate client connected, "
+                    "There are two distinct apps (test launches two mock servers), "
+                    "each of them having a separate client connected, "
                     "so there should be two disting responses"
                 )
 

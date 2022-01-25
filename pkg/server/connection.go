@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -15,15 +14,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func newSessionHandler(
+func newAppConnectionHandler(
 	peer peers.Peer,
-	session *connection,
-	appName string,
-) *sessionHandler {
-	theHandler := &sessionHandler{
-		peer:    peer,
-		session: session,
-		appName: appName,
+	app peers.App,
+	appConnection appConnection,
+) *appConnectionHandler {
+	theHandler := &appConnectionHandler{
+		peer:          peer,
+		appConnection: appConnection,
+		app:           app,
 	}
 	return theHandler
 }
@@ -33,24 +32,19 @@ type messageRouter interface {
 	Done(string)
 }
 
-// sessionHandler is responsible for passing messages between the peer and port opened for the app
-type sessionHandler struct {
-	peer    peers.Peer
-	session *connection
-	appName string
+// appConnectionHandler is responsible for passing messages between the peer and port opened for the app
+type appConnectionHandler struct {
+	peer          peers.Peer
+	appConnection appConnection
+	app           peers.App
 }
 
-func (sh *sessionHandler) handleIncomingPeerMessages(router messageRouter) {
-	logger := logrus.WithField("session_id", sh.session.id).WithField("peer_id", sh.peer.Name())
-	defer func() {
-		logger.Debugf(
-			"Finished HandleIncomingPeerMessages",
-		)
-	}()
-	for message := range router.Get(sh.session.id) {
+func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) {
+	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
+	for message := range router.Get(handler.appConnection.sessionID()) {
 		logger.Infof("Message came from peer")
 		if messages.IsFrame(message) {
-			if writeErr := sh.session.write(message); writeErr != nil {
+			if writeErr := handler.appConnection.write(message); writeErr != nil {
 				logrus.Fatal(writeErr)
 			}
 			logger.Infof("Message sent to session")
@@ -58,16 +52,11 @@ func (sh *sessionHandler) handleIncomingPeerMessages(router messageRouter) {
 	}
 }
 
-func (sh *sessionHandler) handleIncomingServiceMessages(router messageRouter) {
-	defer router.Done(sh.session.id)
-	logger := logrus.WithField("session_id", sh.session.id).WithField("peer_id", sh.peer.Name())
-	defer func() {
-		logger.Debugf(
-			"Finished HandleIncomingServiceMessages",
-		)
-	}()
+func (handler *appConnectionHandler) handleIncomingServiceMessages(router messageRouter) {
+	defer router.Done(handler.appConnection.sessionID())
+	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
 	for {
-		downstreamMsg, receiveErr := sh.session.receive()
+		downstreamMsg, receiveErr := handler.appConnection.receive()
 		if receiveErr != nil {
 			if errors.Is(receiveErr, io.EOF) {
 				logger.Debug("Session connection terminated")
@@ -79,8 +68,8 @@ func (sh *sessionHandler) handleIncomingServiceMessages(router messageRouter) {
 
 		logger.Debug("Message came from session")
 
-		if sendErr := sh.peer.Send(
-			messages.WithAppName(downstreamMsg, sh.appName),
+		if sendErr := handler.peer.Send(
+			messages.WithAppName(downstreamMsg, handler.app.Name),
 		); sendErr != nil {
 			logrus.Error(sendErr)
 			return
@@ -90,9 +79,9 @@ func (sh *sessionHandler) handleIncomingServiceMessages(router messageRouter) {
 	}
 }
 
-func (sh *sessionHandler) Handle(router messageRouter) {
-	go sh.handleIncomingPeerMessages(router)
-	go sh.handleIncomingServiceMessages(router)
+func (handler *appConnectionHandler) Handle(router messageRouter) {
+	go handler.handleIncomingPeerMessages(router)
+	go handler.handleIncomingServiceMessages(router)
 }
 
 // perAppPortExposer exposes a port for every app and allows retrieving new connections for every app
@@ -100,13 +89,11 @@ type perAppPortExposer struct {
 	appName  string
 	listener net.Listener
 	port     int
-
-	sessions sync.Map
 }
 
-func (sm *perAppPortExposer) connections() (chan *connection, error) {
-	theChan := make(chan *connection)
-	go func(theChan chan *connection) {
+func (sm *perAppPortExposer) connections() (chan appConnection, error) {
+	theChan := make(chan appConnection)
+	go func(theChan chan appConnection) {
 		defer func() { close(theChan) }()
 		for {
 			tcpC, acceptErr := sm.listener.Accept()
@@ -116,16 +103,14 @@ func (sm *perAppPortExposer) connections() (chan *connection, error) {
 				}
 				return
 			}
-			ID := uuid.New().String()[:6]
+			sessionID := uuid.New().String()[:6]
 			logrus.Infof(
-				"New session ID %s", ID,
+				"New session ID %s", sessionID,
 			)
-			theSession := &connection{
-				upstreamConn: tcpC,
-				id:           ID,
-				port:         sm.port,
+			theSession := &tcpAppConnection{
+				conn:         tcpC,
+				theSessionID: sessionID,
 			}
-			sm.sessions.Store(ID, theSession)
 			theChan <- theSession
 		}
 	}(theChan)
@@ -167,26 +152,35 @@ func newPerAppPortExposer(name string, allocator PortAllocator) (*perAppPortExpo
 	}, nil
 }
 
-// connection is a wrapper over TCP connection
-type connection struct {
-	id           string
-	upstreamConn net.Conn
-	port         int
+// tcpAppConnection is a wrapper over TCP connection that implements appConnection
+type tcpAppConnection struct {
+	theSessionID string
+	conn         net.Conn
 }
 
-func (s *connection) receive() (messages.Message, error) {
+func (s *tcpAppConnection) receive() (messages.Message, error) {
 	buf := make([]byte, 64*1024)
-	readBytes, readErr := s.upstreamConn.Read(buf)
+	readBytes, readErr := s.conn.Read(buf)
 	if readErr != nil {
 		return messages.Message{}, fmt.Errorf("Failed to read from TCP connection %w", readErr)
 	}
-	return messages.NewFrame(s.id, buf[:readBytes]), nil
+	return messages.NewFrame(s.theSessionID, buf[:readBytes]), nil
 }
 
-func (s *connection) write(m messages.Message) error {
-	_, writeErr := s.upstreamConn.Write(messages.Body(m))
+func (s *tcpAppConnection) write(m messages.Message) error {
+	_, writeErr := s.conn.Write(messages.Body(m))
 	if writeErr != nil {
 		return fmt.Errorf("Failed to write to TCP connection %w", writeErr)
 	}
 	return writeErr
+}
+
+func (s *tcpAppConnection) sessionID() string {
+	return s.theSessionID
+}
+
+type appConnection interface {
+	receive() (messages.Message, error)
+	write(m messages.Message) error
+	sessionID() string
 }

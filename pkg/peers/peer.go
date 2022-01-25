@@ -10,7 +10,7 @@ type Peer interface {
 	Send(messages.Message) error
 	Receive() (chan messages.Message, error)
 	WhenClosed(func())
-	AppStatusChanges() chan AppStatus
+	AppEvents() chan AppEvent
 	Close() error
 }
 
@@ -20,11 +20,15 @@ type App struct {
 	Address string
 }
 
-const AppStatusAdded = "added"
-const AppStatusWithdrawn = "withdrawn"
+// EventAppAdded is emmited, when peer wants to expose a new app
+const EventAppAdded = "added"
 
-type AppStatus struct {
-	Name string
+// EventAppWithdrawn is emmited, when peer no longer wants to expose an app
+const EventAppWithdrawn = "withdrawn"
+
+// AppEvent is a change in app exposure status
+type AppEvent struct {
+	Type string
 	App  App
 }
 
