@@ -1,34 +1,38 @@
 package server
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/glothriel/wormhole/pkg/peers"
-	"github.com/sirupsen/logrus"
+	"github.com/glothriel/wormhole/pkg/ports"
 )
 
-type defaultAppExposer struct {
-	registry      *exposedAppsRegistry
-	portAllocator PortAllocator
+// AppExposer is responsible for keeping track of which apps are registered and their endpoints exported
+type AppExposer interface {
+	Expose(peer peers.Peer, app peers.App, router messageRouter) error
+	Unexpose(peer peers.Peer, app peers.App) error
+	Apps() []ExposedApp
 }
 
-func (exposer *defaultAppExposer) Register(peer peers.Peer, app peers.App, router messageRouter) error {
-	portExposer, portExposerErr := newPerAppPortExposer(app.Name, exposer.portAllocator)
-	if portExposerErr != nil {
-		return portExposerErr
+// ExposedApp represents an app exposed on the server along with the peer the app is exposed from
+type ExposedApp struct {
+	App  peers.App
+	Peer peers.Peer
+}
+type defaultAppExposer struct {
+	registry      *exposedAppsRegistry
+	portAllocator ports.Allocator
+}
+
+func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router messageRouter) error {
+	portOpener, portOpenerErr := newPerAppPortOpener(app.Name, exposer.portAllocator)
+	if portOpenerErr != nil {
+		return portOpenerErr
 	}
 	peer.WhenClosed(func() {
-		portExposer.terminate()
+		portOpener.close()
 	})
-	exposer.registry.store(peer, app, portExposer)
+	exposer.registry.store(peer, app, portOpener)
 	go func() {
-		connections, connectionErr := portExposer.connections()
-		if connectionErr != nil {
-			logrus.Error(connectionErr)
-			return
-		}
-		for connection := range connections {
+		for connection := range portOpener.connections() {
 			handler := newAppConnectionHandler(
 				peer,
 				app,
@@ -41,13 +45,13 @@ func (exposer *defaultAppExposer) Register(peer peers.Peer, app peers.App, route
 	return nil
 }
 
-func (exposer *defaultAppExposer) Unregister(peer peers.Peer, app peers.App) error {
-	listener, found := exposer.registry.get(peer, app)
+func (exposer *defaultAppExposer) Unexpose(peer peers.Peer, app peers.App) error {
+	portOpener, found := exposer.registry.get(peer, app)
 	if !found {
 		return nil
 	}
-	if terminateErr := listener.terminate(); terminateErr != nil {
-		return terminateErr
+	if closeErr := portOpener.close(); closeErr != nil {
+		return closeErr
 	}
 	exposer.registry.delete(peer, app)
 	return nil
@@ -65,61 +69,9 @@ func (exposer *defaultAppExposer) Apps() []ExposedApp {
 }
 
 // NewDefaultAppExposer creates defaultAppExposer instances
-func NewDefaultAppExposer(portAllocator PortAllocator) AppExposer {
+func NewDefaultAppExposer(portAllocator ports.Allocator) AppExposer {
 	return &defaultAppExposer{
 		registry:      newExposedAppsRegistry(),
 		portAllocator: portAllocator,
 	}
-}
-
-// ExposedApp represents an app exposed on the server along with the peer the app is exposed from
-type ExposedApp struct {
-	App  peers.App
-	Peer peers.Peer
-}
-
-type exposedAppsRegistry struct {
-	storage sync.Map
-}
-
-func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (*perAppPortExposer, bool) {
-	val, exists := registry.storage.Load(registry.hash(peer, app))
-	if !exists {
-		return nil, false
-	}
-	return val.(storedExposer).exposer, true
-}
-
-func (registry *exposedAppsRegistry) store(peer peers.Peer, app peers.App, portExposer *perAppPortExposer) {
-	registry.storage.Store(registry.hash(peer, app), storedExposer{
-		exposer: portExposer,
-		app:     app,
-		peer:    peer,
-	})
-}
-func (registry *exposedAppsRegistry) delete(peer peers.Peer, app peers.App) {
-	registry.storage.Delete(registry.hash(peer, app))
-}
-
-func (registry *exposedAppsRegistry) hash(peer peers.Peer, app peers.App) string {
-	return fmt.Sprintf("%s-%s", peer.Name(), app.Name)
-}
-
-func (registry *exposedAppsRegistry) items() []storedExposer {
-	items := []storedExposer{}
-	registry.storage.Range(func(k, storedExposerEntry interface{}) bool {
-		items = append(items, storedExposerEntry.(storedExposer))
-		return true
-	})
-	return items
-}
-
-func newExposedAppsRegistry() *exposedAppsRegistry {
-	return &exposedAppsRegistry{storage: sync.Map{}}
-}
-
-type storedExposer struct {
-	exposer *perAppPortExposer
-	peer    peers.Peer
-	app     peers.App
 }

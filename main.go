@@ -9,6 +9,7 @@ import (
 	"github.com/glothriel/wormhole/pkg/admin"
 	"github.com/glothriel/wormhole/pkg/client"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/glothriel/wormhole/pkg/server"
 	"github.com/glothriel/wormhole/pkg/testutils"
 	"github.com/sirupsen/logrus"
@@ -84,7 +85,7 @@ func main() {
 							if factoryErr != nil {
 								logrus.Fatal(factoryErr)
 							}
-							appExposer := server.NewDefaultAppExposer(server.RandomPortAllocator{})
+							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
 							transportServer := server.NewServer(
 								peers.AutoCloseAppsChan(
 									peers.AllowOnlyUniquePeers(

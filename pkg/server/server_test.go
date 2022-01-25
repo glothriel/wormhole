@@ -15,14 +15,14 @@ type mockAppExposer struct {
 	unregisterLastCalledWith registerAndUnregisterCommonArgs
 }
 
-func (exposer *mockAppExposer) Register(peer peers.Peer, app peers.App, router messageRouter) error {
+func (exposer *mockAppExposer) Expose(peer peers.Peer, app peers.App, router messageRouter) error {
 	exposer.registerLastCalledWith = registerAndUnregisterCommonArgs{
 		peer: peer, app: app,
 	}
 	return nil
 }
 
-func (exposer *mockAppExposer) Unregister(peer peers.Peer, app peers.App) error {
+func (exposer *mockAppExposer) Unexpose(peer peers.Peer, app peers.App) error {
 	exposer.unregisterLastCalledWith = registerAndUnregisterCommonArgs{
 		peer: peer, app: app,
 	}
