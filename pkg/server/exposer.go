@@ -32,9 +32,6 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 		return portOpenerErr
 	}
 	app.Address = fmt.Sprintf("localhost:%d", portOpener.port)
-	peer.WhenClosed(func() {
-		portOpener.close()
-	})
 	exposer.registry.store(peer, app, portOpener)
 	go func() {
 		for connection := range portOpener.connections() {

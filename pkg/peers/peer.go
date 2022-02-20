@@ -9,7 +9,6 @@ type Peer interface {
 	Name() string
 	Send(messages.Message) error
 	Receive() (chan messages.Message, error)
-	WhenClosed(func())
 	AppEvents() chan AppEvent
 	Close() error
 }

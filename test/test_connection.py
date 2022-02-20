@@ -1,3 +1,4 @@
+import pytest
 import requests
 
 from .fixtures import launched_in_background, Client, MockServer
@@ -61,3 +62,25 @@ def test_peer_disappears_from_api_when_client_disconnects(
 
     # After client disconnect
     assert len(requests.get(apps_url).json()) == 0
+
+
+def test_peer_no_longer_listens_on_the_port_when_dissapeared(
+    executable, server, mock_server
+):
+    apps_url = f"http://localhost:{server.admin_port}/v1/apps"
+
+    def _app_port_is_opened(app, timeout_seconds=.1):
+        try:
+            requests.get(f'http://{app["endpoint"]}', timeout=timeout_seconds)
+        except requests.exceptions.ConnectionError:
+            return False
+        return True
+
+    try:
+        peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
+        the_app = requests.get(apps_url).json()[0]
+        assert _app_port_is_opened(the_app)
+    finally:
+        peer.stop()
+
+    assert not _app_port_is_opened(the_app)
