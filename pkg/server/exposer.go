@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
+	"github.com/sirupsen/logrus"
 )
 
 // AppExposer is responsible for keeping track of which apps are registered and their endpoints exported
@@ -10,6 +13,7 @@ type AppExposer interface {
 	Expose(peer peers.Peer, app peers.App, router messageRouter) error
 	Unexpose(peer peers.Peer, app peers.App) error
 	Apps() []ExposedApp
+	Terminate(peer peers.Peer) error
 }
 
 // ExposedApp represents an app exposed on the server along with the peer the app is exposed from
@@ -27,6 +31,7 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 	if portOpenerErr != nil {
 		return portOpenerErr
 	}
+	app.Address = fmt.Sprintf("localhost:%d", portOpener.port)
 	peer.WhenClosed(func() {
 		portOpener.close()
 	})
@@ -54,6 +59,19 @@ func (exposer *defaultAppExposer) Unexpose(peer peers.Peer, app peers.App) error
 		return closeErr
 	}
 	exposer.registry.delete(peer, app)
+	return nil
+}
+
+func (exposer *defaultAppExposer) Terminate(peer peers.Peer) error {
+	for _, storedExposerEntry := range exposer.registry.items() {
+		if storedExposerEntry.peer.Name() == peer.Name() {
+			if closeErr := storedExposerEntry.portOpener.close(); closeErr != nil {
+				logrus.Warnf("Could not close port exposer: %v", closeErr)
+				continue
+			}
+		}
+	}
+	exposer.registry.deleteAll(peer)
 	return nil
 }
 

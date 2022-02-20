@@ -29,6 +29,8 @@ func (exposer *mockAppExposer) Unexpose(peer peers.Peer, app peers.App) error {
 	return nil
 }
 
+func (exposer *mockAppExposer) Terminate(peer peers.Peer) error { return nil }
+
 func (exposer *mockAppExposer) Apps() []ExposedApp {
 	allApps := []ExposedApp{}
 	return allApps

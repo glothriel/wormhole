@@ -35,19 +35,6 @@ func TestExposedAppRegistryGetReturnsItemIfItWasPreviouslyStored(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestExposedAppRegistryHash(t *testing.T) {
-	// given
-	registry := newExposedAppsRegistry()
-	mockPeer := peers.NewMockPeer()
-	mockApp := peers.App{Name: "foo"}
-
-	// when
-	hashedEntry := registry.hash(mockPeer, mockApp)
-
-	// then
-	assert.Equal(t, "mock-foo", hashedEntry)
-}
-
 func TestExposedAppRegistryItems(t *testing.T) {
 	// given
 	registry := newExposedAppsRegistry()

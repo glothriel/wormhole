@@ -16,6 +16,9 @@ func (e *Exposer) Expose(apps ...peers.App) error {
 	appsRegistry := newAppConnectionRegistry()
 	upstreamAddressesByName := map[string]string{}
 	for _, upstreamDefinition := range apps {
+		if sendErr := e.Peer.Send(messages.NewAppAdded(upstreamDefinition.Name)); sendErr != nil {
+			return sendErr
+		}
 		upstreamAddressesByName[upstreamDefinition.Name] = upstreamDefinition.Address
 	}
 
