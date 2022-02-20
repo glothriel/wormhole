@@ -21,10 +21,10 @@ type App struct {
 }
 
 // EventAppAdded is emmited, when peer wants to expose a new app
-const EventAppAdded = "added"
+const EventAppAdded = messages.TypeAppAdded
 
 // EventAppWithdrawn is emmited, when peer no longer wants to expose an app
-const EventAppWithdrawn = "withdrawn"
+const EventAppWithdrawn = messages.TypeAppWithdrawn
 
 // AppEvent is a change in app exposure status
 type AppEvent struct {

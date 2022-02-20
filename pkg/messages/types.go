@@ -1,12 +1,30 @@
 package messages
 
-const typeData = "data"
+const typeFrame = "data"
+const typeIntroduction = "introduction"
+const TypeAppAdded = "app-added"
+const TypeAppWithdrawn = "app-withdrawn"
 const typeDisconnect = "disconnect"
 const typePing = "ping"
 
 // IsFrame checks if message contains raw packet data
 func IsFrame(m Message) bool {
-	return m.Type == typeData
+	return m.Type == typeFrame
+}
+
+// IsIntroduction checks if message contains peer name
+func IsIntroduction(m Message) bool {
+	return m.Type == typeIntroduction
+}
+
+// IsAppAdded checks if message contains information about added app
+func IsAppAdded(m Message) bool {
+	return m.Type == TypeAppAdded
+}
+
+// IsAppWithdrawn checks if message contains message about withdrawn app
+func IsAppWithdrawn(m Message) bool {
+	return m.Type == TypeAppWithdrawn
 }
 
 // IsDisconnect checks if message is a command to disconnect remote connection
@@ -23,7 +41,7 @@ func IsPing(m Message) bool {
 func NewFrame(sessionID string, d []byte) Message {
 	return Message{
 		SessionID:  sessionID,
-		Type:       typeData,
+		Type:       typeFrame,
 		BodyString: string(d),
 	}
 }
@@ -39,5 +57,29 @@ func NewDisconnect() Message {
 func NewPing() Message {
 	return Message{
 		Type: typePing,
+	}
+}
+
+// NewIntroduction allows a peer to introduce to another peer
+func NewIntroduction(peerName string) Message {
+	return Message{
+		Type:       typeIntroduction,
+		BodyString: peerName,
+	}
+}
+
+// NewAppAdded allows adding app added messages
+func NewAppAdded(appName string) Message {
+	return Message{
+		Type:       TypeAppAdded,
+		BodyString: appName,
+	}
+}
+
+// NewAppWithdrawn allows creating app withdrawn messages
+func NewAppWithdrawn(appName string) Message {
+	return Message{
+		Type:       TypeAppWithdrawn,
+		BodyString: appName,
 	}
 }

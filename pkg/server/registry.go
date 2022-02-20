@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/peers"
@@ -14,7 +13,11 @@ type exposedAppsRegistry struct {
 }
 
 func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (*perAppPortOpener, bool) {
-	val, exists := registry.storage.Load(registry.hash(peer, app))
+	peerMap, exists := registry.storage.Load(peer.Name())
+	if !exists {
+		return nil, false
+	}
+	val, exists := peerMap.(*sync.Map).Load(app.Name)
 	if !exists {
 		return nil, false
 	}
@@ -22,24 +25,43 @@ func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (*perAp
 }
 
 func (registry *exposedAppsRegistry) store(peer peers.Peer, app peers.App, portOpener *perAppPortOpener) {
-	registry.storage.Store(registry.hash(peer, app), storedExposer{
+	var peerMap *sync.Map
+	peerMapInterface, exists := registry.storage.Load(peer.Name())
+	if exists {
+		peerMap = peerMapInterface.(*sync.Map)
+	} else {
+		peerMap = &sync.Map{}
+		registry.storage.Store(peer.Name(), peerMap)
+	}
+	peerMap.Store(app.Name, storedExposer{
 		portOpener: portOpener,
 		app:        app,
 		peer:       peer,
 	})
 }
+
 func (registry *exposedAppsRegistry) delete(peer peers.Peer, app peers.App) {
-	registry.storage.Delete(registry.hash(peer, app))
+	var peerMap *sync.Map
+	peerMapInterface, exists := registry.storage.Load(peer.Name())
+	if exists {
+		peerMap = peerMapInterface.(*sync.Map)
+	} else {
+		peerMap = &sync.Map{}
+	}
+	peerMap.Delete(app.Name)
 }
 
-func (registry *exposedAppsRegistry) hash(peer peers.Peer, app peers.App) string {
-	return fmt.Sprintf("%s-%s", peer.Name(), app.Name)
+func (registry *exposedAppsRegistry) deleteAll(peer peers.Peer) {
+	registry.storage.Delete(peer.Name())
 }
 
 func (registry *exposedAppsRegistry) items() []storedExposer {
 	items := []storedExposer{}
-	registry.storage.Range(func(k, storedExposerEntry interface{}) bool {
-		items = append(items, storedExposerEntry.(storedExposer))
+	registry.storage.Range(func(k, internalMap interface{}) bool {
+		internalMap.(*sync.Map).Range(func(k, storedExposerEntry interface{}) bool {
+			items = append(items, storedExposerEntry.(storedExposer))
+			return true
+		})
 		return true
 	})
 	return items

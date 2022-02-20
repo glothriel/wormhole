@@ -40,6 +40,9 @@ func (l *Server) Start() error {
 					}
 				}
 			}
+			if terminateErr := l.appExposer.Terminate(peer); terminateErr != nil {
+				logrus.Warnf("could not terminate peer gracefully: %v", terminateErr)
+			}
 		}(peer)
 	}
 	return nil

@@ -81,17 +81,17 @@ func main() {
 							},
 						},
 						Action: func(c *cli.Context) error {
-							wsFactory, factoryErr := peers.NewWebsocketServerPeerFactory("localhost", strconv.Itoa(c.Int("port")))
-							if factoryErr != nil {
-								logrus.Fatal(factoryErr)
+							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
+								"localhost",
+								strconv.Itoa(c.Int("port")),
+							)
+							if wsTransportFactoryErr != nil {
+								return wsTransportFactoryErr
 							}
+							peerFactory := peers.NewPeerConnectionFactory("my-server", wsTransportFactory)
 							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
 							transportServer := server.NewServer(
-								peers.AutoCloseAppsChan(
-									peers.AllowOnlyUniquePeers(
-										wsFactory,
-									),
-								),
+								peerFactory,
 								appExposer,
 							)
 							adminServer := admin.NewWormholeAdminServer(
@@ -118,12 +118,13 @@ func main() {
 							},
 						},
 						Action: func(c *cli.Context) error {
+							transport, transportErr := peers.NewWebsocketClientTransport(c.String("server"))
+							if transportErr != nil {
+								return transportErr
+							}
+
 							exposedApps := getExposedApps(c)
-							peer, peerErr := peers.NewWebsocketClientPeer(
-								c.String("name"),
-								c.String("server"),
-								exposedApps,
-							)
+							peer, peerErr := peers.NewPeerConnection(c.String("name"), transport)
 							if peerErr != nil {
 								return peerErr
 							}
