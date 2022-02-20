@@ -46,10 +46,6 @@ func (o *PeerConnection) Close() error {
 	return o.transport.Close()
 }
 
-// WhenClosed immplements Peer
-func (o *PeerConnection) WhenClosed(func()) {
-}
-
 func (o *PeerConnection) startRouting(failedChan chan error, localName string) {
 	messagesChan, receiveErr := o.transport.Receive()
 	if receiveErr != nil {
