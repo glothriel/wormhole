@@ -38,19 +38,14 @@ func (wt *MockPeer) Name() string {
 	return "mock"
 }
 
-// Receive implements Peer
-func (wt *MockPeer) Receive() (chan messages.Message, error) {
-	return wt.MessagesFromPeer, nil
+// Frames implements Peer
+func (wt *MockPeer) Frames() chan messages.Message {
+	return wt.MessagesFromPeer
 }
 
 // AppEvents implements Peer
 func (wt *MockPeer) AppEvents() chan AppEvent {
 	return wt.AppEventsPeer
-}
-
-// WhenClosed implements Peer
-func (wt *MockPeer) WhenClosed(cb func()) {
-	wt.callbacks = append(wt.callbacks, cb)
 }
 
 // NewMockPeer creates MockPeer instances

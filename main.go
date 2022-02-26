@@ -88,7 +88,7 @@ func main() {
 							if wsTransportFactoryErr != nil {
 								return wsTransportFactoryErr
 							}
-							peerFactory := peers.NewPeerConnectionFactory("my-server", wsTransportFactory)
+							peerFactory := peers.NewDefaultPeerFactory("my-server", wsTransportFactory)
 							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
 							transportServer := server.NewServer(
 								peerFactory,
@@ -124,12 +124,12 @@ func main() {
 							}
 
 							exposedApps := getExposedApps(c)
-							peer, peerErr := peers.NewPeerConnection(c.String("name"), transport)
+							peer, peerErr := peers.NewDefaultPeer(c.String("name"), transport)
 							if peerErr != nil {
 								return peerErr
 							}
 
-							return client.NewExposer(peer).Expose(exposedApps...)
+							return client.NewExposer(peer).Expose(client.NewStaticAppStateManager(exposedApps))
 						},
 					},
 				},

@@ -2,11 +2,12 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/glothriel/wormhole/pkg/messages"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,7 +37,7 @@ func (e *appConnection) terminate() {
 	close(e.theOutbox)
 }
 
-func newAppConnection(sessionID, address, appName string, peer peers.Peer) (*appConnection, error) {
+func newAppConnection(sessionID, address, appName string) (*appConnection, error) {
 	conn, dialErr := net.Dial("tcp", address)
 	if dialErr != nil {
 		return nil, dialErr
@@ -52,21 +53,7 @@ func newAppConnection(sessionID, address, appName string, peer peers.Peer) (*app
 		appName: appName,
 	}
 
-	logger := logrus.WithField("session_id", theConnection.sessionID).WithField("peer", peer.Name())
-
-	go func() {
-		defer func() {
-			logger.Debug("Stopped orchestrating TCP connection")
-		}()
-		for theMsg := range theConnection.inbox() {
-			logger.Debug("Received message over TCP")
-			writeErr := peer.Send(messages.WithAppName(theMsg, appName))
-			if writeErr != nil {
-				panic(writeErr)
-			}
-			logger.Debug("Transimitted message to peer")
-		}
-	}()
+	logger := logrus.WithField("session_id", theConnection.sessionID)
 
 	go func() {
 		defer func() {
@@ -100,4 +87,55 @@ func newAppConnection(sessionID, address, appName string, peer peers.Peer) (*app
 	}()
 
 	return theConnection, nil
+}
+
+type appConnectionsRegistry struct {
+	upstreamConnections sync.Map
+	addresses           *appAddressRegistry
+}
+
+func (registry *appConnectionsRegistry) create(
+	sessionID, appName string,
+) (*appConnection, error) {
+	session, found := registry.upstreamConnections.Load(sessionID)
+	if !found {
+		destination, upstreamNameFound := registry.addresses.get(appName)
+		if !upstreamNameFound {
+			return nil, fmt.Errorf("Could not find app with name %s", appName)
+		}
+		logrus.WithField("session_id", sessionID).Infof("Creating new client session on %s", destination)
+		theSession, sessionErr := newAppConnection(sessionID, destination, appName)
+		if sessionErr != nil {
+			return nil, sessionErr
+		}
+		registry.upstreamConnections.Store(sessionID, theSession)
+		return theSession, nil
+	}
+	return session.(*appConnection), nil
+}
+
+func (registry *appConnectionsRegistry) get(
+	sessionID string,
+) (*appConnection, error) {
+	session, found := registry.upstreamConnections.Load(sessionID)
+	if !found {
+		return nil, fmt.Errorf("Could not find connection with ID %s", sessionID)
+	}
+	return session.(*appConnection), nil
+}
+
+func (registry *appConnectionsRegistry) delete(sessionID string) error {
+	session, found := registry.upstreamConnections.Load(sessionID)
+	if found {
+		session.(*appConnection).terminate()
+		registry.upstreamConnections.Delete(sessionID)
+	}
+	return nil
+}
+
+func newAppConnectionRegistry(addresses *appAddressRegistry) *appConnectionsRegistry {
+	return &appConnectionsRegistry{
+		upstreamConnections: sync.Map{},
+		addresses:           addresses,
+	}
 }
