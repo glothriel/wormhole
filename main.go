@@ -79,6 +79,13 @@ func main() {
 								Name:  "port",
 								Value: 8080,
 							},
+							&cli.StringFlag{
+								Name:  "labels",
+								Value: "application=wormhole-server",
+							},
+							&cli.BoolFlag{
+								Name: "kubernetes",
+							},
 						},
 						Action: func(c *cli.Context) error {
 							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
@@ -89,9 +96,20 @@ func main() {
 								return wsTransportFactoryErr
 							}
 							peerFactory := peers.NewDefaultPeerFactory("my-server", wsTransportFactory)
-							appExposer := server.NewDefaultAppExposer(server.NewPerAppPortOpenerFactory(
+							var portOpenerFactory server.PortOpenerFactory
+							portOpenerFactory = server.NewPerAppPortOpenerFactory(
 								ports.RandomPortAllocator{},
-							))
+							)
+							if c.Bool("kubernetes") {
+								portOpenerFactory = server.NewK8sServicePortOpenerFactory(
+									"default",
+									server.CSVToMap(c.String("labels")),
+									portOpenerFactory,
+								)
+							}
+							appExposer := server.NewDefaultAppExposer(
+								portOpenerFactory,
+							)
 							transportServer := server.NewServer(
 								peerFactory,
 								appExposer,
