@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/glothriel/wormhole/pkg/peers"
@@ -65,6 +66,13 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		return nil, clientSetErr
 	}
 	servicesClient := clientset.CoreV1().Services(factory.namespace)
+	port, portErr := strconv.Atoi(strings.Split(childOpener.listenAddr(), ":")[1])
+	if portErr != nil {
+		if closeErr := childOpener.close(); closeErr != nil {
+			logrus.Warningf("Failed to close port opener: %v", closeErr)
+		}
+		return nil, portErr
+	}
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", peer.Name(), app.Name),
@@ -75,7 +83,7 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 			Ports: []corev1.ServicePort{
 				{
 					Port:       8080,
-					TargetPort: intstr.FromString(strings.Split(childOpener.listenAddr(), ":")[1]),
+					TargetPort: intstr.FromInt(port),
 				},
 			},
 			Selector: factory.ownSelectors,
