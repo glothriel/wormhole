@@ -64,7 +64,7 @@ def test_peer_disappears_from_api_when_client_disconnects(
     assert len(requests.get(apps_url).json()) == 0
 
 
-def test_peer_no_longer_listens_on_the_port_when_dissapeared(
+def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconnects(
     executable, server, mock_server
 ):
     apps_url = f"http://localhost:{server.admin_port}/v1/apps"
