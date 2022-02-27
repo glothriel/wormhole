@@ -1,11 +1,11 @@
-name: Integration
+name: Docker
 on:
   push:
     tags:
       - '*'
 
 jobs:
-  test:
+  build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
