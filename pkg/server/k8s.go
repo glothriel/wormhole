@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -97,12 +98,19 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		},
 	}
 
-	_, createErr := servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
-	if createErr != nil {
+	var upsertErr error
+
+	if _, getErr := servicesClient.Get(context.Background(), service.ObjectMeta.Name, metav1.GetOptions{}); errors.IsNotFound(getErr) {
+		_, upsertErr = servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
+	} else {
+		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
+	}
+
+	if upsertErr != nil {
 		if closeErr := childOpener.close(); closeErr != nil {
 			logrus.Warningf("Failed to close port opener: %v", closeErr)
 		}
-		return nil, createErr
+		return nil, upsertErr
 	}
 
 	return &k8sServicePortOpener{
