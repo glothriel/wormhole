@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    application: wormhole-server
+  name: wormhole-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: wormhole-server
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        application: wormhole-server
+    spec:
+      containers:
+        - image: ghcr.io/glothriel/wormhole:latest
+          name: wormhole
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          command:
+            - /usr/bin/wormhole
+            - mesh
+            - listen
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 0
+            failureThreshold: 3
+            periodSeconds: 5
