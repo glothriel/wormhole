@@ -7,8 +7,7 @@ import (
 )
 
 type staticAppStateManager struct {
-	Apps    []peers.App
-	theChan chan AppStateChange
+	Apps []peers.App
 }
 
 func (manager staticAppStateManager) Changes() chan AppStateChange {
@@ -81,35 +80,23 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 		if messages.IsPing(theMsg) {
 			continue
 		}
-		var appConnection *appConnection
-		appConnection, upstreamConnectionErr := connectionRegistry.get(
+		var theConnection *appConnection
+		theConnection, upstreamConnectionErr := connectionRegistry.get(
 			theMsg.SessionID,
 		)
 		if upstreamConnectionErr != nil {
 			var createErr error
-			appConnection, createErr = connectionRegistry.create(
+			theConnection, createErr = connectionRegistry.create(
 				theMsg.SessionID,
 				theMsg.AppName,
 			)
 			if createErr != nil {
 				logrus.Errorf("Error when creating connection to app %s: %s", theMsg.AppName, createErr)
 			}
-			go func() {
-				defer func() {
-					logrus.Debug("Stopped orchestrating TCP connection")
-				}()
-				for theMsg := range appConnection.inbox() {
-					logrus.Debug("Received message over TCP")
-					writeErr := e.Peer.Send(messages.WithAppName(theMsg, theMsg.AppName))
-					if writeErr != nil {
-						panic(writeErr)
-					}
-					logrus.Debug("Transimitted message to peer")
-				}
-			}()
+			go e.forward(theConnection)
 		}
 		if messages.IsFrame(theMsg) {
-			appConnection.outbox() <- theMsg
+			theConnection.outbox() <- theMsg
 		}
 		if messages.IsDisconnect(theMsg) {
 			connectionRegistry.delete(theMsg.SessionID)
@@ -117,6 +104,20 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 	}
 
 	return nil
+}
+
+func (e *Exposer) forward(connection *appConnection) {
+	defer func() {
+		logrus.Debug("Stopped orchestrating TCP connection")
+	}()
+	for theMsg := range connection.inbox() {
+		logrus.Debug("Received message over TCP")
+		writeErr := e.Peer.Send(messages.WithAppName(theMsg, theMsg.AppName))
+		if writeErr != nil {
+			panic(writeErr)
+		}
+		logrus.Debug("Transimitted message to peer")
+	}
 }
 
 // NewExposer creates Exposer instances
