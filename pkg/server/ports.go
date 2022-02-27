@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -45,6 +46,9 @@ func (sm *perAppPortOpener) connections() chan appConnection {
 
 	return theChan
 }
+func (sm *perAppPortOpener) listenAddr() string {
+	return fmt.Sprintf("0.0.0.0:%d", sm.port)
+}
 
 func (sm *perAppPortOpener) close() error {
 	return sm.listener.Close()
@@ -78,4 +82,17 @@ func newPerAppPortOpener(name string, allocator ports.Allocator) (*perAppPortOpe
 		listener: listener,
 		port:     freePort,
 	}, nil
+}
+
+type perAppPortOpenerFactory struct {
+	portAllocator ports.Allocator
+}
+
+func (factory *perAppPortOpenerFactory) Create(app peers.App, peer peers.Peer) (portOpener, error) {
+	theOpener, openerErr := newPerAppPortOpener(app.Name, factory.portAllocator)
+	return theOpener, openerErr
+}
+
+func NewPerAppPortOpenerFactory(allocator ports.Allocator) PortOpenerFactory {
+	return &perAppPortOpenerFactory{portAllocator: allocator}
 }

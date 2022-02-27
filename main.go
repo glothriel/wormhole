@@ -89,7 +89,9 @@ func main() {
 								return wsTransportFactoryErr
 							}
 							peerFactory := peers.NewDefaultPeerFactory("my-server", wsTransportFactory)
-							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
+							appExposer := server.NewDefaultAppExposer(server.NewPerAppPortOpenerFactory(
+								ports.RandomPortAllocator{},
+							))
 							transportServer := server.NewServer(
 								peerFactory,
 								appExposer,
