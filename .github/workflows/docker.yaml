@@ -24,10 +24,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      - name: Docker meta
+        id: meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: ghcr.io/glothriel/wormhole
+
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags:
-            ghcr.io/glothriel/wormhole:${GITHUB_REF#refs/tags/}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
