@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wormhole-mocks
+  labels:
+    application: wormhole-mocks
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    application: wormhole-mocks
+  sessionAffinity: None
+  type: ClusterIP

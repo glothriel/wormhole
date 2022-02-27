@@ -11,5 +11,5 @@ func RunTestServer(port int, response string) error {
 		rw.WriteHeader(200)
 		rw.Write([]byte(response))
 	})
-	return http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", port), nil)
+	return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), nil)
 }
