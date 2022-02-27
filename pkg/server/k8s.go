@@ -110,7 +110,7 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		service.Spec = theSpec
 		resourceAtNum, atoiErr := strconv.Atoi(service.GetResourceVersion())
 		if atoiErr != nil {
-			return nil, atoiErr
+			resourceAtNum = 1000
 		}
 		service.SetResourceVersion(strconv.Itoa(resourceAtNum + 1))
 		service, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
