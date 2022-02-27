@@ -81,30 +81,38 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	for sKey, sVal := range factory.ownSelectors {
 		theMap[sKey] = sVal
 	}
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%s", peer.Name(), app.Name),
-			Namespace:       factory.namespace,
-			ResourceVersion: "21337",
-			Labels:          theMap,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port:       8080,
-					TargetPort: intstr.FromInt(port),
-				},
+	theSpec := corev1.ServiceSpec{
+		Ports: []corev1.ServicePort{
+			{
+				Port:       8080,
+				TargetPort: intstr.FromInt(port),
 			},
-			Selector: factory.ownSelectors,
 		},
+		Selector: factory.ownSelectors,
 	}
 
 	var upsertErr error
 
-	if _, getErr := servicesClient.Get(context.Background(), service.ObjectMeta.Name, metav1.GetOptions{}); errors.IsNotFound(getErr) {
-		_, upsertErr = servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
+	var service *corev1.Service
+
+	if service, getErr := servicesClient.Get(context.Background(), service.ObjectMeta.Name, metav1.GetOptions{}); errors.IsNotFound(getErr) {
+		service, upsertErr = servicesClient.Create(context.Background(), &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("%s-%s", peer.Name(), app.Name),
+				Namespace:       factory.namespace,
+				ResourceVersion: "21337",
+				Labels:          theMap,
+			},
+			Spec: theSpec,
+		}, metav1.CreateOptions{})
 	} else {
-		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
+		service.Spec = theSpec
+		resourceAtNum, atoiErr := strconv.Atoi(service.GetResourceVersion())
+		if atoiErr != nil {
+			return nil, atoiErr
+		}
+		service.SetResourceVersion(strconv.Itoa(resourceAtNum))
+		service, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}
 
 	if upsertErr != nil {
