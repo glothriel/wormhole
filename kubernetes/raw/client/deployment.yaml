@@ -1,0 +1,34 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    application: wormhole-client
+  name: wormhole-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: wormhole-client
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        application: wormhole-client
+    spec:
+      containers:
+        - image: ghcr.io/glothriel/wormhole:latest
+          name: wormhole
+          imagePullPolicy: Always
+          command:
+            - /usr/bin/wormhole
+            - mesh
+            - join
+            - --name
+            - mysterious-peer
+            - --expose
+            - name=mock-client,address=wormhole-mocks:8080
+            - --server
+            - ws://wormhole-server:8080
+
