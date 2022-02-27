@@ -7,8 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PeerConnection implements Peer by plucing out Transport layer into another interface
-type PeerConnection struct {
+// DefaultPeer implements Peer by plucing out Transport layer into another interface
+type DefaultPeer struct {
 	remoteName string
 
 	transport  Transport
@@ -17,36 +17,31 @@ type PeerConnection struct {
 }
 
 // Name implements Peer
-func (o *PeerConnection) Name() string {
+func (o *DefaultPeer) Name() string {
 	return o.remoteName
 }
 
-// Receive implements Peer
-func (o *PeerConnection) Receive() (chan messages.Message, error) {
-	return o.Frames(), nil
-}
-
 // Frames returns messages that are used to interchange app data
-func (o *PeerConnection) Frames() chan messages.Message {
+func (o *DefaultPeer) Frames() chan messages.Message {
 	return o.framesChan
 }
 
 // AppEvents immplements Peer
-func (o *PeerConnection) AppEvents() chan AppEvent {
+func (o *DefaultPeer) AppEvents() chan AppEvent {
 	return o.appsChan
 }
 
 // Send immplements Peer
-func (o *PeerConnection) Send(msg messages.Message) error {
+func (o *DefaultPeer) Send(msg messages.Message) error {
 	return o.transport.Send(msg)
 }
 
 // Close immplements Peer
-func (o *PeerConnection) Close() error {
+func (o *DefaultPeer) Close() error {
 	return o.transport.Close()
 }
 
-func (o *PeerConnection) startRouting(failedChan chan error, localName string) {
+func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	messagesChan, receiveErr := o.transport.Receive()
 	if receiveErr != nil {
 		failedChan <- receiveErr
@@ -81,9 +76,9 @@ func (o *PeerConnection) startRouting(failedChan chan error, localName string) {
 	close(o.appsChan)
 }
 
-// NewPeerConnection creates PeerConnection instances
-func NewPeerConnection(introduceAsName string, transport Transport) (*PeerConnection, error) {
-	theConnection := &PeerConnection{
+// NewDefaultPeer creates PeerConnection instances
+func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, error) {
+	theConnection := &DefaultPeer{
 		transport:  transport,
 		framesChan: make(chan messages.Message),
 		appsChan:   make(chan AppEvent),
@@ -96,23 +91,23 @@ func NewPeerConnection(introduceAsName string, transport Transport) (*PeerConnec
 	return theConnection, nil
 }
 
-// PeerConnectionFactory implements PeerFactory
-type PeerConnectionFactory struct {
+// DefaultPeerFactory implements PeerFactory
+type DefaultPeerFactory struct {
 	ownName          string
 	transportFactory TransportFactory
 }
 
 // Peers implements PeerFactory
-func (peerConnectionFactory *PeerConnectionFactory) Peers() (chan Peer, error) {
+func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
 	connections := make(chan Peer)
 	go func() {
 		for {
-			newTransport, newTransportErr := peerConnectionFactory.transportFactory.Create()
+			newTransport, newTransportErr := defaultPeerFactory.transportFactory.Create()
 			if newTransportErr != nil {
 				close(connections)
 				return
 			}
-			newConnection, newConnectionErr := NewPeerConnection(peerConnectionFactory.ownName, newTransport)
+			newConnection, newConnectionErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
 			if newConnectionErr != nil {
 				close(connections)
 				return
@@ -123,7 +118,7 @@ func (peerConnectionFactory *PeerConnectionFactory) Peers() (chan Peer, error) {
 	return connections, nil
 }
 
-// NewPeerConnectionFactory creates PeerConnectionFactory instances
-func NewPeerConnectionFactory(ownName string, transportFactory TransportFactory) PeerFactory {
-	return &PeerConnectionFactory{transportFactory: transportFactory, ownName: ownName}
+// NewDefaultPeerFactory creates PeerConnectionFactory instances
+func NewDefaultPeerFactory(ownName string, transportFactory TransportFactory) PeerFactory {
+	return &DefaultPeerFactory{transportFactory: transportFactory, ownName: ownName}
 }

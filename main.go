@@ -51,7 +51,7 @@ func getExposedApps(c *cli.Context) []peers.App {
 	}
 	if len(upstreams) < 1 {
 		logrus.Fatal(
-			"You need to provide at least once upstream, that will be exposed on this host to join the mesh",
+			"You need to provide at least one app, that will be exposed on this host to join the mesh",
 		)
 	}
 	return upstreams
@@ -88,7 +88,7 @@ func main() {
 							if wsTransportFactoryErr != nil {
 								return wsTransportFactoryErr
 							}
-							peerFactory := peers.NewPeerConnectionFactory("my-server", wsTransportFactory)
+							peerFactory := peers.NewDefaultPeerFactory("my-server", wsTransportFactory)
 							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
 							transportServer := server.NewServer(
 								peerFactory,
@@ -124,12 +124,12 @@ func main() {
 							}
 
 							exposedApps := getExposedApps(c)
-							peer, peerErr := peers.NewPeerConnection(c.String("name"), transport)
+							peer, peerErr := peers.NewDefaultPeer(c.String("name"), transport)
 							if peerErr != nil {
 								return peerErr
 							}
 
-							return client.NewExposer(peer).Expose(exposedApps...)
+							return client.NewExposer(peer).Expose(client.NewStaticAppStateManager(exposedApps))
 						},
 					},
 				},

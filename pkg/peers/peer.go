@@ -4,13 +4,12 @@ import (
 	"github.com/glothriel/wormhole/pkg/messages"
 )
 
-// Peer is entity connected to wormhole network, that cen exchange messages with other entities
+// Peer is entity connected to wormhole network, that can exchange messages with other entities
 type Peer interface {
 	Name() string
 	Send(messages.Message) error
-	Receive() (chan messages.Message, error)
+	Frames() chan messages.Message
 	AppEvents() chan AppEvent
-	Close() error
 }
 
 // App is a definition of application exposed by given peer

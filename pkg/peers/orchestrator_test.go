@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func generateLocalConnectionAndRemoteTransport() (*PeerConnection, *MockTransport) {
+func generateLocalConnectionAndRemoteTransport() (*DefaultPeer, *MockTransport) {
 	remoteTransport, ochestratorTransport := CreateMockTransportPair()
 	remoteTransport.Send(messages.NewIntroduction("test-remote-machine"))
-	connection, connnectionErr := NewPeerConnection("test-local-machine", ochestratorTransport)
+	connection, connnectionErr := NewDefaultPeer("test-local-machine", ochestratorTransport)
 	if connnectionErr != nil {
 		logrus.Fatal(connnectionErr)
 	}
@@ -28,7 +28,7 @@ func TestNewPeerConnectionIntroductionWorksCorrectly(t *testing.T) {
 func TestNewPeerConnectionErrorIsThrownWhenMessageOtherThanIntroductionIsReceived(t *testing.T) {
 	remoteTransport, ochestratorTransport := CreateMockTransportPair()
 	remoteTransport.Send(messages.NewPing())
-	_, connnectionErr := NewPeerConnection("test-local-machine", ochestratorTransport)
+	_, connnectionErr := NewDefaultPeer("test-local-machine", ochestratorTransport)
 
 	assert.NotNil(t, connnectionErr)
 }

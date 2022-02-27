@@ -21,11 +21,7 @@ func (l *Server) Start() error {
 		return fmt.Errorf("Failed to start Peer factory %w", peerErr)
 	}
 	for peer := range peersChan {
-		msgs, receiveErr := peer.Receive()
-		if receiveErr != nil {
-			return receiveErr
-		}
-		messageRouter := router.NewMessageRouter(msgs)
+		messageRouter := router.NewMessageRouter(peer.Frames())
 		go func(peer peers.Peer) {
 			for appEvent := range peer.AppEvents() {
 				if appEvent.Type == peers.EventAppAdded {
