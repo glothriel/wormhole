@@ -29,5 +29,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/glothriel/wormhole:latest
+          tags:
+            ghcr.io/glothriel/wormhole:${GITHUB_REF#refs/tags/}
