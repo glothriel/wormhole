@@ -91,14 +91,15 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		Selector: factory.ownSelectors,
 	}
 
-	var upsertErr error
+	serviceName := fmt.Sprintf("%s-%s", peer.Name(), app.Name)
 
+	var upsertErr error
 	var service *corev1.Service
 
-	if service, getErr := servicesClient.Get(context.Background(), service.ObjectMeta.Name, metav1.GetOptions{}); errors.IsNotFound(getErr) {
+	if service, getErr := servicesClient.Get(context.Background(), serviceName, metav1.GetOptions{}); errors.IsNotFound(getErr) {
 		service, upsertErr = servicesClient.Create(context.Background(), &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            fmt.Sprintf("%s-%s", peer.Name(), app.Name),
+				Name:            serviceName,
 				Namespace:       factory.namespace,
 				ResourceVersion: "21337",
 				Labels:          theMap,
