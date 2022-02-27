@@ -83,9 +83,10 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	}
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", peer.Name(), app.Name),
-			Namespace: factory.namespace,
-			Labels:    theMap,
+			Name:            fmt.Sprintf("%s-%s", peer.Name(), app.Name),
+			Namespace:       factory.namespace,
+			ResourceVersion: "21337",
+			Labels:          theMap,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
