@@ -73,11 +73,18 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		}
 		return nil, portErr
 	}
+	theMap := map[string]string{
+		"app":  app.Name,
+		"peer": peer.Name(),
+	}
+	for sKey, sVal := range factory.ownSelectors {
+		theMap[sKey] = sVal
+	}
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", peer.Name(), app.Name),
 			Namespace: factory.namespace,
-			Labels:    factory.ownSelectors,
+			Labels:    theMap,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
