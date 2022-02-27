@@ -80,7 +80,7 @@ type wsWriteChanRequest struct {
 }
 
 func wsParseServerAddr(serverAddr string) (string, string, error) {
-	re := regexp.MustCompile(`(wss|ws):\/\/([a-z\.0-9]*:\d*)`)
+	re := regexp.MustCompile(`(wss|ws):\/\/([a-z\.0-9\-]*:\d*)`)
 	matches := re.FindAllStringSubmatch(serverAddr, -1)
 	if len(matches) == 0 {
 		return "", "", fmt.Errorf("Invalid server address, must match %s, received %s", re.String(), serverAddr)
