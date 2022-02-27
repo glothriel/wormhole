@@ -1,7 +1,8 @@
 name: Integration
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - '*'
 
 jobs:
   test:
@@ -26,6 +27,6 @@ jobs:
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
-          context: .
+          push: true
           tags: |
             ghcr.io/glothriel/wormhole:latest
