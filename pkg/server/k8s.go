@@ -117,6 +117,8 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}
 
+	logrus.Warn(service.ObjectMeta.Name)
+
 	if upsertErr != nil {
 		if closeErr := childOpener.close(); closeErr != nil {
 			logrus.Warningf("Failed to close port opener: %v", closeErr)
