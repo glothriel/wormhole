@@ -82,7 +82,7 @@ func main() {
 						},
 						Action: func(c *cli.Context) error {
 							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
-								"localhost",
+								c.String("host"),
 								strconv.Itoa(c.Int("port")),
 							)
 							if wsTransportFactoryErr != nil {
