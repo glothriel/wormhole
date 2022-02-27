@@ -21,7 +21,7 @@ import (
 type k8sServicePortOpener struct {
 	client      clientcorev1.ServiceInterface
 	childOpener portOpener
-	service     *corev1.Service
+	serviceName string
 }
 
 func (sm *k8sServicePortOpener) connections() chan appConnection {
@@ -29,13 +29,13 @@ func (sm *k8sServicePortOpener) connections() chan appConnection {
 }
 
 func (sm *k8sServicePortOpener) listenAddr() string {
-	return fmt.Sprintf("%s:%d", sm.service.ObjectMeta.Name, 8080)
+	return fmt.Sprintf("%s:%d", sm.serviceName, 8080)
 }
 
 func (sm *k8sServicePortOpener) close() error {
 	return multierr.Combine(
 		sm.childOpener.close(),
-		sm.client.Delete(context.Background(), sm.service.ObjectMeta.Name, metav1.DeleteOptions{}),
+		sm.client.Delete(context.Background(), sm.serviceName, metav1.DeleteOptions{}),
 	)
 }
 
@@ -94,14 +94,15 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	serviceName := fmt.Sprintf("%s-%s", peer.Name(), app.Name)
 
 	var upsertErr error
-	var service *corev1.Service
 
-	if service, getErr := servicesClient.Get(context.Background(), serviceName, metav1.GetOptions{}); errors.IsNotFound(getErr) {
-		service, upsertErr = servicesClient.Create(context.Background(), &corev1.Service{
+	service, getErr := servicesClient.Get(context.Background(), serviceName, metav1.GetOptions{})
+
+	if errors.IsNotFound(getErr) {
+		_, upsertErr = servicesClient.Create(context.Background(), &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            serviceName,
 				Namespace:       factory.namespace,
-				ResourceVersion: "21337",
+				ResourceVersion: "1000",
 				Labels:          theMap,
 			},
 			Spec: theSpec,
@@ -113,18 +114,18 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 			resourceAtNum = 1000
 		}
 		service.SetResourceVersion(strconv.Itoa(resourceAtNum + 1))
-		service, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
+		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}
 
 	if upsertErr != nil {
 		if closeErr := childOpener.close(); closeErr != nil {
 			logrus.Warningf("Failed to close port opener: %v", closeErr)
 		}
-		return nil, upsertErr
+		return nil, fmt.Errorf("Unable to upert the service: %v", upsertErr)
 	}
 
 	return &k8sServicePortOpener{
-		service:     service,
+		serviceName: serviceName,
 		client:      servicesClient,
 		childOpener: childOpener,
 	}, nil
