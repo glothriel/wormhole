@@ -22,3 +22,13 @@ func WithAppName(m Message, name string) Message {
 		AppName:    name,
 	}
 }
+
+// WithBody returns a copy of a message, with its body modified
+func WithBody(m Message, bodyString string) Message {
+	return Message{
+		SessionID:  m.SessionID,
+		Type:       m.Type,
+		BodyString: bodyString,
+		AppName:    m.AppName,
+	}
+}

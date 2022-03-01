@@ -4,6 +4,8 @@ Reverse tunnels over websocket, similar to ngrok, teleport or skupper. Not produ
 
 ## Usage
 
+Really, you shouldn't use this ESPECIALLY anywhere near production.
+
 ### Client
 
 ```

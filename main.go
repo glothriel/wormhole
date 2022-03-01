@@ -57,6 +57,10 @@ func getExposedApps(c *cli.Context) []peers.App {
 	return upstreams
 }
 
+// We need some asymmetric encryption in transit anyway, this is only to be able to perform
+// some real tests between real machines and not be worried about sending plaintext
+const aesPasswordHardcodedForNow = "S3cr37e30-a9bd-4a85-9ded-e81134969703"
+
 //nolint:funlen
 func main() {
 	app := &cli.App{
@@ -79,6 +83,13 @@ func main() {
 								Name:  "port",
 								Value: 8080,
 							},
+							&cli.StringFlag{
+								Name:  "labels",
+								Value: "application=wormhole-server",
+							},
+							&cli.BoolFlag{
+								Name: "kubernetes",
+							},
 						},
 						Action: func(c *cli.Context) error {
 							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
@@ -88,8 +99,25 @@ func main() {
 							if wsTransportFactoryErr != nil {
 								return wsTransportFactoryErr
 							}
-							peerFactory := peers.NewDefaultPeerFactory("my-server", wsTransportFactory)
-							appExposer := server.NewDefaultAppExposer(ports.RandomPortAllocator{})
+
+							peerFactory := peers.NewDefaultPeerFactory(
+								"my-server",
+								peers.NewAesTransportFactory(aesPasswordHardcodedForNow, wsTransportFactory),
+							)
+							var portOpenerFactory server.PortOpenerFactory
+							portOpenerFactory = server.NewPerAppPortOpenerFactory(
+								ports.RandomPortAllocator{},
+							)
+							if c.Bool("kubernetes") {
+								portOpenerFactory = server.NewK8sServicePortOpenerFactory(
+									"default",
+									server.CSVToMap(c.String("labels")),
+									portOpenerFactory,
+								)
+							}
+							appExposer := server.NewDefaultAppExposer(
+								portOpenerFactory,
+							)
 							transportServer := server.NewServer(
 								peerFactory,
 								appExposer,
@@ -124,11 +152,13 @@ func main() {
 							}
 
 							exposedApps := getExposedApps(c)
-							peer, peerErr := peers.NewDefaultPeer(c.String("name"), transport)
+							peer, peerErr := peers.NewDefaultPeer(
+								c.String("name"),
+								peers.NewAesTransport(aesPasswordHardcodedForNow, transport),
+							)
 							if peerErr != nil {
 								return peerErr
 							}
-
 							return client.NewExposer(peer).Expose(client.NewStaticAppStateManager(exposedApps))
 						},
 					},

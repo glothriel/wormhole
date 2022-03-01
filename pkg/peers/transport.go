@@ -1,11 +1,13 @@
 package peers
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/gorilla/mux"
@@ -233,4 +235,99 @@ func NewWebsocketTransportFactory(host, port string) (TransportFactory, error) {
 	return &websocketTransportFactory{
 		transports: transportsChan,
 	}, nil
+}
+
+// aesTransport is a decorator over Transport interface, that encrypts all the messages in transit
+type aesTransport struct {
+	child    Transport
+	password string
+}
+
+// CiphertextTag prefixes all messages that have body encrypted
+const CiphertextTag = "AesCiphertext::"
+
+// Send implements Transport
+func (transport *aesTransport) Send(message messages.Message) error {
+	cipherText, encryptErr := encrypt(
+		transport.password, []byte(message.BodyString),
+	)
+	if encryptErr != nil {
+		return encryptErr
+	}
+	return transport.child.Send(
+		messages.WithBody(
+			message,
+			strings.Join([]string{CiphertextTag, base64.RawStdEncoding.EncodeToString(cipherText)}, ""),
+		),
+	)
+}
+
+// Receive implements Transport
+func (transport *aesTransport) Receive() (chan messages.Message, error) {
+	localChan := make(chan messages.Message)
+
+	childChan, childReceiveErr := transport.child.Receive()
+	if childReceiveErr != nil {
+		return nil, childReceiveErr
+	}
+	go func() {
+		for remoteMessage := range childChan {
+			encryptedBase64, base64Err := base64.RawStdEncoding.DecodeString(remoteMessage.BodyString[len(CiphertextTag):])
+			if base64Err != nil {
+				logrus.Errorf("Could not decode base64: %v", base64Err)
+			}
+
+			plainText, decryptErr := decrypt(
+				transport.password, encryptedBase64,
+			)
+			if decryptErr != nil {
+				logrus.Errorf("Could not decrypt BodyString of incomming message: %v", decryptErr)
+				// continue
+			}
+			localChan <- messages.WithBody(remoteMessage, string(plainText))
+		}
+		close(localChan)
+	}()
+	return localChan, nil
+}
+
+// Close implements Transport
+func (transport *aesTransport) Close() error {
+	return transport.child.Close()
+}
+
+// NewAesTransport creates AesTranport instances
+func NewAesTransport(password string, child Transport) Transport {
+	return &aesTransport{
+		password: password,
+		child:    child,
+	}
+}
+
+type aesTransportFactory struct {
+	password   string
+	child      TransportFactory
+	transports chan Transport
+}
+
+func (factory *aesTransportFactory) Create() (Transport, error) {
+	transport, transportErr := factory.child.Create()
+	if transportErr != nil {
+		return nil, transportErr
+	}
+	return &aesTransport{
+		password: factory.password,
+		child:    transport,
+	}, nil
+}
+
+// NewAesTransportFactory is a decorator over TransportFactory, that allows encryption in transit with AES
+func NewAesTransportFactory(password string, child TransportFactory) TransportFactory {
+	transportsChan := make(chan Transport)
+
+	return &aesTransportFactory{
+		transports: transportsChan,
+		password:   password,
+		child:      child,
+	}
 }

@@ -17,6 +17,7 @@ spec:
       labels:
         application: wormhole-server
     spec:
+      serviceAccountName: wormhole-server
       containers:
         - image: ghcr.io/glothriel/wormhole:latest
           name: wormhole
@@ -27,6 +28,7 @@ spec:
             - /usr/bin/wormhole
             - mesh
             - listen
+            - --kubernetes
           livenessProbe:
             tcpSocket:
               port: 8080
