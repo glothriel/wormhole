@@ -1,5 +1,6 @@
 import pytest
 import requests
+from retry import retry
 
 from .fixtures import launched_in_background, Client, MockServer
 
@@ -61,7 +62,12 @@ def test_peer_disappears_from_api_when_client_disconnects(
         peer.stop()
 
     # After client disconnect
-    assert len(requests.get(apps_url).json()) == 0
+
+    @retry(delay=0.1, tries=10)
+    def _ensure_this_clients_app_is_delisted():
+        assert len(requests.get(apps_url).json()) == 0
+
+    _ensure_this_clients_app_is_delisted()
 
 
 def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconnects(
@@ -71,7 +77,7 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
 
     def _app_port_is_opened(app, timeout_seconds=.1):
         try:
-            requests.get(f'http://{app["endpoint"]}', timeout=timeout_seconds)
+            requests.get(f'http://{app["endpoint"].replace("0.0.0.0", "localhost")}', timeout=timeout_seconds)
         except requests.exceptions.ConnectionError:
             return False
         return True
@@ -83,4 +89,8 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
     finally:
         peer.stop()
 
-    assert not _app_port_is_opened(the_app)
+    @retry(delay=0.1, tries=10)
+    def _ensure_app_port_is_not_opened():
+        assert not _app_port_is_opened(the_app)
+
+    _ensure_app_port_is_not_opened()

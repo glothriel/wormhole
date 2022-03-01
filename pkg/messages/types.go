@@ -2,7 +2,11 @@ package messages
 
 const typeFrame = "data"
 const typeIntroduction = "introduction"
+
+// TypeAppAdded is message type set when given app is exposed
 const TypeAppAdded = "app-added"
+
+// TypeAppWithdrawn is message type set when given app is withdrawn
 const TypeAppWithdrawn = "app-withdrawn"
 const typeDisconnect = "disconnect"
 const typePing = "ping"

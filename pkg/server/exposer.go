@@ -1,10 +1,7 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/glothriel/wormhole/pkg/peers"
-	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,16 +19,30 @@ type ExposedApp struct {
 	Peer peers.Peer
 }
 type defaultAppExposer struct {
-	registry      *exposedAppsRegistry
-	portAllocator ports.Allocator
+	registry *exposedAppsRegistry
+
+	portOpenerFactory PortOpenerFactory
+}
+
+type portOpener interface {
+	connections() chan appConnection
+	listenAddr() string
+	close() error
+}
+
+// PortOpenerFactory is a factory interface for portOpener
+type PortOpenerFactory interface {
+	Create(app peers.App, peer peers.Peer) (portOpener, error)
 }
 
 func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router messageRouter) error {
-	portOpener, portOpenerErr := newPerAppPortOpener(app.Name, exposer.portAllocator)
+	portOpener, portOpenerErr := exposer.portOpenerFactory.Create(app, peer)
 	if portOpenerErr != nil {
 		return portOpenerErr
 	}
-	app.Address = fmt.Sprintf("localhost:%d", portOpener.port)
+	app.Address = portOpener.listenAddr()
+
+	logrus.Infof("Started listening: %s", portOpener.listenAddr())
 	exposer.registry.store(peer, app, portOpener)
 	go func() {
 		for connection := range portOpener.connections() {
@@ -84,9 +95,9 @@ func (exposer *defaultAppExposer) Apps() []ExposedApp {
 }
 
 // NewDefaultAppExposer creates defaultAppExposer instances
-func NewDefaultAppExposer(portAllocator ports.Allocator) AppExposer {
+func NewDefaultAppExposer(portOpenerFactory PortOpenerFactory) AppExposer {
 	return &defaultAppExposer{
-		registry:      newExposedAppsRegistry(),
-		portAllocator: portAllocator,
+		portOpenerFactory: portOpenerFactory,
+		registry:          newExposedAppsRegistry(),
 	}
 }

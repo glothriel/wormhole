@@ -12,7 +12,7 @@ type exposedAppsRegistry struct {
 	storage sync.Map
 }
 
-func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (*perAppPortOpener, bool) {
+func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (portOpener, bool) {
 	peerMap, exists := registry.storage.Load(peer.Name())
 	if !exists {
 		return nil, false
@@ -24,7 +24,7 @@ func (registry *exposedAppsRegistry) get(peer peers.Peer, app peers.App) (*perAp
 	return val.(storedExposer).portOpener, true
 }
 
-func (registry *exposedAppsRegistry) store(peer peers.Peer, app peers.App, portOpener *perAppPortOpener) {
+func (registry *exposedAppsRegistry) store(peer peers.Peer, app peers.App, portOpener portOpener) {
 	var peerMap *sync.Map
 	peerMapInterface, exists := registry.storage.Load(peer.Name())
 	if exists {
@@ -72,7 +72,7 @@ func newExposedAppsRegistry() *exposedAppsRegistry {
 }
 
 type storedExposer struct {
-	portOpener *perAppPortOpener
+	portOpener portOpener
 	peer       peers.Peer
 	app        peers.App
 }
