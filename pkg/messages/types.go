@@ -73,10 +73,10 @@ func NewIntroduction(peerName string) Message {
 }
 
 // NewAppAdded allows adding app added messages
-func NewAppAdded(appName string) Message {
+func NewAppAdded(appName string, address string) Message {
 	return Message{
 		Type:       TypeAppAdded,
-		BodyString: appName,
+		BodyString: AppAddedEncode(appName, address),
 	}
 }
 

@@ -7,9 +7,13 @@ metadata:
     application: wormhole-server
 spec:
   ports:
-  - port: 8080
+  - name: data
+    port: 8080
     targetPort: 8080
+  - name: admin
+    port: 8081
+    targetPort: 8081
   selector:
     application: wormhole-server
   sessionAffinity: None
-  type: ClusterIP
+  type: LoadBalancer

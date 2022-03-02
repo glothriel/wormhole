@@ -97,7 +97,7 @@ func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 		select {
 		case change := <-changes:
 			if change.State == AppStateChangeAdded {
-				if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name)); sendErr != nil {
+				if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name, change.App.Address)); sendErr != nil {
 					logrus.Errorf("Could not send app added message to the peer: %v", sendErr)
 				}
 				appRegistry.register(change.App.Name, change.App.Address)

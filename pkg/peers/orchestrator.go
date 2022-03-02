@@ -67,7 +67,14 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 		if messages.IsFrame(message) {
 			o.framesChan <- message
 		} else if messages.IsAppAdded(message) || messages.IsAppWithdrawn(message) {
-			o.appsChan <- AppEvent{Type: message.Type, App: App{Name: message.BodyString}}
+			var app App
+			if messages.IsAppAdded(message) {
+				name, address := messages.AppAddedDecode(message.BodyString)
+				app = App{Name: name, Address: address}
+			} else {
+				app = App{Name: message.BodyString}
+			}
+			o.appsChan <- AppEvent{Type: message.Type, App: app}
 		} else if messages.IsDisconnect(message) {
 			break
 		}

@@ -25,7 +25,6 @@ func listAppsHander(appList appLister) http.HandlerFunc {
 			logrus.Error(marshalErr)
 			return
 		}
-		logrus.Warn(string(appsListAsBytes))
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(200)
 		rw.Write(appsListAsBytes)

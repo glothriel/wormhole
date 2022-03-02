@@ -50,8 +50,12 @@ def test_peer_disappears_from_api_when_client_disconnects(
 ):
     apps_url = f"http://localhost:{server.admin_port}/v1/apps"
 
+    @retry(delay=0.1, tries=10)
+    def _ensure_this_clients_app_is_delisted():
+        assert len(requests.get(apps_url).json()) == 0
+
     # When no client connected
-    assert len(requests.get(apps_url).json()) == 0
+    _ensure_this_clients_app_is_delisted()
 
     try:
         peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
@@ -62,11 +66,6 @@ def test_peer_disappears_from_api_when_client_disconnects(
         peer.stop()
 
     # After client disconnect
-
-    @retry(delay=0.1, tries=10)
-    def _ensure_this_clients_app_is_delisted():
-        assert len(requests.get(apps_url).json()) == 0
-
     _ensure_this_clients_app_is_delisted()
 
 
