@@ -24,11 +24,14 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+            - containerPort: 8081
           command:
             - /usr/bin/wormhole
             - mesh
             - listen
             - --kubernetes
+            - --kubernetes-namespace
+            - default
           livenessProbe:
             tcpSocket:
               port: 8080

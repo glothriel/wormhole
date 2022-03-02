@@ -90,6 +90,18 @@ func main() {
 							&cli.BoolFlag{
 								Name: "kubernetes",
 							},
+							&cli.StringFlag{
+								Name:  "kubernetes-namespace",
+								Value: "wormhole",
+							},
+							&cli.IntFlag{
+								Name:  "kubernetes-pod-port-range-min",
+								Value: 30000,
+							},
+							&cli.IntFlag{
+								Name:  "kubernetes-pod-port-range-max",
+								Value: 30499,
+							},
 						},
 						Action: func(c *cli.Context) error {
 							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
@@ -105,14 +117,20 @@ func main() {
 								peers.NewAesTransportFactory(aesPasswordHardcodedForNow, wsTransportFactory),
 							)
 							var portOpenerFactory server.PortOpenerFactory
-							portOpenerFactory = server.NewPerAppPortOpenerFactory(
-								ports.RandomPortAllocator{},
-							)
 							if c.Bool("kubernetes") {
 								portOpenerFactory = server.NewK8sServicePortOpenerFactory(
-									"default",
+									c.String("kubernetes-namespace"),
 									server.CSVToMap(c.String("labels")),
-									portOpenerFactory,
+									server.NewPerAppPortOpenerFactory(
+										ports.RandomPortFromARangeAllocator{
+											Min: c.Int("kubernetes-pod-port-range-min"),
+											Max: c.Int("kubernetes-pod-port-range-max"),
+										},
+									),
+								)
+							} else {
+								portOpenerFactory = server.NewPerAppPortOpenerFactory(
+									ports.RandomPortAllocator{},
 								)
 							}
 							appExposer := server.NewDefaultAppExposer(

@@ -65,12 +65,14 @@ func newPerAppPortOpener(name string, allocator ports.Allocator) (*perAppPortOpe
 			if portErr != nil {
 				return portErr
 			}
-			address := fmt.Sprintf("localhost:%d", freePort)
+			address := fmt.Sprintf("0.0.0.0:%d", freePort)
 			var listenErr error
 			listener, listenErr = net.Listen("tcp", address)
 			return listenErr
 		},
-		retry.Attempts(20),
+		// The ports can be "allocated" just by selecting random number from a range, so we should retry enough times
+		// to be sure, that it works
+		retry.Attempts(50),
 		retry.Delay(time.Millisecond),
 	); retryErr != nil {
 		return nil, fmt.Errorf("Could not obtain a free port and start listening: %w", retryErr)

@@ -69,6 +69,10 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	for sKey, sVal := range factory.ownSelectors {
 		labelsMap[sKey] = sVal
 	}
+	originalPort, originalPortErr := extractPortFromAddr(app.Address)
+	if portErr != nil {
+		return nil, multierr.Combine(originalPortErr, childOpener.close())
+	}
 	serviceName := fmt.Sprintf("%s-%s", peer.Name(), app.Name)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -81,12 +85,10 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port:       8080,
-					TargetPort: intstr.FromInt(port),
-				},
-			},
+			Ports: []corev1.ServicePort{{
+				Port:       int32(originalPort),
+				TargetPort: intstr.FromInt(port),
+			}},
 			Selector: factory.ownSelectors,
 		},
 	}
@@ -120,7 +122,7 @@ func NewK8sServicePortOpenerFactory(
 	childFactory PortOpenerFactory,
 ) PortOpenerFactory {
 	return &k8sServicePortOpenerFactory{
-		namespace:    "default",
+		namespace:    namespace,
 		ownSelectors: selectors,
 		childFactory: childFactory,
 	}
@@ -134,4 +136,9 @@ func CSVToMap(csv string) map[string]string {
 		theMap[parsedKVPair[0]] = strings.Join(parsedKVPair[1:], "=")
 	}
 	return theMap
+}
+
+func extractPortFromAddr(address string) (int, error) {
+	parts := strings.Split(address, ":")
+	return strconv.Atoi(parts[1])
 }
