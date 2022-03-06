@@ -17,6 +17,7 @@ spec:
       labels:
         application: wormhole-client
     spec:
+      serviceAccountName: wormhole-client
       containers:
         - image: ghcr.io/glothriel/wormhole:latest
           name: wormhole
@@ -27,8 +28,7 @@ spec:
             - join
             - --name
             - mysterious-peer
-            - --expose
-            - name=mock-client,address=wormhole-mocks:8080
+            - --kubernetes
             - --server
             - ws://wormhole-server:8080
 

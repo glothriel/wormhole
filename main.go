@@ -5,15 +5,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/glothriel/wormhole/pkg/admin"
 	"github.com/glothriel/wormhole/pkg/client"
+	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/glothriel/wormhole/pkg/server"
 	"github.com/glothriel/wormhole/pkg/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func getExposedApps(c *cli.Context) []peers.App {
@@ -55,6 +59,25 @@ func getExposedApps(c *cli.Context) []peers.App {
 		)
 	}
 	return upstreams
+}
+
+func getAppStateManager(c *cli.Context) client.AppStateManager {
+	if c.Bool("kubernetes") {
+		config, inClusterConfigErr := rest.InClusterConfig()
+		if inClusterConfigErr != nil {
+			logrus.Fatal(inClusterConfigErr)
+		}
+		clientset, clientSetErr := kubernetes.NewForConfig(config)
+		if clientSetErr != nil {
+			logrus.Fatal(clientSetErr)
+		}
+		servicesClient := clientset.CoreV1().Services("")
+		return svcdetector.NewK8sAppStateManager(
+			svcdetector.NewDefaultServiceRepository(servicesClient),
+			time.Second*30,
+		)
+	}
+	return client.NewStaticAppStateManager(getExposedApps(c))
 }
 
 // We need some asymmetric encryption in transit anyway, this is only to be able to perform
@@ -158,6 +181,9 @@ func main() {
 							&cli.StringSliceFlag{
 								Name: "expose",
 							},
+							&cli.BoolFlag{
+								Name: "kubernetes",
+							},
 							&cli.StringFlag{
 								Name:  "name",
 								Value: "default",
@@ -168,8 +194,6 @@ func main() {
 							if transportErr != nil {
 								return transportErr
 							}
-
-							exposedApps := getExposedApps(c)
 							peer, peerErr := peers.NewDefaultPeer(
 								c.String("name"),
 								peers.NewAesTransport(aesPasswordHardcodedForNow, transport),
@@ -177,7 +201,7 @@ func main() {
 							if peerErr != nil {
 								return peerErr
 							}
-							return client.NewExposer(peer).Expose(client.NewStaticAppStateManager(exposedApps))
+							return client.NewExposer(peer).Expose(getAppStateManager(c))
 						},
 					},
 				},
