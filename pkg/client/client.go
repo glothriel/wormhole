@@ -6,44 +6,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type staticAppStateManager struct {
-	Apps []peers.App
-}
-
-func (manager staticAppStateManager) Changes() chan AppStateChange {
-	theChan := make(chan AppStateChange, len(manager.Apps))
-	for _, app := range manager.Apps {
-		theChan <- AppStateChange{
-			App:   app,
-			State: AppStateChangeAdded,
-		}
-	}
-	return theChan
-}
-
-// NewStaticAppStateManager creates new AppStateManager for a static list of supported apps
-func NewStaticAppStateManager(apps []peers.App) AppStateManager {
-	return &staticAppStateManager{Apps: apps}
-}
-
-// AppStateManager notifies the client about the state of exposed apps
-type AppStateManager interface {
-	Changes() chan AppStateChange
-}
-
-const (
-	// AppStateChangeAdded is emmited when new app is exposed
-	AppStateChangeAdded = "added"
-	// AppStateChangeWithdrawn is emmited when app is withdrawn
-	AppStateChangeWithdrawn = "withdrawn"
-)
-
-// AppStateChange is emmited when app state changes
-type AppStateChange struct {
-	App   peers.App
-	State string
-}
-
 // Exposer exposes given apps via the peer
 type Exposer struct {
 	Peer peers.Peer
@@ -91,9 +53,8 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 	appManager AppStateManager, appRegistry *appAddressRegistry, peerDisconnected chan bool,
 ) {
-	keepLooping := true
 	changes := appManager.Changes()
-	for keepLooping {
+	for {
 		select {
 		case change := <-changes:
 			if change.State == AppStateChangeAdded {
@@ -110,7 +71,7 @@ func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 				logrus.Errorf("Unknown app state change: %s", change.State)
 			}
 		case <-peerDisconnected:
-			keepLooping = false
+			return
 		}
 	}
 }
