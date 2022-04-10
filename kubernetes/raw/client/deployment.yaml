@@ -27,8 +27,8 @@ spec:
             - mesh
             - join
             - --name
-            - mysterious-peer
+            - tagi
             - --kubernetes
             - --server
-            - ws://wormhole-server:8080
+            - ws://20.52.208.163:8080
 

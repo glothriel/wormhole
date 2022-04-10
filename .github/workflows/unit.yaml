@@ -18,7 +18,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.43.0
-          args: --exclude-use-default=false
+          args: --exclude-use-default=false --timeout=300s
 
 
   test:

@@ -37,26 +37,21 @@ type appConnectionHandler struct {
 }
 
 func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) {
-	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
 	for message := range router.Get(handler.appConnection.sessionID()) {
-		logger.Infof("Message came from peer")
 		if messages.IsFrame(message) {
 			if writeErr := handler.appConnection.write(message); writeErr != nil {
 				logrus.Fatal(writeErr)
 			}
-			logger.Infof("Message sent to session")
 		}
 	}
 }
 
 func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRouter) {
 	defer router.Done(handler.appConnection.sessionID())
-	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
 	for {
 		downstreamMsg, receiveErr := handler.appConnection.receive()
 		if receiveErr != nil {
 			if errors.Is(receiveErr, io.EOF) {
-				logger.Debug("Session connection terminated")
 				return
 			}
 			logrus.Error(receiveErr)

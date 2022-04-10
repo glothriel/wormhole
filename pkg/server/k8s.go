@@ -33,7 +33,7 @@ func (sm *k8sServicePortOpener) listenAddr() string {
 }
 
 func (sm *k8sServicePortOpener) close() error {
-	logrus.Infof("Deleting service %s", sm.serviceName)
+	logrus.Debugf("Deleting service %s", sm.serviceName)
 	return multierr.Combine(
 		sm.childOpener.close(),
 		sm.client.Delete(context.Background(), sm.serviceName, metav1.DeleteOptions{}),
@@ -95,12 +95,12 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	var upsertErr error
 	previousService, getErr := servicesClient.Get(context.Background(), serviceName, metav1.GetOptions{})
 	if errors.IsNotFound(getErr) {
-		logrus.Infof("Creating service %s", serviceName)
+		logrus.Debugf("Creating service %s", serviceName)
 		_, upsertErr = servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
 	} else if getErr != nil {
 		return nil, multierr.Combine(fmt.Errorf("Could not get service %s: %v", serviceName, getErr), childOpener.close())
 	} else {
-		logrus.Infof("Updating service %s", serviceName)
+		logrus.Debugf("Updating service %s", serviceName)
 		service.SetResourceVersion(previousService.GetResourceVersion())
 		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}

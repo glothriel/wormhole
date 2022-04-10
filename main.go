@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/admin"
+	"github.com/glothriel/wormhole/pkg/auth"
 	"github.com/glothriel/wormhole/pkg/client"
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
@@ -137,7 +139,7 @@ func main() {
 
 							peerFactory := peers.NewDefaultPeerFactory(
 								"my-server",
-								peers.NewAesTransportFactory(aesPasswordHardcodedForNow, wsTransportFactory),
+								auth.NewRSAAuthorizedTransportFactory(wsTransportFactory),
 							)
 							var portOpenerFactory server.PortOpenerFactory
 							if c.Bool("kubernetes") {
@@ -194,9 +196,17 @@ func main() {
 							if transportErr != nil {
 								return transportErr
 							}
+							keyPairProvider, keyPairProviderErr := auth.NewStoredInFilesKeypairProvider("/tmp")
+							if keyPairProviderErr != nil {
+								return fmt.Errorf("Failed to initialize key pair provider: %w", keyPairProviderErr)
+							}
+							rsaTransport, rsaTransportErr := auth.NewRSAAuthorizedTransport(transport, keyPairProvider)
+							if rsaTransportErr != nil {
+								return rsaTransportErr
+							}
 							peer, peerErr := peers.NewDefaultPeer(
 								c.String("name"),
-								peers.NewAesTransport(aesPasswordHardcodedForNow, transport),
+								rsaTransport,
 							)
 							if peerErr != nil {
 								return peerErr

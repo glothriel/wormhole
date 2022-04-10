@@ -32,3 +32,4 @@ linters:
     - whitespace
     - goconst
     - unconvert
+    - gosec

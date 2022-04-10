@@ -58,11 +58,13 @@ func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 		select {
 		case change := <-changes:
 			if change.State == AppStateChangeAdded {
+				logrus.Infof("New app added: %s on %s", change.App.Name, change.App.Address)
 				if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name, change.App.Address)); sendErr != nil {
 					logrus.Errorf("Could not send app added message to the peer: %v", sendErr)
 				}
 				appRegistry.register(change.App.Name, change.App.Address)
 			} else if change.State == AppStateChangeWithdrawn {
+				logrus.Infof("App withdrawn: %s", change.App.Name)
 				if sendErr := e.Peer.Send(messages.NewAppWithdrawn(change.App.Name)); sendErr != nil {
 					logrus.Errorf("Could not send app withdrawn message to the peer: %v", sendErr)
 				}
