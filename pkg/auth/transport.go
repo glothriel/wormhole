@@ -11,7 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type KeyPairProvider interface {
+// KeypairProvider allows retrieving key pairs for transport messages encryption
+type KeypairProvider interface {
 	Public() (*rsa.PublicKey, error)
 	Private() (*rsa.PrivateKey, error)
 }
@@ -86,7 +87,7 @@ func (transport *rsaAuthorizedTransport) Close() error {
 }
 
 // NewRSAAuthorizedTransport creates AesTranport instances
-func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeyPairProvider) (peers.Transport, error) {
+func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeypairProvider) (peers.Transport, error) {
 	publicKey, publicKeyErr := keyProvider.Public()
 	if publicKeyErr != nil {
 		return nil, fmt.Errorf("Failed to fetch public key: %w", publicKeyErr)
@@ -95,12 +96,14 @@ func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeyPairProvide
 	if encodeErr != nil {
 		return nil, fmt.Errorf("Failed encoding public key to PEM: %w", encodeErr)
 	}
-	child.Send(
+	if sendErr := child.Send(
 		messages.Message{
 			Type:       "RSA-PING",
 			BodyString: base64.StdEncoding.EncodeToString(encodedPublicKey),
 		},
-	)
+	); sendErr != nil {
+		return nil, sendErr
+	}
 	msgs, receiveErr := child.Receive()
 	if receiveErr != nil {
 		return nil, fmt.Errorf("Failed to receive the messages from child peer: %w", receiveErr)
@@ -174,18 +177,22 @@ func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) 
 	if publicKeyErr != nil {
 		return nil, fmt.Errorf("Could not extract a valid public key from RSA-PING message: %w", publicKeyErr)
 	}
-	aesKey := generateAESKey()
-	logrus.Warn(aesKey)
+	aesKey, aesErr := generateAESKey()
+	if aesErr != nil {
+		return nil, aesErr
+	}
 	encryptedMessage, encryptErr := EncryptWithPublicKey(aesKey, publicKey)
 	if encryptErr != nil {
 		return nil, fmt.Errorf("Failed to encrypt AES key with remote public key: %w", encryptErr)
 	}
-	transport.Send(
+	if sendErr := transport.Send(
 		messages.Message{
 			Type:       "RSA-PONG",
 			BodyString: base64.StdEncoding.EncodeToString(encryptedMessage),
 		},
-	)
+	); sendErr != nil {
+		return nil, sendErr
+	}
 
 	return &rsaAuthorizedTransport{
 		password:         aesKey,

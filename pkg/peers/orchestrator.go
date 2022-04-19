@@ -47,13 +47,19 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 		failedChan <- receiveErr
 		return
 	}
-	o.transport.Send(messages.NewIntroduction(localName))
+
+	if sendErr := o.transport.Send(messages.NewIntroduction(localName)); sendErr != nil {
+		failedChan <- sendErr
+		return
+	}
 
 	logrus.Debug("A new peer detected, waiting for introduction")
 	introductionMessage := <-messagesChan
 
 	if !messages.IsIntroduction(introductionMessage) {
-		o.transport.Close()
+		if closeErr := o.transport.Close(); closeErr != nil {
+			logrus.Warnf("Failed to close the transport: %s", closeErr)
+		}
 		logrus.Error(introductionMessage)
 		failedChan <- fmt.Errorf(
 			"New peer connected, but no introduction message received, closing remote connection: %v", introductionMessage,

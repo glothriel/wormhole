@@ -7,6 +7,7 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,7 +51,11 @@ func TestServer_Start(t *testing.T) {
 		peerFactory: peers.NewMockPeerFactory(incomingPeers),
 		appExposer:  appExposer,
 	}
-	go theServer.Start()
+	go func() {
+		if startErr := theServer.Start(); startErr != nil {
+			logrus.Fatal(startErr)
+		}
+	}()
 	go func() { incomingPeers <- firstPeer }()
 
 	firstPeer.AppEventsPeer <- peers.AppEvent{

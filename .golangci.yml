@@ -13,12 +13,13 @@ linters-settings:
 
 
 linters:
-  disable-all: true
+  # disable-all: true
   enable:
     - revive
     - ifshort
     - staticcheck
     - depguard
+    - gosec
     - dogsled
     - godox
     - megacheck
@@ -31,5 +32,12 @@ linters:
     - dupl
     - whitespace
     - goconst
+    - unparam
+    - nilerr
+    - noctx
     - unconvert
-    - gosec
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false

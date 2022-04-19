@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"fmt"
 	"io"
 
 	"github.com/sirupsen/logrus"
@@ -45,13 +46,13 @@ func decrypt(key []byte, data []byte) ([]byte, error) {
 	}
 	return plaintext, nil
 }
-func generateAESKey() []byte {
+
+func generateAESKey() ([]byte, error) {
 	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	if err != nil {
-		logrus.Fatal("Could not generate key")
+	if _, readErr := rand.Read(key); readErr != nil {
+		return key, fmt.Errorf("Unable to generate AES key: %w", readErr)
 	}
-	return key
+	return key, nil
 }
 
 func ensureHas32Bytes(key []byte) []byte {

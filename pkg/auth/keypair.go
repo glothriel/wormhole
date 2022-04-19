@@ -13,7 +13,7 @@ import (
 )
 
 func isFile(path string) bool {
-	if _, err := os.Stat("/tmp/public.pem"); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return true
 	}
 	return false
@@ -39,11 +39,13 @@ func (keypairProvier storedInFilesKeypairProvider) Public() (*rsa.PublicKey, err
 	return &privateKey.PublicKey, nil
 }
 
-func NewStoredInFilesKeypairProvider(directoryPath string) (KeyPairProvider, error) {
+// NewStoredInFilesKeypairProvider uses private key from given directory or creates fresh one
+// if none exists, then uses it as KeypairProvider.
+func NewStoredInFilesKeypairProvider(directoryPath string) (KeypairProvider, error) {
 	privateKeyPath := path.Join(directoryPath, "private.pem")
 	if !isFile(privateKeyPath) {
 		logrus.Infof("Generating new RSA key, will be stored in %s", privateKeyPath)
-		generateErr := GenerateRSAAndSaveAsPem(privateKeyPath)
+		generateErr := generateRSAAndSaveAsPem(privateKeyPath)
 		if generateErr != nil {
 			return nil, generateErr
 		}
@@ -53,13 +55,13 @@ func NewStoredInFilesKeypairProvider(directoryPath string) (KeyPairProvider, err
 	}, nil
 }
 
-func GenerateRSAAndSaveAsPem(privKey string) error {
+func generateRSAAndSaveAsPem(privKey string) error {
 	privatekey, generateKeyErr := rsa.GenerateKey(rand.Reader, 2048)
 	if generateKeyErr != nil {
 		return fmt.Errorf("Failed to generate RSA private key: %w", generateKeyErr)
 	}
 
-	privateWriteErr := ioutil.WriteFile(privKey, PrivateKeyToBytes(privatekey), 0x600)
+	privateWriteErr := ioutil.WriteFile(privKey, PrivateKeyToBytes(privatekey), 0600)
 	if privateWriteErr != nil {
 		return fmt.Errorf("Failed to save RSA private key: %w", privateWriteErr)
 	}

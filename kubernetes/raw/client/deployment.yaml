@@ -30,5 +30,5 @@ spec:
             - tagi
             - --kubernetes
             - --server
-            - ws://20.52.208.163:8080
+            - ws://wormhole-server:8080
 

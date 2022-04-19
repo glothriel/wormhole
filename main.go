@@ -82,10 +82,6 @@ func getAppStateManager(c *cli.Context) client.AppStateManager {
 	return client.NewStaticAppStateManager(getExposedApps(c))
 }
 
-// We need some asymmetric encryption in transit anyway, this is only to be able to perform
-// some real tests between real machines and not be worried about sending plaintext
-const aesPasswordHardcodedForNow = "S3cr37e30-a9bd-4a85-9ded-e81134969703"
-
 //nolint:funlen
 func main() {
 	app := &cli.App{
@@ -169,7 +165,11 @@ func main() {
 								":8081",
 								server.NewServerAppsListAdapter(appExposer),
 							)
-							go adminServer.Listen()
+							go func() {
+								if listenErr := adminServer.Listen(); listenErr != nil {
+									logrus.Fatal(listenErr)
+								}
+							}()
 							return transportServer.Start()
 						},
 					},

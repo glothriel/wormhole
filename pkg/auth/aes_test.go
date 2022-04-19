@@ -9,7 +9,8 @@ import (
 func TestAesHelpers(t *testing.T) {
 	// given
 	originalPlaintext := "Hej, hej, hej! Sokoły! Omijajcie góry, lasy, doły!"
-	theKey := generateAESKey()
+	theKey, generateErr := generateAESKey()
+	assert.Nil(t, generateErr)
 
 	// when
 	ciphertext, encryptErr := encrypt(theKey, []byte(originalPlaintext))

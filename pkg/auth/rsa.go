@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"log"
 
 	"github.com/sirupsen/logrus"
 )
@@ -51,16 +50,8 @@ func PublicKeyToBytes(pub *rsa.PublicKey) ([]byte, error) {
 // BytesToPrivateKey bytes to private key
 func BytesToPrivateKey(priv []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(priv)
-	enc := x509.IsEncryptedPEMBlock(block)
 	b := block.Bytes
 	var err error
-	if enc {
-		log.Println("is encrypted pem block")
-		b, err = x509.DecryptPEMBlock(block, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
 	key, err := x509.ParsePKCS1PrivateKey(b)
 	if err != nil {
 		return nil, err
@@ -71,16 +62,8 @@ func BytesToPrivateKey(priv []byte) (*rsa.PrivateKey, error) {
 // BytesToPublicKey bytes to public key
 func BytesToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
-	enc := x509.IsEncryptedPEMBlock(block)
 	b := block.Bytes
 	var err error
-	if enc {
-		log.Println("is encrypted pem block")
-		b, err = x509.DecryptPEMBlock(block, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
 	ifc, err := x509.ParsePKIXPublicKey(b)
 	if err != nil {
 		return nil, err

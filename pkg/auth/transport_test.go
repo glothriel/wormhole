@@ -37,14 +37,14 @@ func TestMessagesArePassedTransparentlyToThePeers(t *testing.T) {
 	clientTransport := <-clientTransportReady
 
 	// when
-	serverTransport.Send(messages.NewFrame(
+	assert.Nil(t, serverTransport.Send(messages.NewFrame(
 		"unknown",
 		[]byte("Cześć!"),
-	))
-	clientTransport.Send(messages.NewFrame(
+	)))
+	assert.Nil(t, clientTransport.Send(messages.NewFrame(
 		"unknown",
 		[]byte("No hej!"),
-	))
+	)))
 	clientReceivedMessages, _ := clientTransport.Receive()
 	serverReceivedMessages, _ := serverTransport.Receive()
 

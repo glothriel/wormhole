@@ -130,7 +130,9 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 				if !websocket.IsUnexpectedCloseError(readMessageErr) {
 					logrus.Error(readMessageErr)
 				}
-				transport.Close()
+				if closeErr := transport.Close(); closeErr != nil {
+					logrus.Warnf("Failed to close transport: %s", closeErr)
+				}
 				return
 			}
 			logrus.Debugf("Received message: %s", string(msg))

@@ -124,13 +124,12 @@ func (registry *appConnectionsRegistry) get(
 	return session.(*appConnection), nil
 }
 
-func (registry *appConnectionsRegistry) delete(sessionID string) error {
+func (registry *appConnectionsRegistry) delete(sessionID string) {
 	session, found := registry.upstreamConnections.Load(sessionID)
 	if found {
 		session.(*appConnection).terminate()
 		registry.upstreamConnections.Delete(sessionID)
 	}
-	return nil
 }
 
 func newAppConnectionRegistry(addresses *appAddressRegistry) *appConnectionsRegistry {
