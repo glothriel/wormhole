@@ -14,9 +14,9 @@ import (
 
 func isFile(path string) bool {
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return true
+		return false
 	}
-	return false
+	return true
 }
 
 type storedInFilesKeypairProvider struct {

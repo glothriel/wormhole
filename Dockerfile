@@ -1,4 +1,4 @@
-FROM golang:1.17.7-alpine as builder
+FROM golang:1.18-alpine as builder
 RUN mkdir /app 
 WORKDIR /app 
 ADD go.mod /app/
@@ -8,7 +8,7 @@ RUN go build -o /usr/bin/wormhole main.go
 RUN chmod +x /usr/bin/wormhole
 
 
-FROM alpine:3.15.0 as runner
+FROM alpine:latest as runner
 RUN apk add tzdata
 RUN adduser wormhole --uid 1000 --disabled-password
 USER wormhole

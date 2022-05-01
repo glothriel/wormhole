@@ -18,10 +18,13 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
     executable, server, mock_server
 ):
     with launched_in_background(MockServer(executable, response="Bla!", port=4321)) as second_mock_server:
-        with launched_in_background(Client(executable, exposes=[f"localhost:{mock_server.port}"])):
+        with launched_in_background(
+                Client(executable, exposes=[f"localhost:{mock_server.port}"], metrics_port=8091)
+            ):
             with launched_in_background(Client(
                 executable,
                 exposes=[("app-from-client-two", f"localhost:{second_mock_server.port}")],
+                metrics_port=8092
             )):
 
                 api_response = requests.get(

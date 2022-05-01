@@ -42,7 +42,7 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 	}
 	app.Address = portOpener.listenAddr()
 
-	logrus.Infof("Started listening: %s", portOpener.listenAddr())
+	logrus.Infof("App `%s`.`%s`: listening on %s", peer.Name(), app.Name, portOpener.listenAddr())
 	exposer.registry.store(peer, app, portOpener)
 	go func() {
 		for connection := range portOpener.connections() {

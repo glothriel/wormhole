@@ -105,7 +105,7 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}
 	if upsertErr != nil {
-		return nil, multierr.Combine(fmt.Errorf("Unable to upert the service: %v", upsertErr), childOpener.close())
+		return nil, multierr.Combine(fmt.Errorf("Unable to upsert the service: %v", upsertErr), childOpener.close())
 	}
 	return &k8sServicePortOpener{
 		serviceName: serviceName,

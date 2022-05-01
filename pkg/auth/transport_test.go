@@ -32,7 +32,7 @@ func TestMessagesArePassedTransparentlyToThePeers(t *testing.T) {
 		}
 		returnChan <- clientTransport
 	}(clientTransportReady)
-	serverFactory := NewRSAAuthorizedTransportFactory(&mockTransportFactory{createdTransport: serverMock})
+	serverFactory := NewRSAAuthorizedTransportFactory(&mockTransportFactory{createdTransport: serverMock}, DummyAcceptor{})
 	serverTransport, _ := serverFactory.Create()
 	clientTransport := <-clientTransportReady
 

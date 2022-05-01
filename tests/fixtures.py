@@ -3,8 +3,9 @@ import os
 import signal
 import subprocess
 import uuid
-
 import socket
+
+import requests
 from retry import retry
 
 
@@ -17,14 +18,22 @@ def is_port_opened(port):
 
 
 class Server:
-    def __init__(self, executable):
+    def __init__(self, executable, metrics_port=8090):
         self.executable = executable
         self.process = None
         self.admin_port = 8081
+        self.metrics_port = metrics_port
 
     def start(self):
         self.process = subprocess.Popen(
-            [self.executable, "--debug", "mesh", "listen"],
+            [
+                self.executable, 
+                "--debug", 
+                "--metrics",
+                "--metrics-port", str(self.metrics_port),
+                "mesh", 
+                "listen"
+            ],
             shell=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -47,13 +56,21 @@ class Server:
 
 
 class Client:
-    def __init__(self, executable, exposes):
+    def __init__(self, executable, exposes, metrics_port=8091):
         self.executable = executable
         self.exposes = exposes
+        self.metrics_port = metrics_port
         self.process = None
 
     def start(self):
-        command = [self.executable, "mesh", "join", "--name", uuid.uuid4().hex]
+        command = [
+            self.executable, 
+            "--metrics",
+            "--metrics-port", str(self.metrics_port),
+            "mesh", 
+            "join", 
+            "--name", uuid.uuid4().hex
+        ]
         for expose in self.exposes:
             if type(expose) == str:
                 command += ["--expose", expose]
@@ -122,3 +139,13 @@ def launched_in_background(process):
         yield process
     finally:
         process.stop()
+
+
+def get_number_of_running_goroutines(port=8090):
+    return int(
+        [
+            l for l in requests.get(
+                f'http://localhost:{port}/metrics'
+            ).text.split('\n') if l.strip().startswith('go_goroutines')
+        ][0].split(' ')[1]
+    )

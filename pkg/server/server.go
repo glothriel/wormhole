@@ -23,6 +23,7 @@ func (l *Server) Start() error {
 	for peer := range peersChan {
 		messageRouter := router.NewMessageRouter(peer.Frames())
 		go func(peer peers.Peer) {
+			logrus.Infof("Peer `%s` connected", peer.Name())
 			for appEvent := range peer.AppEvents() {
 				if appEvent.Type == peers.EventAppAdded {
 					if registerErr := l.appExposer.Expose(peer, appEvent.App, messageRouter); registerErr != nil {
@@ -37,7 +38,9 @@ func (l *Server) Start() error {
 				}
 			}
 			if terminateErr := l.appExposer.Terminate(peer); terminateErr != nil {
-				logrus.Warnf("could not terminate peer gracefully: %v", terminateErr)
+				logrus.Warnf("could not terminate peer `%s` gracefully: %v", peer.Name(), terminateErr)
+			} else {
+				logrus.Infof("Peer `%s` disconnected", peer.Name())
 			}
 		}(peer)
 	}

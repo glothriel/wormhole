@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rsa"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,7 +36,6 @@ func (transport *rsaAuthorizedTransport) Send(message messages.Message) error {
 	if encryptErr != nil {
 		return encryptErr
 	}
-	logrus.Warn(transport.password)
 	return transport.child.Send(
 		messages.WithBody(
 			message,
@@ -67,9 +67,6 @@ func (transport *rsaAuthorizedTransport) Receive() (chan messages.Message, error
 			plainText, decryptErr := decrypt(
 				transport.password, encryptedBase64,
 			)
-			// logrus.Warn(encryptedBase64)
-			logrus.Warn("Decrypting with")
-			logrus.Warn(transport.password)
 			if decryptErr != nil {
 				logrus.Errorf("Could not decrypt BodyString of incoming message: %v", decryptErr)
 				continue
@@ -133,8 +130,6 @@ func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeypairProvide
 			"Could not decrypt the AES key received from remote peer: %w", aesKeyErr,
 		)
 	}
-	logrus.Warn("New aes key")
-	logrus.Warn(aesKey)
 	return &rsaAuthorizedTransport{
 		child:            child,
 		childReceiveChan: msgs,
@@ -142,9 +137,15 @@ func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeypairProvide
 	}, nil
 }
 
+// Acceptor lets rsaAuthorizedTransportFactory decide if the key is trusted or not
+type Acceptor interface {
+	IsTrusted(*rsa.PublicKey) (bool, error)
+}
+
 type rsaAuthorizedTransportFactory struct {
 	child      peers.TransportFactory
 	transports chan peers.Transport
+	acceptor   Acceptor
 }
 
 func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) {
@@ -162,7 +163,7 @@ func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) 
 
 	if pingMessage.Type != "RSA-PING" {
 		return nil, fmt.Errorf(
-			"RSAAuthorizedTransport expects first message coming from client transport to be %s, got %s",
+			"RSAAuthorizedTransport expects first message coming from client transport to be `%s`, got `%s`",
 			"RSA-PING",
 			pingMessage.Type,
 		)
@@ -176,6 +177,13 @@ func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) 
 	publicKey, publicKeyErr := BytesToPublicKey(decoded)
 	if publicKeyErr != nil {
 		return nil, fmt.Errorf("Could not extract a valid public key from RSA-PING message: %w", publicKeyErr)
+	}
+	isPublicKeyTrusted, isTrustedErr := factory.acceptor.IsTrusted(publicKey)
+	if isTrustedErr != nil {
+		return nil, isTrustedErr
+	}
+	if !isPublicKeyTrusted {
+		return nil, errors.New("Dropping untrusted key")
 	}
 	aesKey, aesErr := generateAESKey()
 	if aesErr != nil {
@@ -202,11 +210,12 @@ func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) 
 }
 
 // NewRSAAuthorizedTransportFactory is a decorator over TransportFactory, that allows encryption in transit with AES
-func NewRSAAuthorizedTransportFactory(child peers.TransportFactory) peers.TransportFactory {
+func NewRSAAuthorizedTransportFactory(child peers.TransportFactory, acceptor Acceptor) peers.TransportFactory {
 	transportsChan := make(chan peers.Transport)
 
 	return &rsaAuthorizedTransportFactory{
 		transports: transportsChan,
 		child:      child,
+		acceptor:   acceptor,
 	}
 }

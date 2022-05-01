@@ -68,7 +68,7 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	}
 	failedChan <- nil
 	o.remoteName = introductionMessage.BodyString
-	logrus.Infof("Peer %s connected", o.remoteName)
+
 	for message := range messagesChan {
 		if messages.IsFrame(message) {
 			o.framesChan <- message
@@ -112,23 +112,23 @@ type DefaultPeerFactory struct {
 
 // Peers implements PeerFactory
 func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
-	connections := make(chan Peer)
+	peersChan := make(chan Peer)
 	go func() {
 		for {
 			newTransport, newTransportErr := defaultPeerFactory.transportFactory.Create()
 			if newTransportErr != nil {
-				close(connections)
-				return
+				logrus.Error(fmt.Errorf("Error when creating transport: %w", newTransportErr))
+				continue
 			}
-			newConnection, newConnectionErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
-			if newConnectionErr != nil {
-				close(connections)
-				return
+			newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
+			if newPeerErr != nil {
+				logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
+				continue
 			}
-			connections <- newConnection
+			peersChan <- newPeer
 		}
 	}()
-	return connections, nil
+	return peersChan, nil
 }
 
 // NewDefaultPeerFactory creates PeerConnectionFactory instances
