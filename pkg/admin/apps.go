@@ -27,7 +27,9 @@ func listAppsHander(appList appLister) http.HandlerFunc {
 		}
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(200)
-		rw.Write(appsListAsBytes)
+		if _, writeErr := rw.Write(appsListAsBytes); writeErr != nil {
+			logrus.Error(writeErr)
+		}
 	}
 }
 

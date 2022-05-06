@@ -1,10 +1,14 @@
 package messages
 
-import "encoding/json"
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+)
 
 // SerializeBytes serializes the message for transit over the wire
 func SerializeBytes(m Message) []byte {
-	b, marshalErr := json.Marshal(m)
+	b, marshalErr := json.Marshal(WithBody(m, base64.StdEncoding.EncodeToString([]byte(m.BodyString))))
 	if marshalErr != nil {
 		panic(marshalErr)
 	}
@@ -24,7 +28,11 @@ func DeserializeMessageBytes(b []byte) (Message, error) {
 		return Message{}, unmarshalErr
 	}
 
-	return theMsg, nil
+	decoded, decodedErr := base64.StdEncoding.DecodeString(theMsg.BodyString)
+	if decodedErr != nil {
+		return theMsg, fmt.Errorf("Failed to decode message from base64: %w", decodedErr)
+	}
+	return WithBody(theMsg, string(decoded)), nil
 }
 
 // DeserializeMessageString Deserializes message from string

@@ -37,29 +37,31 @@ type appConnectionHandler struct {
 }
 
 func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) {
-	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
 	for message := range router.Get(handler.appConnection.sessionID()) {
-		logger.Infof("Message came from peer")
 		if messages.IsFrame(message) {
 			if writeErr := handler.appConnection.write(message); writeErr != nil {
 				logrus.Fatal(writeErr)
 			}
-			logger.Infof("Message sent to session")
 		}
 	}
 }
 
 func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRouter) {
 	defer router.Done(handler.appConnection.sessionID())
-	logger := logrus.WithField("session_id", handler.appConnection.sessionID).WithField("peer_id", handler.peer.Name())
 	for {
 		downstreamMsg, receiveErr := handler.appConnection.receive()
 		if receiveErr != nil {
 			if errors.Is(receiveErr, io.EOF) {
-				logger.Debug("Session connection terminated")
-				return
+				if sessionClosedErr := handler.peer.Send(
+					messages.NewSessionClosed(handler.appConnection.sessionID(), handler.app.Name),
+				); sessionClosedErr != nil {
+					logrus.Errorf(
+						"Failed to notify peer about closed session: %v", sessionClosedErr,
+					)
+				}
+			} else {
+				logrus.Error(receiveErr)
 			}
-			logrus.Error(receiveErr)
 			return
 		}
 
@@ -73,6 +75,12 @@ func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRou
 }
 
 func (handler *appConnectionHandler) Handle(router messageRouter) {
+	if sendErr := handler.peer.Send(messages.NewSessionOpened(
+		handler.appConnection.sessionID(),
+		handler.app.Name,
+	)); sendErr != nil {
+		logrus.Errorf("Could not notify the peer about new opened session")
+	}
 	go handler.handleIncomingPeerMessages(router)
 	go handler.handleIncomingAppMessages(router)
 }
@@ -89,11 +97,16 @@ func (s *tcpAppConnection) receive() (messages.Message, error) {
 	if readErr != nil {
 		return messages.Message{}, fmt.Errorf("Failed to read from TCP connection %w", readErr)
 	}
-	return messages.NewFrame(s.theSessionID, buf[:readBytes]), nil
+	msgBody := make([]byte, readBytes)
+	for i := 0; i < readBytes; i++ {
+		msgBody[i] = buf[i]
+	}
+	return messages.NewFrame(s.theSessionID, msgBody), nil
 }
 
 func (s *tcpAppConnection) write(m messages.Message) error {
-	_, writeErr := s.conn.Write(messages.Body(m))
+	theBody := messages.Body(m)
+	_, writeErr := s.conn.Write(theBody)
 	if writeErr != nil {
 		return fmt.Errorf("Failed to write to TCP connection %w", writeErr)
 	}

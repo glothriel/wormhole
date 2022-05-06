@@ -10,7 +10,9 @@ import (
 
 func generateLocalConnectionAndRemoteTransport() (*DefaultPeer, *MockTransport) {
 	remoteTransport, ochestratorTransport := CreateMockTransportPair()
-	remoteTransport.Send(messages.NewIntroduction("test-remote-machine"))
+	if sendErr := remoteTransport.Send(messages.NewIntroduction("test-remote-machine")); sendErr != nil {
+		logrus.Fatalf("Failed to send introduction message: %s", sendErr)
+	}
 	connection, connnectionErr := NewDefaultPeer("test-local-machine", ochestratorTransport)
 	if connnectionErr != nil {
 		logrus.Fatal(connnectionErr)
@@ -27,7 +29,7 @@ func TestNewPeerConnectionIntroductionWorksCorrectly(t *testing.T) {
 
 func TestNewPeerConnectionErrorIsThrownWhenMessageOtherThanIntroductionIsReceived(t *testing.T) {
 	remoteTransport, ochestratorTransport := CreateMockTransportPair()
-	remoteTransport.Send(messages.NewPing())
+	assert.Nil(t, remoteTransport.Send(messages.NewPing()))
 	_, connnectionErr := NewDefaultPeer("test-local-machine", ochestratorTransport)
 
 	assert.NotNil(t, connnectionErr)

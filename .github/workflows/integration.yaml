@@ -13,20 +13,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17.x
+      - name: Setup integration tests
+        uses: PiwikPRO/actions/go/setup/integration@master
 
-      - name: Install Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-
-      - name: Install development package
-        run: |
-          cd test && python setup.py develop
-
-      - name: Run test suite
-        run: |
-          py.test --tb=short -v
+      - name: Run integration tests
+        run: py.test -v --tb=short

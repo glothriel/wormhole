@@ -31,7 +31,7 @@ spec:
             - listen
             - --kubernetes
             - --kubernetes-namespace
-            - default
+            - wormhole
           livenessProbe:
             tcpSocket:
               port: 8080

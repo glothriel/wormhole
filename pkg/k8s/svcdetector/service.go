@@ -50,7 +50,7 @@ func (wrapper defaultServiceWrapper) ports() []corev1.ServicePort {
 	}
 	thePorts := make([]corev1.ServicePort, 0)
 	for _, rawPortID := range strings.Split(ports, ",") {
-		portAsNumber, atoiErr := strconv.Atoi(rawPortID)
+		portAsNumber, atoiErr := strconv.ParseInt(rawPortID, 10, 32)
 		if atoiErr != nil {
 			for _, portDefinition := range wrapper.k8sSvc.Spec.Ports {
 				if portDefinition.Name == rawPortID {
