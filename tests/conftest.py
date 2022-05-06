@@ -1,14 +1,12 @@
 import logging
 import os
-import subprocess
-
 import socket
+import subprocess
 import tempfile
 
 import pytest
 
-from .fixtures import Client, MockServer, Server
-
+from .fixtures import Client, MockServer, Server, MySQLServer
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +64,16 @@ def server(executable):
         yield server.start()
     finally:
         server.stop()
+
+
+@pytest.fixture()
+def mysql():
+    mysql = MySQLServer()
+    try:
+        mysql.start()
+        yield mysql
+    finally:
+        mysql.stop()
 
 
 @pytest.fixture()

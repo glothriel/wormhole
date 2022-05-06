@@ -11,6 +11,9 @@ const TypeAppWithdrawn = "app-withdrawn"
 const typeDisconnect = "disconnect"
 const typePing = "ping"
 
+const typeSessionClosed = "session-closed"
+const typeSessionOpened = "session-opened"
+
 // IsFrame checks if message contains raw packet data
 func IsFrame(m Message) bool {
 	return m.Type == typeFrame
@@ -39,6 +42,16 @@ func IsDisconnect(m Message) bool {
 // IsPing checks if message is heartbeat / ping message used to check conection liveness
 func IsPing(m Message) bool {
 	return m.Type == typePing
+}
+
+// IsSessionOpened checks if the message notifies about opened session
+func IsSessionOpened(m Message) bool {
+	return m.Type == typeSessionOpened
+}
+
+// IsSessionClosed checks if the message notifies about closed session
+func IsSessionClosed(m Message) bool {
+	return m.Type == typeSessionClosed
 }
 
 // NewFrame Allows creating new message that carries raw packet data
@@ -85,5 +98,23 @@ func NewAppWithdrawn(appName string) Message {
 	return Message{
 		Type:       TypeAppWithdrawn,
 		BodyString: appName,
+	}
+}
+
+// NewSessionOpened creates new session opened messages
+func NewSessionOpened(sessionID string, appName string) Message {
+	return Message{
+		Type:      typeSessionOpened,
+		SessionID: sessionID,
+		AppName:   appName,
+	}
+}
+
+// NewSessionClosed creates new session closed messages
+func NewSessionClosed(sessionID string, appName string) Message {
+	return Message{
+		Type:      typeSessionClosed,
+		SessionID: sessionID,
+		AppName:   appName,
 	}
 }

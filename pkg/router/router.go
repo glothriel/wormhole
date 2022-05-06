@@ -61,7 +61,9 @@ func NewMessageRouter(allMessages chan messages.Message) *MessageRouter {
 	}
 	go func(router *MessageRouter, msgs chan messages.Message) {
 		for message := range msgs {
-			router.put(message)
+			if messages.IsFrame(message) {
+				router.put(message)
+			}
 		}
 		// Once the upstream channel closes, remove all remaining sessions
 		for sessionID := range router.perSessionMailboxes {

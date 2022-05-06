@@ -31,7 +31,7 @@ metadata:
     application: wormhole-client
 subjects:
   - kind: ServiceAccount
-    namespace: default
+    namespace: wormhole
     name: wormhole-client
 roleRef:
   kind: ClusterRole

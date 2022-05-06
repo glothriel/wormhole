@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/messages"
@@ -38,6 +39,7 @@ func (e *appConnection) terminate() {
 }
 
 func newAppConnection(sessionID, address, appName string) (*appConnection, error) {
+	logrus.Debugf("Dial %s", address)
 	conn, dialErr := net.Dial("tcp", address)
 	if dialErr != nil {
 		return nil, dialErr
@@ -60,29 +62,41 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 			logger.Debug("Closing TCP connection outbox")
 		}()
 		for msg := range theConnection.outbox() {
-			_, writeErr := theConnection.connection.Write(messages.Body(msg))
+			theBody := messages.Body(msg)
+			_, writeErr := theConnection.connection.Write(theBody)
 			if writeErr != nil {
-				panic(writeErr)
+				logrus.Debugf("Failed writing message: %s", msg.Type)
 			}
 		}
 	}()
 
 	go func() {
 		defer func() {
+			if r := recover(); r != nil {
+				logger.Debugf("Recovered in %s", r)
+			}
 			logger.Debug("Closing TCP connection inbox")
 		}()
 		for {
 			buf := make([]byte, 1024*64)
 
-			i, err := theConnection.connection.Read(buf)
+			readBytes, err := theConnection.connection.Read(buf)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					theConnection.terminate()
-					return
+				} else if !strings.Contains(err.Error(), "use of closed network connection") {
+					logger.Errorf("Failed to read TCP connection: %v", err)
 				}
-				logger.Errorf("Failed to read TCP connection: %v", err)
+				return
 			}
-			theConnection.inbox() <- messages.NewFrame(theConnection.sessionID, buf[:i])
+
+			msgBody := make([]byte, readBytes)
+			// io.Copy(msgBody, buf)
+			for i := 0; i < readBytes; i++ {
+				msgBody[i] = buf[i]
+			}
+
+			theConnection.inbox() <- messages.NewFrame(theConnection.sessionID, msgBody)
 		}
 	}()
 
@@ -124,13 +138,12 @@ func (registry *appConnectionsRegistry) get(
 	return session.(*appConnection), nil
 }
 
-func (registry *appConnectionsRegistry) delete(sessionID string) error {
+func (registry *appConnectionsRegistry) delete(sessionID string) {
 	session, found := registry.upstreamConnections.Load(sessionID)
 	if found {
 		session.(*appConnection).terminate()
 		registry.upstreamConnections.Delete(sessionID)
 	}
-	return nil
 }
 
 func newAppConnectionRegistry(addresses *appAddressRegistry) *appConnectionsRegistry {

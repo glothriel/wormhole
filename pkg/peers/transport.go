@@ -30,10 +30,8 @@ type TransportFactory interface {
 // MockTransport implements Transport and can be used for unit tests
 type MockTransport struct {
 	theOtherOne *MockTransport
-
-	inbox chan messages.Message
-
-	closed bool
+	inbox       chan messages.Message
+	closed      bool
 }
 
 // Send implements Transport
@@ -60,8 +58,7 @@ func CreateMockTransportPair() (*MockTransport, *MockTransport) {
 		inbox: make(chan messages.Message, 255),
 	}
 	second := &MockTransport{
-		inbox: make(chan messages.Message, 255),
-
+		inbox:       make(chan messages.Message, 255),
 		theOtherOne: first,
 	}
 	first.theOtherOne = second
@@ -112,6 +109,7 @@ func (transport *websocketTransport) Send(message messages.Message) error {
 func (transport *websocketTransport) sendWorker() {
 	for request := range transport.writeChan {
 		theBytes := messages.SerializeBytes(request.message)
+		logrus.Debugf("Sending message: %s", string(theBytes))
 		writeErr := transport.Connection.WriteMessage(websocket.BinaryMessage, theBytes)
 		if writeErr != nil {
 			request.errChan <- fmt.Errorf("Failed writing message to websocket: %w", writeErr)
@@ -132,9 +130,12 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 				if !websocket.IsUnexpectedCloseError(readMessageErr) {
 					logrus.Error(readMessageErr)
 				}
-				transport.Close()
+				if closeErr := transport.Close(); closeErr != nil {
+					logrus.Warnf("Failed to close transport: %s", closeErr)
+				}
 				return
 			}
+			logrus.Debugf("Received message: %s", string(msg))
 			theMsg, deserializeErr := messages.DeserializeMessageBytes(msg)
 			if deserializeErr != nil {
 				logrus.Error(deserializeErr)
@@ -281,7 +282,7 @@ func (transport *aesTransport) Receive() (chan messages.Message, error) {
 				transport.password, encryptedBase64,
 			)
 			if decryptErr != nil {
-				logrus.Errorf("Could not decrypt BodyString of incomming message: %v", decryptErr)
+				logrus.Errorf("Could not decrypt BodyString of incoming message: %v", decryptErr)
 				// continue
 			}
 			localChan <- messages.WithBody(remoteMessage, string(plainText))

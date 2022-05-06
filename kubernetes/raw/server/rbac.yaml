@@ -32,7 +32,7 @@ metadata:
     application: wormhole-server
 subjects:
   - kind: ServiceAccount
-    namespace: default
+    namespace: wormhole
     name: wormhole-server
 roleRef:
   kind: Role

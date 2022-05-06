@@ -16,6 +16,9 @@ type MockPeer struct {
 
 	// MessagesToPeer are used to simulate sending messages to remote peer
 	MessagesToPeer chan messages.Message
+
+	// SessionEvents can be used to simulate, that the mock emits session changing events
+	MessagesSessionEvents chan messages.Message
 }
 
 // Send implements Peer
@@ -40,6 +43,11 @@ func (wt *MockPeer) Name() string {
 
 // Frames implements Peer
 func (wt *MockPeer) Frames() chan messages.Message {
+	return wt.MessagesFromPeer
+}
+
+// SessionEvents implements Peer
+func (wt *MockPeer) SessionEvents() chan messages.Message {
 	return wt.MessagesFromPeer
 }
 

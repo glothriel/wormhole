@@ -1,6 +1,9 @@
 package client
 
 import (
+	"time"
+
+	"github.com/avast/retry-go"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -20,29 +23,46 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 	go e.manageRegisteringAndUnregisteringOfApps(appManager, appRegistry, peerDisconnected)
 	defer func() { peerDisconnected <- true }()
 
+	go func() {
+		for theMsg := range e.Peer.SessionEvents() {
+			if messages.IsSessionClosed(theMsg) {
+				connectionRegistry.delete(theMsg.SessionID)
+			} else if messages.IsSessionOpened(theMsg) {
+				theConnection, createErr := connectionRegistry.create(
+					theMsg.SessionID,
+					theMsg.AppName,
+				)
+				if createErr != nil {
+					logrus.Errorf("Error when creating connection to app %s: %s", theMsg.AppName, createErr)
+				}
+				go e.forwardMessagesFromConnectionToPeer(theConnection)
+			}
+		}
+	}()
+
 	for theMsg := range e.Peer.Frames() {
 		if messages.IsPing(theMsg) {
 			continue
 		}
 		var theConnection *appConnection
-		theConnection, upstreamConnectionErr := connectionRegistry.get(
-			theMsg.SessionID,
-		)
-		if upstreamConnectionErr != nil {
-			var createErr error
-			theConnection, createErr = connectionRegistry.create(
+		if retryErr := retry.Do(func() error {
+			var upstreamConnectionErr error
+			theConnection, upstreamConnectionErr = connectionRegistry.get(
 				theMsg.SessionID,
-				theMsg.AppName,
 			)
-			if createErr != nil {
-				logrus.Errorf("Error when creating connection to app %s: %s", theMsg.AppName, createErr)
-			}
-			go e.forwardMessagesFromConnectionToPeer(theConnection)
+			return upstreamConnectionErr
+		}, retry.Attempts(20), retry.Delay(time.Millisecond*1)); retryErr != nil {
+			logrus.Errorf(
+				"Session ID `%s` does not have port opened - closing orchestrator", theMsg.SessionID,
+			)
+			connectionRegistry.delete(theMsg.SessionID)
+			return retryErr
 		}
+
 		if messages.IsFrame(theMsg) {
 			theConnection.outbox() <- theMsg
 		}
-		if messages.IsDisconnect(theMsg) {
+		if messages.IsSessionClosed(theMsg) {
 			connectionRegistry.delete(theMsg.SessionID)
 		}
 	}
@@ -58,11 +78,13 @@ func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 		select {
 		case change := <-changes:
 			if change.State == AppStateChangeAdded {
+				logrus.Infof("New app added: %s on %s", change.App.Name, change.App.Address)
 				if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name, change.App.Address)); sendErr != nil {
 					logrus.Errorf("Could not send app added message to the peer: %v", sendErr)
 				}
 				appRegistry.register(change.App.Name, change.App.Address)
 			} else if change.State == AppStateChangeWithdrawn {
+				logrus.Infof("App withdrawn: %s", change.App.Name)
 				if sendErr := e.Peer.Send(messages.NewAppWithdrawn(change.App.Name)); sendErr != nil {
 					logrus.Errorf("Could not send app withdrawn message to the peer: %v", sendErr)
 				}
@@ -82,9 +104,9 @@ func (e *Exposer) forwardMessagesFromConnectionToPeer(connection *appConnection)
 	}()
 	for theMsg := range connection.inbox() {
 		logrus.Debug("Received message over TCP")
-		writeErr := e.Peer.Send(messages.WithAppName(theMsg, theMsg.AppName))
+		writeErr := e.Peer.Send(messages.WithAppName(theMsg, connection.appName))
 		if writeErr != nil {
-			panic(writeErr)
+			logrus.Errorf("Could not send the message to peer: %v", writeErr)
 		}
 		logrus.Debug("Transimitted message to peer")
 	}

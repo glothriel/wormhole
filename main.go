@@ -1,19 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/admin"
+	"github.com/glothriel/wormhole/pkg/auth"
 	"github.com/glothriel/wormhole/pkg/client"
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/glothriel/wormhole/pkg/server"
 	"github.com/glothriel/wormhole/pkg/testutils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/kubernetes"
@@ -35,14 +39,14 @@ func getExposedApps(c *cli.Context) []peers.App {
 		for _, wholeDef := range splitDefinition {
 			fields := strings.Split(wholeDef, "=")
 			if len(fields) != 2 {
-				logrus.Fatalf("Invalid expose value %s: shold consist of comma-separated key=value pairs", wholeDef)
+				logrus.Fatalf("Invalid expose value %s: should consist of comma-separated key=value pairs", wholeDef)
 			}
 			if fields[0] == "name" {
 				name = fields[1]
 			} else if fields[0] == "address" {
 				address = fields[1]
 			} else {
-				logrus.Fatalf("Invalid expose value %s: could not recongnize `%s` field", wholeDef, fields[0])
+				logrus.Fatalf("Invalid expose value %s: could not recognize `%s` field", wholeDef, fields[0])
 			}
 		}
 		if name == "" || address == "" {
@@ -80,9 +84,19 @@ func getAppStateManager(c *cli.Context) client.AppStateManager {
 	return client.NewStaticAppStateManager(getExposedApps(c))
 }
 
-// We need some asymmetric encryption in transit anyway, this is only to be able to perform
-// some real tests between real machines and not be worried about sending plaintext
-const aesPasswordHardcodedForNow = "S3cr37e30-a9bd-4a85-9ded-e81134969703"
+func startPrometheusServer(c *cli.Context) {
+	if !c.Bool("metrics") {
+		return
+	}
+	metricsAddr := fmt.Sprintf("%s:%d", c.String("metrics-host"), c.Int("metrics-port"))
+	http.Handle("/metrics", promhttp.Handler())
+	logrus.Infof("Starting prometheus metrics server on %s", metricsAddr)
+	go func() {
+		if listenErr := http.ListenAndServe(metricsAddr, nil); listenErr != nil {
+			logrus.Fatalf("Failed to start prometheus metrics server: %v", listenErr)
+		}
+	}()
+}
 
 //nolint:funlen
 func main() {
@@ -127,6 +141,7 @@ func main() {
 							},
 						},
 						Action: func(c *cli.Context) error {
+							startPrometheusServer(c)
 							wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
 								c.String("host"),
 								strconv.Itoa(c.Int("port")),
@@ -137,7 +152,7 @@ func main() {
 
 							peerFactory := peers.NewDefaultPeerFactory(
 								"my-server",
-								peers.NewAesTransportFactory(aesPasswordHardcodedForNow, wsTransportFactory),
+								auth.NewRSAAuthorizedTransportFactory(wsTransportFactory, auth.DummyAcceptor{}),
 							)
 							var portOpenerFactory server.PortOpenerFactory
 							if c.Bool("kubernetes") {
@@ -167,7 +182,11 @@ func main() {
 								":8081",
 								server.NewServerAppsListAdapter(appExposer),
 							)
-							go adminServer.Listen()
+							go func() {
+								if listenErr := adminServer.Listen(); listenErr != nil {
+									logrus.Fatal(listenErr)
+								}
+							}()
 							return transportServer.Start()
 						},
 					},
@@ -190,13 +209,22 @@ func main() {
 							},
 						},
 						Action: func(c *cli.Context) error {
+							startPrometheusServer(c)
 							transport, transportErr := peers.NewWebsocketClientTransport(c.String("server"))
 							if transportErr != nil {
 								return transportErr
 							}
+							keyPairProvider, keyPairProviderErr := auth.NewStoredInFilesKeypairProvider("/tmp")
+							if keyPairProviderErr != nil {
+								return fmt.Errorf("Failed to initialize key pair provider: %w", keyPairProviderErr)
+							}
+							rsaTransport, rsaTransportErr := auth.NewRSAAuthorizedTransport(transport, keyPairProvider)
+							if rsaTransportErr != nil {
+								return rsaTransportErr
+							}
 							peer, peerErr := peers.NewDefaultPeer(
 								c.String("name"),
-								peers.NewAesTransport(aesPasswordHardcodedForNow, transport),
+								rsaTransport,
 							)
 							if peerErr != nil {
 								return peerErr
@@ -229,9 +257,23 @@ func main() {
 			&cli.BoolFlag{
 				Name:  "debug",
 				Usage: "Be more verbose when logging stuff",
-			}, &cli.BoolFlag{
+			},
+			&cli.BoolFlag{
 				Name:  "trace",
 				Usage: "Be even more verbose when logging stuff",
+			},
+			&cli.BoolFlag{
+				Name:  "metrics",
+				Usage: "Start prometheus metrics server",
+				Value: false,
+			},
+			&cli.StringFlag{
+				Name:  "metrics-host",
+				Value: "0.0.0.0",
+			},
+			&cli.IntFlag{
+				Name:  "metrics-port",
+				Value: 8090,
 			},
 		},
 

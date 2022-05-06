@@ -45,8 +45,8 @@ func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
 	if listErr != nil {
 		return []serviceWrapper{}, listErr
 	}
-	for _, svc := range k8sServices.Items {
-		services = append(services, newDefaultServiceWrapper(&svc))
+	for i := range k8sServices.Items {
+		services = append(services, newDefaultServiceWrapper(&k8sServices.Items[i]))
 	}
 	return services, nil
 }

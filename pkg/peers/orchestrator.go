@@ -11,9 +11,10 @@ import (
 type DefaultPeer struct {
 	remoteName string
 
-	transport  Transport
-	framesChan chan messages.Message
-	appsChan   chan AppEvent
+	transport    Transport
+	framesChan   chan messages.Message
+	sessionsChan chan messages.Message
+	appsChan     chan AppEvent
 }
 
 // Name implements Peer
@@ -29,6 +30,11 @@ func (o *DefaultPeer) Frames() chan messages.Message {
 // AppEvents immplements Peer
 func (o *DefaultPeer) AppEvents() chan AppEvent {
 	return o.appsChan
+}
+
+// SessionEvents immplements Peer
+func (o *DefaultPeer) SessionEvents() chan messages.Message {
+	return o.sessionsChan
 }
 
 // Send immplements Peer
@@ -47,13 +53,19 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 		failedChan <- receiveErr
 		return
 	}
-	o.transport.Send(messages.NewIntroduction(localName))
+
+	if sendErr := o.transport.Send(messages.NewIntroduction(localName)); sendErr != nil {
+		failedChan <- sendErr
+		return
+	}
 
 	logrus.Debug("A new peer detected, waiting for introduction")
 	introductionMessage := <-messagesChan
 
 	if !messages.IsIntroduction(introductionMessage) {
-		o.transport.Close()
+		if closeErr := o.transport.Close(); closeErr != nil {
+			logrus.Warnf("Failed to close the transport: %s", closeErr)
+		}
 		logrus.Error(introductionMessage)
 		failedChan <- fmt.Errorf(
 			"New peer connected, but no introduction message received, closing remote connection: %v", introductionMessage,
@@ -62,9 +74,9 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	}
 	failedChan <- nil
 	o.remoteName = introductionMessage.BodyString
-	logrus.Infof("Peer %s connected", o.remoteName)
+
 	for message := range messagesChan {
-		if messages.IsFrame(message) {
+		if messages.IsFrame(message) || messages.IsSessionClosed(message) {
 			o.framesChan <- message
 		} else if messages.IsAppAdded(message) || messages.IsAppWithdrawn(message) {
 			var app App
@@ -77,18 +89,24 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 			o.appsChan <- AppEvent{Type: message.Type, App: app}
 		} else if messages.IsDisconnect(message) {
 			break
+		} else if messages.IsSessionOpened(message) || messages.IsSessionClosed(message) {
+			o.sessionsChan <- message
+		} else {
+			logrus.Warnf("Droping message of unknown type `%s`", message.Type)
 		}
 	}
 	close(o.framesChan)
 	close(o.appsChan)
+	close(o.sessionsChan)
 }
 
 // NewDefaultPeer creates PeerConnection instances
 func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, error) {
 	theConnection := &DefaultPeer{
-		transport:  transport,
-		framesChan: make(chan messages.Message),
-		appsChan:   make(chan AppEvent),
+		transport:    transport,
+		framesChan:   make(chan messages.Message),
+		appsChan:     make(chan AppEvent),
+		sessionsChan: make(chan messages.Message),
 	}
 	orchestrationFailed := make(chan error)
 	go theConnection.startRouting(orchestrationFailed, introduceAsName)
@@ -106,23 +124,23 @@ type DefaultPeerFactory struct {
 
 // Peers implements PeerFactory
 func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
-	connections := make(chan Peer)
+	peersChan := make(chan Peer)
 	go func() {
 		for {
 			newTransport, newTransportErr := defaultPeerFactory.transportFactory.Create()
 			if newTransportErr != nil {
-				close(connections)
-				return
+				logrus.Error(fmt.Errorf("Error when creating transport: %w", newTransportErr))
+				continue
 			}
-			newConnection, newConnectionErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
-			if newConnectionErr != nil {
-				close(connections)
-				return
+			newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
+			if newPeerErr != nil {
+				logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
+				continue
 			}
-			connections <- newConnection
+			peersChan <- newPeer
 		}
 	}()
-	return connections, nil
+	return peersChan, nil
 }
 
 // NewDefaultPeerFactory creates PeerConnectionFactory instances
