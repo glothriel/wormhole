@@ -45,12 +45,12 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
             @retry(delay=0.05, tries=20)
             def _ensure_mock_app_status(exposed=True):
                 assert len(
-                    requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
+                    requests.get(server.admin('/v1/apps')).json()
                 ) == (1 if exposed else 0)
 
             _ensure_mock_app_status(exposed=True)
             # List the apps
-            apps = requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
+            apps = requests.get(server.admin('/v1/apps')).json()
             # Call the proxied app
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
         _ensure_mock_app_status(exposed=False)
@@ -94,18 +94,17 @@ def test_resource_leaks_when_passing_messages(executable, server, mock_server, o
 
         @retry(delay=0.05, tries=20)
         def _ensure_mock_app_exposed():
-            assert requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
+            assert requests.get(server.admin('/v1/apps')).json()
 
         _ensure_mock_app_exposed()
 
         # List the apps
-        apps = requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
+        apps = requests.get(server.admin('/v1/apps')).json()
 
         starting_resources = opts.counter_func(client, server)
 
         # Call the proxied app
         for i in range(50):
-            print(i)
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
 
         # Give it a second to get rid of the resources (close files, goroutines, etc)

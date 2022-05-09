@@ -2,6 +2,8 @@ package admin
 
 import (
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 // WormholeAdminServer is a separate HTTP server, that allows managing wormhole using API
@@ -15,9 +17,15 @@ func (apiServer *WormholeAdminServer) Listen() error {
 }
 
 // NewWormholeAdminServer creates WormholeAdminServer instances
-func NewWormholeAdminServer(addr string, appList appLister) *WormholeAdminServer {
-	mux := http.NewServeMux()
+func NewWormholeAdminServer(
+	addr string,
+	appList appLister,
+	gatherer *ConsentGatherer,
+) *WormholeAdminServer {
+	mux := mux.NewRouter()
 	mux.HandleFunc("/v1/apps", listAppsHander(appList))
+	mux.HandleFunc("/v1/requests", listAcceptRequests(gatherer))
+	mux.HandleFunc("/v1/requests/{fingerprint}", updateAcceptRequest(gatherer))
 	return &WormholeAdminServer{
 		server: &http.Server{
 			Addr:    addr,

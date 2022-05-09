@@ -91,7 +91,6 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 			}
 
 			msgBody := make([]byte, readBytes)
-			// io.Copy(msgBody, buf)
 			for i := 0; i < readBytes; i++ {
 				msgBody[i] = buf[i]
 			}

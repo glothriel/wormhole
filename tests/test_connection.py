@@ -5,7 +5,7 @@ from .fixtures import Client, MockServer, launched_in_background
 
 
 def test_hello_world_is_returned_via_tunnel(mock_server, client, server):
-    apps = requests.get(f"http://localhost:{server.admin_port}/v1/apps").json()
+    apps = requests.get(server.admin('/v1/apps')).json()
     assert len(apps) == 1, "One app should be registered"
     assert (
         requests.get(f'http://{apps[0]["endpoint"]}', timeout=2).text == "Hello world!"
@@ -34,7 +34,7 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
             ):
 
                 api_response = requests.get(
-                    f"http://localhost:{server.admin_port}/v1/apps"
+                    server.admin('/v1/apps')
                 ).json()
 
                 assert list(sorted([item["app"] for item in api_response])) == [
@@ -62,11 +62,9 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
 def test_peer_disappears_from_api_when_client_disconnects(
     executable, server, mock_server
 ):
-    apps_url = f"http://localhost:{server.admin_port}/v1/apps"
-
     @retry(delay=0.1, tries=10)
     def _ensure_this_clients_app_is_delisted():
-        assert len(requests.get(apps_url).json()) == 0
+        assert len(requests.get(server.admin('/v1/apps')).json()) == 0
 
     # When no client connected
     _ensure_this_clients_app_is_delisted()
@@ -75,7 +73,7 @@ def test_peer_disappears_from_api_when_client_disconnects(
         peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
 
         # One client connected
-        assert len(requests.get(apps_url).json()) == 1
+        assert len(requests.get(server.admin('/v1/apps')).json()) == 1
     finally:
         peer.stop()
 
@@ -86,8 +84,6 @@ def test_peer_disappears_from_api_when_client_disconnects(
 def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconnects(
     executable, server, mock_server
 ):
-    apps_url = f"http://localhost:{server.admin_port}/v1/apps"
-
     def _app_port_is_opened(app, timeout_seconds=0.1):
         try:
             requests.get(
@@ -100,7 +96,7 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
 
     try:
         peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
-        the_app = requests.get(apps_url).json()[0]
+        the_app = requests.get(server.admin('/v1/apps')).json()[0]
         assert _app_port_is_opened(the_app)
     finally:
         peer.stop()

@@ -24,7 +24,7 @@ type Transport interface {
 
 // TransportFactory creates Transport instances
 type TransportFactory interface {
-	Create() (Transport, error)
+	Transports() (chan Transport, error)
 }
 
 // MockTransport implements Transport and can be used for unit tests
@@ -131,7 +131,9 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 					logrus.Error(readMessageErr)
 				}
 				if closeErr := transport.Close(); closeErr != nil {
-					logrus.Warnf("Failed to close transport: %s", closeErr)
+					if !strings.Contains(closeErr.Error(), "use of closed network connection") {
+						logrus.Warnf("Failed to close transport: %s", closeErr)
+					}
 				}
 				return
 			}
@@ -149,14 +151,23 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 
 func (transport *websocketTransport) Close() error {
 	for _, readChan := range transport.readChans {
-		close(readChan)
+		forceClose(readChan)
 	}
-	close(transport.writeChan)
+	forceClose(transport.writeChan)
 	closeErr := transport.Connection.Close()
 	if closeErr != nil {
 		return fmt.Errorf("Failed closing websocket connection: %w", closeErr)
 	}
 	return nil
+}
+
+func forceClose[V chan messages.Message | chan wsWriteChanRequest](c V) {
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Debugf("Recovered in %s", r)
+		}
+	}()
+	close(c)
 }
 
 // NewWebsocketTransport creates new websocketTransport instances, that implement Transport over a websocket connection
@@ -203,8 +214,8 @@ type websocketTransportFactory struct {
 	transports chan Transport
 }
 
-func (wsTransportFactory *websocketTransportFactory) Create() (Transport, error) {
-	return <-wsTransportFactory.transports, nil
+func (wsTransportFactory *websocketTransportFactory) Transports() (chan Transport, error) {
+	return wsTransportFactory.transports, nil
 }
 
 // NewWebsocketTransportFactory allows creating peers, that are servers, waiting for clients to connect to them
@@ -311,15 +322,22 @@ type aesTransportFactory struct {
 	transports chan Transport
 }
 
-func (factory *aesTransportFactory) Create() (Transport, error) {
-	transport, transportErr := factory.child.Create()
+func (factory *aesTransportFactory) Transports() (chan Transport, error) {
+	myTransports := make(chan Transport)
+	childTransports, transportErr := factory.child.Transports()
 	if transportErr != nil {
 		return nil, transportErr
 	}
-	return &aesTransport{
-		password: factory.password,
-		child:    transport,
-	}, nil
+	go func() {
+		for childTransport := range childTransports {
+			myTransports <- &aesTransport{
+				password: factory.password,
+				child:    childTransport,
+			}
+		}
+		close(myTransports)
+	}()
+	return myTransports, nil
 }
 
 // NewAesTransportFactory is a decorator over TransportFactory, that allows encryption in transit with AES

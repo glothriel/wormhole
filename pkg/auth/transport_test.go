@@ -13,8 +13,12 @@ type mockTransportFactory struct {
 	createdTransport peers.Transport
 }
 
-func (mock *mockTransportFactory) Create() (peers.Transport, error) {
-	return mock.createdTransport, nil
+func (mock *mockTransportFactory) Transports() (chan peers.Transport, error) {
+	transports := make(chan peers.Transport)
+	go func() {
+		transports <- mock.createdTransport
+	}()
+	return transports, nil
 }
 
 func TestMessagesArePassedTransparentlyToThePeers(t *testing.T) {
@@ -33,8 +37,10 @@ func TestMessagesArePassedTransparentlyToThePeers(t *testing.T) {
 		returnChan <- clientTransport
 	}(clientTransportReady)
 	serverFactory := NewRSAAuthorizedTransportFactory(&mockTransportFactory{createdTransport: serverMock}, DummyAcceptor{})
-	serverTransport, _ := serverFactory.Create()
+	serverTransportChan, _ := serverFactory.Transports()
 	clientTransport := <-clientTransportReady
+
+	serverTransport := <-serverTransportChan
 
 	// when
 	assert.Nil(t, serverTransport.Send(messages.NewFrame(

@@ -20,11 +20,12 @@ def is_port_opened(port):
 
 
 class Server:
-    def __init__(self, executable, metrics_port=8090):
+    def __init__(self, executable, metrics_port=8090, acceptor="dummy"):
         self.executable = executable
         self.process = None
         self.admin_port = 8081
         self.metrics_port = metrics_port
+        self.acceptor = acceptor
 
     def start(self):
         self.process = subprocess.Popen(
@@ -36,6 +37,7 @@ class Server:
                 str(self.metrics_port),
                 "mesh",
                 "listen",
+                "--acceptor", self.acceptor,
             ],
             shell=False,
         )
@@ -51,6 +53,9 @@ class Server:
         return_code = self.process.poll()
         if return_code is None:
             return os.kill(self.process.pid, signal.SIGINT)
+
+    def admin(self, path):
+        return f'http://localhost:{self.admin_port}/{path if not path.startswith("/") else path[1:]}'
 
 
 class MySQLServer:
@@ -167,6 +172,9 @@ class MockServer:
         stdout, stderr = self.process.communicate()
         print(stdout.decode())
         print(stderr.decode())
+
+    def endpoint(self):
+        return f'localhost:{self.port}'
 
 
 @contextmanager

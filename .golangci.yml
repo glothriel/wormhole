@@ -13,7 +13,6 @@ linters-settings:
 
 
 linters:
-  # disable-all: true
   enable:
     - revive
     - ifshort
@@ -32,7 +31,6 @@ linters:
     - dupl
     - whitespace
     - goconst
-    - unparam
     - nilerr
     - noctx
     - unconvert
