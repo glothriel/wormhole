@@ -1,0 +1,44 @@
+{{- if .Values.server.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - create
+      - update
+      - delete
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ $.Release.Namespace }}
+    name: {{ template "name-server" . }}
+roleRef:
+  kind: Role
+  name: {{ template "name-server" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{ end }}

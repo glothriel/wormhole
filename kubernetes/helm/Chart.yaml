@@ -1,0 +1,9 @@
+---
+apiVersion: v2
+name: wormhole
+description: Deploys wormhole, that allows connecting kubernetes clusters over encrypted websocket reverse tunnel
+type: application
+version: 1.0.0
+maintainers:
+  - name: glothriel
+    email: k.karagiorgis@piwik.pro
