@@ -93,6 +93,10 @@ func NewRSAAuthorizedTransport(child peers.Transport, keyProvider KeypairProvide
 	if encodeErr != nil {
 		return nil, fmt.Errorf("Failed encoding public key to PEM: %w", encodeErr)
 	}
+	logrus.Infof(
+		"Sending public key to the server, please make sure, that the fingerprint matches: %s",
+		Fingerprint(publicKey),
+	)
 	if sendErr := child.Send(
 		messages.Message{
 			Type:       "RSA-PING",
@@ -148,50 +152,79 @@ type rsaAuthorizedTransportFactory struct {
 	acceptor   Acceptor
 }
 
-func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) {
-	transport, transportErr := factory.child.Create()
+func (factory *rsaAuthorizedTransportFactory) Transports() (chan peers.Transport, error) {
+	myTransports := make(chan peers.Transport)
+
+	childTransports, transportErr := factory.child.Transports()
 	if transportErr != nil {
 		return nil, transportErr
 	}
 
+	go func() {
+		for transport := range childTransports {
+			go func(transport peers.Transport) {
+				initializedTransport, initializeErr := factory.initializeTransport(transport)
+
+				if initializeErr == nil {
+					myTransports <- initializedTransport
+				} else {
+					logrus.Warnf(
+						"Did not initialize transport: %v", initializeErr,
+					)
+				}
+			}(transport)
+		}
+		close(myTransports)
+	}()
+
+	return myTransports, nil
+}
+
+func (factory *rsaAuthorizedTransportFactory) initializeTransport(transport peers.Transport) (peers.Transport, error) {
 	msgs, receiveErr := transport.Receive()
 	if receiveErr != nil {
-		return nil, receiveErr
+		return nil, factory.logClose(receiveErr, transport)
 	}
 
 	pingMessage := <-msgs
 
 	if pingMessage.Type != "RSA-PING" {
-		return nil, fmt.Errorf(
+		return nil, factory.logClose(fmt.Errorf(
 			"RSAAuthorizedTransport expects first message coming from client transport to be `%s`, got `%s`",
 			"RSA-PING",
 			pingMessage.Type,
-		)
+		), transport)
 	}
 	decoded, decodeErr := base64.StdEncoding.DecodeString(pingMessage.BodyString)
 	if decodeErr != nil {
-		return nil, fmt.Errorf(
+		return nil, factory.logClose(fmt.Errorf(
 			"Could not decode RSA-PING message from base64: %w", decodeErr,
-		)
+		), transport)
 	}
 	publicKey, publicKeyErr := BytesToPublicKey(decoded)
 	if publicKeyErr != nil {
-		return nil, fmt.Errorf("Could not extract a valid public key from RSA-PING message: %w", publicKeyErr)
+		return nil, factory.logClose(fmt.Errorf(
+			"Could not extract a valid public key from RSA-PING message: %w", publicKeyErr,
+		), transport)
 	}
+
 	isPublicKeyTrusted, isTrustedErr := factory.acceptor.IsTrusted(publicKey)
 	if isTrustedErr != nil {
-		return nil, isTrustedErr
+		return nil, factory.logClose(isTrustedErr, transport)
 	}
 	if !isPublicKeyTrusted {
-		return nil, errors.New("Dropping untrusted key")
+		return nil, factory.logClose(errors.New("Key fingerprint is not trusted"), transport)
 	}
 	aesKey, aesErr := generateAESKey()
 	if aesErr != nil {
-		return nil, aesErr
+		return nil, factory.logClose(aesErr, transport)
 	}
 	encryptedMessage, encryptErr := EncryptWithPublicKey(aesKey, publicKey)
 	if encryptErr != nil {
-		return nil, fmt.Errorf("Failed to encrypt AES key with remote public key: %w", encryptErr)
+		return nil, factory.logClose(
+			fmt.Errorf("Failed to encrypt AES key with remote public key: %w", encryptErr),
+			transport,
+		)
 	}
 	if sendErr := transport.Send(
 		messages.Message{
@@ -199,14 +232,20 @@ func (factory *rsaAuthorizedTransportFactory) Create() (peers.Transport, error) 
 			BodyString: base64.StdEncoding.EncodeToString(encryptedMessage),
 		},
 	); sendErr != nil {
-		return nil, sendErr
+		return nil, factory.logClose(sendErr, transport)
 	}
-
 	return &rsaAuthorizedTransport{
 		password:         aesKey,
 		child:            transport,
 		childReceiveChan: msgs,
 	}, nil
+}
+
+func (factory *rsaAuthorizedTransportFactory) logClose(upstreamErr error, t peers.Transport) error {
+	if closeErr := t.Close(); closeErr != nil {
+		logrus.Warnf("Problem when closing transport: %v", closeErr)
+	}
+	return upstreamErr
 }
 
 // NewRSAAuthorizedTransportFactory is a decorator over TransportFactory, that allows encryption in transit with AES

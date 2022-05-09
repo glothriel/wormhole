@@ -1,6 +1,6 @@
 # Wormhole
 
-Reverse tunnels over websocket, similar to ngrok, teleport or skupper. Not production ready, this is mostly a learning project.
+Reverse tunnels over websocket, similar to ngrok, teleport or skupper. Mostly a learning project.
 
 ## Usage
 

@@ -127,17 +127,19 @@ func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
 	peersChan := make(chan Peer)
 	go func() {
 		for {
-			newTransport, newTransportErr := defaultPeerFactory.transportFactory.Create()
+			transports, newTransportErr := defaultPeerFactory.transportFactory.Transports()
 			if newTransportErr != nil {
 				logrus.Error(fmt.Errorf("Error when creating transport: %w", newTransportErr))
 				continue
 			}
-			newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
-			if newPeerErr != nil {
-				logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
-				continue
+			for newTransport := range transports {
+				newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
+				if newPeerErr != nil {
+					logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
+					continue
+				}
+				peersChan <- newPeer
 			}
-			peersChan <- newPeer
 		}
 	}()
 	return peersChan, nil
