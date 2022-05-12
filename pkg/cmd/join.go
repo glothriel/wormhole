@@ -32,6 +32,10 @@ var joinCommand *cli.Command = &cli.Command{
 			Name:  "name",
 			Value: "default",
 		},
+		&cli.StringFlag{
+			Name:  "keypair-storage-path",
+			Value: "/tmp",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
@@ -39,7 +43,9 @@ var joinCommand *cli.Command = &cli.Command{
 		if transportErr != nil {
 			return transportErr
 		}
-		keyPairProvider, keyPairProviderErr := auth.NewStoredInFilesKeypairProvider("/tmp")
+		keyPairProvider, keyPairProviderErr := auth.NewStoredInFilesKeypairProvider(
+			c.String("keypair-storage-path"),
+		)
 		if keyPairProviderErr != nil {
 			return fmt.Errorf("Failed to initialize key pair provider: %w", keyPairProviderErr)
 		}

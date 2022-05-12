@@ -17,3 +17,10 @@ wormhole mesh join --as piwikpro --expose name=python-server,address=127.0.0.1:1
 ```
 wormhole mesh listen
 ```
+
+
+TODO:
+* Websocket data exchange path parametrization (passable via --server flag)
+* Finish helm charts
+* There appears to be some problem with exchanging ports
+* Consider sending pings (shitty OVH LB disconnects)
