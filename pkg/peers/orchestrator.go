@@ -106,7 +106,10 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 }
 
 func (o *DefaultPeer) startPinging() {
-	timer := time.NewTimer(time.Second * 30)
+	defer func() {
+		logrus.Debugf("Closing ping goroutine for peer %s", o.remoteName)
+	}()
+	timer := time.NewTicker(time.Second * 30)
 	for {
 		select {
 		case <-timer.C:
