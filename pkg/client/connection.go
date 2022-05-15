@@ -31,6 +31,11 @@ func (e *appConnection) outbox() chan messages.Message {
 }
 
 func (e *appConnection) terminate() {
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Debugf("Recovered in %s", r)
+		}
+	}()
 	if closeErr := e.connection.Close(); closeErr != nil {
 		logrus.Errorf("Failed closing TCP connection: %v", closeErr)
 	}

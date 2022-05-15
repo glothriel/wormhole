@@ -34,6 +34,7 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 				)
 				if createErr != nil {
 					logrus.Errorf("Error when creating connection to app %s: %s", theMsg.AppName, createErr)
+					continue
 				}
 				go e.forwardMessagesFromConnectionToPeer(theConnection)
 			}

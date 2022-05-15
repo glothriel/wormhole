@@ -21,6 +21,7 @@ import (
 type k8sServicePortOpener struct {
 	client      clientcorev1.ServiceInterface
 	childOpener portOpener
+	servicePort int32
 	serviceName string
 }
 
@@ -29,7 +30,7 @@ func (sm *k8sServicePortOpener) connections() chan appConnection {
 }
 
 func (sm *k8sServicePortOpener) listenAddr() string {
-	return fmt.Sprintf("%s:%d", sm.serviceName, 8080)
+	return fmt.Sprintf("%s:%d", sm.serviceName, sm.servicePort)
 }
 
 func (sm *k8sServicePortOpener) close() error {
@@ -51,7 +52,6 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	if inClusterConfigErr != nil {
 		return nil, inClusterConfigErr
 	}
-	// creates the clientset
 	clientset, clientSetErr := kubernetes.NewForConfig(config)
 	if clientSetErr != nil {
 		return nil, clientSetErr
@@ -110,6 +110,7 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	return &k8sServicePortOpener{
 		serviceName: serviceName,
 		client:      servicesClient,
+		servicePort: int32(originalPort),
 		childOpener: childOpener,
 	}, nil
 }

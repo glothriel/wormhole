@@ -55,15 +55,21 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 	theChannel := make(chan watchEvent)
 	go func() {
 		for {
-			watcher, watchErr := repository.client.Watch(context.Background(), v1.ListOptions{})
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				time.Second*30,
+			)
+			watcher, watchErr := repository.client.Watch(ctx, v1.ListOptions{})
 			if watchErr != nil {
-				logrus.Errorf("Failed to watch for kuberenetes services, none will be exposed: %v", watchErr)
-				time.Sleep(time.Second * 30)
+				logrus.Errorf("Failed to watch for kubernetes services, none will be exposed: %v", watchErr)
+				time.Sleep(time.Second * 5)
+				cancel()
 				continue
 			}
 			for event := range watcher.ResultChan() {
 				svc, castingOK := event.Object.(*corev1.Service)
 				if !castingOK {
+					cancel()
 					continue
 				}
 				if event.Type == watch.Added || event.Type == watch.Modified {
@@ -78,6 +84,7 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 					}
 				}
 			}
+			cancel()
 		}
 	}()
 	return theChannel
