@@ -1,5 +1,8 @@
+import time
+
 import requests
 from retry import retry
+import pytest
 
 from .fixtures import Client, MockServer, launched_in_background
 
@@ -106,3 +109,19 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
         assert not _app_port_is_opened(the_app)
 
     _ensure_app_port_is_not_opened()
+
+
+def test_nothing_crashes_when_app_client_exposes_is_not_available(executable, server):
+    with launched_in_background(Client(executable, exposes=['localhost:1337'])) as client:
+        app = requests.get(server.admin('/v1/apps')).json()[0]
+
+        with pytest.raises(requests.exceptions.ReadTimeout):
+            requests.get(
+                f'http://{app["endpoint"].replace("0.0.0.0", "localhost")}',
+                timeout=1,
+            )
+
+        for _ in range(3):
+            assert server.process.poll() is None, "Server crashes when app client tries to expose is unavailable"
+            # assert client.process.poll() is None, "Client crashes when app it tries to expose is unavailable"
+            time.sleep(1)

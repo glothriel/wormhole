@@ -2,6 +2,7 @@ package peers
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/sirupsen/logrus"
@@ -11,10 +12,11 @@ import (
 type DefaultPeer struct {
 	remoteName string
 
-	transport    Transport
-	framesChan   chan messages.Message
-	sessionsChan chan messages.Message
-	appsChan     chan AppEvent
+	transport     Transport
+	framesChan    chan messages.Message
+	sessionsChan  chan messages.Message
+	appsChan      chan AppEvent
+	closePingChan chan bool
 }
 
 // Name implements Peer
@@ -74,7 +76,7 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	}
 	failedChan <- nil
 	o.remoteName = introductionMessage.BodyString
-
+	go o.startPinging()
 	for message := range messagesChan {
 		if messages.IsFrame(message) || messages.IsSessionClosed(message) {
 			o.framesChan <- message
@@ -91,6 +93,8 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 			break
 		} else if messages.IsSessionOpened(message) || messages.IsSessionClosed(message) {
 			o.sessionsChan <- message
+		} else if messages.IsPing(message) {
+			logrus.Tracef("Received ping message from %s", o.remoteName)
 		} else {
 			logrus.Warnf("Droping message of unknown type `%s`", message.Type)
 		}
@@ -98,15 +102,39 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	close(o.framesChan)
 	close(o.appsChan)
 	close(o.sessionsChan)
+	close(o.closePingChan)
+}
+
+func (o *DefaultPeer) startPinging() {
+	defer func() {
+		logrus.Debugf("Closing ping goroutine for peer %s", o.remoteName)
+	}()
+	timer := time.NewTicker(time.Second * 30)
+	for {
+		select {
+		case <-timer.C:
+			if pingErr := o.transport.Send(messages.NewPing()); pingErr != nil {
+				if closeErr := o.Close(); closeErr != nil {
+					logrus.Errorf(
+						"Failed to send ping to peer %s - closing transport", o.remoteName,
+					)
+				}
+				return
+			}
+		case <-o.closePingChan:
+			return
+		}
+	}
 }
 
 // NewDefaultPeer creates PeerConnection instances
 func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, error) {
 	theConnection := &DefaultPeer{
-		transport:    transport,
-		framesChan:   make(chan messages.Message),
-		appsChan:     make(chan AppEvent),
-		sessionsChan: make(chan messages.Message),
+		transport:     transport,
+		framesChan:    make(chan messages.Message),
+		appsChan:      make(chan AppEvent),
+		sessionsChan:  make(chan messages.Message),
+		closePingChan: make(chan bool),
 	}
 	orchestrationFailed := make(chan error)
 	go theConnection.startRouting(orchestrationFailed, introduceAsName)

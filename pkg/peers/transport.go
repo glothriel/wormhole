@@ -2,6 +2,7 @@ package peers
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -95,13 +96,21 @@ type websocketTransport struct {
 	readChans []chan messages.Message
 }
 
-func (transport *websocketTransport) Send(message messages.Message) error {
+func (transport *websocketTransport) Send(message messages.Message) (theErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Trace("Recovered panic when trying to send to closed channel in websocket transport")
+		}
+	}()
+	// The default value is returned when above panic is triggered
+	theErr = errors.New("The connection is closed, message cannot be sent")
 	waitErr := make(chan error)
 	transport.writeChan <- wsWriteChanRequest{
 		message: message,
 		errChan: waitErr,
 	}
-	theErr := <-waitErr
+	// If the panic did not trigger, the default is overridden
+	theErr = <-waitErr
 	close(waitErr)
 	return theErr
 }
