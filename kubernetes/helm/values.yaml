@@ -1,0 +1,89 @@
+client:
+  enabled: false
+
+  name: ""
+
+  serverDsn: "ws://wormhole-server:8080"
+
+  priorityClassName: ""
+  pullPolicy: Always
+
+  securityContext:
+    runAsUser: 1337
+    runAsGroup: 1337
+    runAsNonRoot: true
+    fsGroup: 1337
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  resources:
+    requests:
+      cpu: 0
+      memory: 128Mi
+    limits:
+      cpu: 0
+      memory: 128Mi
+
+  affinity: null
+  nodeSelector: null
+  tolerations: null
+
+  pvc:
+    enabled: false
+    storageClassName: ""
+    storage: 1Gi
+
+
+server:
+  enabled: false
+
+  service:
+    type: ClusterIP
+
+  priorityClassName: ""
+  pullPolicy: Always
+
+  securityContext:
+    runAsUser: 1337
+    runAsGroup: 1337
+    runAsNonRoot: true
+    fsGroup: 1337
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  resources:
+    requests:
+      cpu: 0
+      memory: 128Mi
+    limits:
+      cpu: 0
+      memory: 128Mi
+
+  affinity: null
+  nodeSelector: null
+  tolerations: null
+
+  pvc:
+    enabled: false
+    storageClassName: ""
+    storage: 1Gi
+
+  acceptor: "server"
+
+docker:
+  registry: ghcr.io
+  image: glothriel/wormhole
+  version: "0.6.0"
+

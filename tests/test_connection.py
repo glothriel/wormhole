@@ -1,14 +1,14 @@
 import time
 
+import pytest
 import requests
 from retry import retry
-import pytest
 
 from .fixtures import Client, MockServer, launched_in_background
 
 
 def test_hello_world_is_returned_via_tunnel(mock_server, client, server):
-    apps = requests.get(server.admin('/v1/apps')).json()
+    apps = requests.get(server.admin("/v1/apps")).json()
     assert len(apps) == 1, "One app should be registered"
     assert (
         requests.get(f'http://{apps[0]["endpoint"]}', timeout=2).text == "Hello world!"
@@ -36,9 +36,7 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
                 )
             ):
 
-                api_response = requests.get(
-                    server.admin('/v1/apps')
-                ).json()
+                api_response = requests.get(server.admin("/v1/apps")).json()
 
                 assert list(sorted([item["app"] for item in api_response])) == [
                     "app-from-client-two",
@@ -67,7 +65,7 @@ def test_peer_disappears_from_api_when_client_disconnects(
 ):
     @retry(delay=0.1, tries=10)
     def _ensure_this_clients_app_is_delisted():
-        assert len(requests.get(server.admin('/v1/apps')).json()) == 0
+        assert len(requests.get(server.admin("/v1/apps")).json()) == 0
 
     # When no client connected
     _ensure_this_clients_app_is_delisted()
@@ -76,7 +74,7 @@ def test_peer_disappears_from_api_when_client_disconnects(
         peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
 
         # One client connected
-        assert len(requests.get(server.admin('/v1/apps')).json()) == 1
+        assert len(requests.get(server.admin("/v1/apps")).json()) == 1
     finally:
         peer.stop()
 
@@ -99,7 +97,7 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
 
     try:
         peer = Client(executable, exposes=[f"localhost:{mock_server.port}"]).start()
-        the_app = requests.get(server.admin('/v1/apps')).json()[0]
+        the_app = requests.get(server.admin("/v1/apps")).json()[0]
         assert _app_port_is_opened(the_app)
     finally:
         peer.stop()
@@ -112,8 +110,15 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
 
 
 def test_nothing_crashes_when_app_client_exposes_is_not_available(executable, server):
-    with launched_in_background(Client(executable, exposes=['localhost:1337'])) as client:
-        app = requests.get(server.admin('/v1/apps')).json()[0]
+    with launched_in_background(
+        Client(executable, exposes=["localhost:1337"])
+    ) as client:
+
+        @retry(delay=0.1, tries=10)
+        def _try_downloading_app_list():
+            return requests.get(server.admin("/v1/apps")).json()[0]
+
+        app = _try_downloading_app_list()
 
         with pytest.raises(requests.exceptions.ReadTimeout):
             requests.get(
@@ -122,6 +127,10 @@ def test_nothing_crashes_when_app_client_exposes_is_not_available(executable, se
             )
 
         for _ in range(3):
-            assert server.process.poll() is None, "Server crashes when app client tries to expose is unavailable"
-            # assert client.process.poll() is None, "Client crashes when app it tries to expose is unavailable"
+            assert (
+                server.process.poll() is None
+            ), "Server crashes when app client tries to expose is unavailable"
+            assert (
+                client.process.poll() is None
+            ), "Client crashes when app it tries to expose is unavailable"
             time.sleep(1)

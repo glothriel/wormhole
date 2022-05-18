@@ -1,4 +1,6 @@
+import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -19,6 +21,11 @@ def is_port_opened(port):
     return is_opened
 
 
+def run_process(command, *args, **kwargs):
+    print(f">>> {' '.join(command)}")
+    return subprocess.run(command, *args, **kwargs)
+
+
 class Server:
     def __init__(self, executable, metrics_port=8090, acceptor="dummy"):
         self.executable = executable
@@ -37,7 +44,8 @@ class Server:
                 str(self.metrics_port),
                 "mesh",
                 "listen",
-                "--acceptor", self.acceptor,
+                "--acceptor",
+                self.acceptor,
             ],
             shell=False,
         )
@@ -67,7 +75,7 @@ class MySQLServer:
         self.password = "123123"
 
     def start(self):
-        process = subprocess.run(
+        process = run_process(
             [
                 "docker",
                 "run",
@@ -95,7 +103,7 @@ class MySQLServer:
         _check_if_mysql_already_listens()
 
     def stop(self):
-        subprocess.run(
+        run_process(
             ["docker", "rm", "-f", self.container_id],
             shell=False,
             stdout=subprocess.PIPE,
@@ -174,7 +182,7 @@ class MockServer:
         print(stderr.decode())
 
     def endpoint(self):
-        return f'localhost:{self.port}'
+        return f"localhost:{self.port}"
 
 
 @contextmanager
@@ -200,3 +208,163 @@ def get_number_of_running_goroutines(port=8090):
 
 def get_number_of_opened_files(process_owner):
     return len(psutil.Process(pid=process_owner.process.pid).open_files())
+
+
+class Kubectl:
+    def __init__(self, cluster):
+        self.cluster = cluster
+
+    def json(self, command):
+        return json.loads(self.run(command + ["-o", "json"]).stdout.decode())
+
+    def run(self, command):
+        return run_process(
+            [self.executable(), "--kubeconfig", self.cluster.kubeconfig] + command,
+            shell=False,
+            stdout=subprocess.PIPE,
+            check=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+
+    @classmethod
+    def executable(cls):
+        if shutil.which("kubectl"):
+            return shutil.which("kubectl")
+        if os.path.isfile("/tmp/kubectl"):
+            return "/tmp/kubectl"
+
+        latest_version = requests.get(
+            "https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+        ).text
+        download(
+            f"https://storage.googleapis.com/kubernetes-release/release/{latest_version}"
+            "/bin/linux/amd64/kubectl",
+            "/tmp/kubectl",
+        )
+        run_process(["chmod", "+x", "/tmp/kubectl"], check=True)
+        return "/tmp/kubectl"
+
+
+class KindCluster:
+
+    KIND_VERSION = "v0.11.1"
+
+    def __init__(self, name):
+        self.name = name
+        self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
+
+    @property
+    def exists(self):
+        result = run_process(
+            ["docker", "ps", "--format", "{{ .Names }}"], stdout=subprocess.PIPE
+        )
+        assert not result.returncode, "Could not list running docker containers"
+        exists = f"{self.name}-control-plane" in result.stdout.decode()
+        return exists
+
+    def create(self):
+        assert not self.exists, f"Cannot create cluster {self.name} - it already exists"
+        assert not run_process(
+            [
+                self.executable(),
+                "create",
+                "cluster",
+                "--name",
+                self.name,
+                "--kubeconfig",
+                self.kubeconfig,
+            ],
+        ).returncode, "Could not create cluster"
+
+        @retry(tries=60, delay=2)
+        def wait_for_cluster_availability():
+            Kubectl(self).run(["get", "namespaces"])
+
+        wait_for_cluster_availability()
+
+    def delete(self):
+        assert self.exists, f"Cannot delete cluster {self.name} - it does not exist"
+        assert not run_process(
+            [self.executable(), "delete", "cluster", "--name", self.name],
+        ).returncode, "Could not delete cluster"
+
+    def executable(self):
+        if shutil.which("kind"):
+            return shutil.which("kind")
+        if os.path.isfile("/tmp/kind-linux-amd64"):
+            return "/tmp/kind-linux-amd64"
+        download(
+            f"https://github.com/kubernetes-sigs/kind/releases/download/{self.KIND_VERSION}/kind-linux-amd64",
+            "/tmp/kind-linux-amd64",
+        )
+        assert not run_process(["chmod", "+x", "/tmp/kind-linux-amd64"]).returncode
+        return "/tmp/kind-linux-amd64"
+
+    def load_image(self, image):
+        run_process(
+            [self.executable(), "load", "docker-image", "--name", self.name, image],
+            check=True,
+        )
+
+
+class Helm:
+
+    HELM_VERSION = "v3.8.2"
+
+    def __init__(self, cluster):
+        self.cluster = cluster
+
+    def install(self, name, values, namespace=None):
+        self.run(
+            [
+                "install",
+                "-n",
+                namespace or name,
+                name,
+                "kubernetes/helm",
+                "--wait",
+                "--set",
+                "client.pullPolicy=Never",
+                "--set",
+                "server.pullPolicy=Never",
+                "--set",
+                "docker.version=pytest",
+            ]
+            + [
+                item
+                for sublist in [["--set", f"{k}={v}"] for k, v in values.items()]
+                for item in sublist
+            ]
+        )
+
+    def run(self, command):
+        process = run_process(
+            [self.executable(), "--kubeconfig", self.cluster.kubeconfig] + command,
+            shell=False,
+            stdout=subprocess.PIPE,
+            check=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        return process
+
+    def executable(self):
+        if shutil.which("helm"):
+            return shutil.which("helm")
+        final_extract_path = "/tmp/linux-amd64/helm"
+        if os.path.isfile(final_extract_path):
+            return final_extract_path
+        download(
+            f"https://get.helm.sh/helm-{self.HELM_VERSION}-linux-amd64.tar.gz",
+            f"/tmp/helm-{self.HELM_VERSION}-linux-amd64.tar.gz",
+        )
+        assert not run_process(
+            ["tar", "-xvzf", f"helm-{self.HELM_VERSION}-linux-amd64.tar.gz"], cwd="/tmp"
+        ).returncode
+        return final_extract_path
+
+
+def download(url, path):
+    response = requests.get(url, allow_redirects=True)
+    assert response.status_code < 299, f"Could not download file from {url}"
+    with open(path, "wb") as f:
+        f.write(response.content)
