@@ -1,10 +1,14 @@
 FROM golang:1.18-alpine as builder
 RUN mkdir /app 
 WORKDIR /app 
-ADD go.mod /app/
+RUN apk add upx
+ADD go.mod go.sum /app/
 RUN go mod download -x
-ADD . /app/
-RUN go build -o /usr/bin/wormhole main.go
+ADD main.go /app/
+ADD pkg/ /app/pkg
+RUN go build -ldflags="-s -w" -o /usr/bin/wormhole main.go
+# upx compresses the binary, trading startup time (several hundered ms added) for smaller image size (~30%)
+RUN upx /usr/bin/wormhole
 RUN chmod +x /usr/bin/wormhole
 
 

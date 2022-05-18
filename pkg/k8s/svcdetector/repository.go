@@ -2,13 +2,21 @@ package svcdetector
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
-	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -36,62 +44,103 @@ func (event watchEvent) isDeleted() bool {
 }
 
 type defaultServiceRepository struct {
-	client clientcorev1.ServiceInterface
+	client dynamic.Interface
 }
 
 func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
 	services := []serviceWrapper{}
-	k8sServices, listErr := repository.client.List(context.Background(), v1.ListOptions{})
+	k8sServices, listErr := repository.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "services",
+	}).List(context.Background(), v1.ListOptions{})
 	if listErr != nil {
 		return []serviceWrapper{}, listErr
 	}
 	for i := range k8sServices.Items {
-		services = append(services, newDefaultServiceWrapper(&k8sServices.Items[i]))
+		svc := &corev1.Service{}
+		if convertError := runtime.DefaultUnstructuredConverter.FromUnstructured(
+			k8sServices.Items[i].Object, svc,
+		); convertError != nil {
+			return services, fmt.Errorf(
+				"Received invalid type when trying to dispatch informer events: %v",
+				convertError,
+			)
+		}
+		services = append(services, newDefaultServiceWrapper(svc))
 	}
 	return services, nil
 }
 
 func (repository defaultServiceRepository) watch() chan watchEvent {
+	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+		repository.client,
+		time.Second*10,
+		metav1.NamespaceAll,
+		nil,
+	)
+	informer := informerFactory.ForResource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "services",
+	})
 	theChannel := make(chan watchEvent)
 	go func() {
-		for {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				time.Second*30,
-			)
-			watcher, watchErr := repository.client.Watch(ctx, v1.ListOptions{})
-			if watchErr != nil {
-				logrus.Errorf("Failed to watch for kubernetes services, none will be exposed: %v", watchErr)
-				time.Sleep(time.Second * 5)
-				cancel()
-				continue
-			}
-			for event := range watcher.ResultChan() {
-				svc, castingOK := event.Object.(*corev1.Service)
-				if !castingOK {
-					cancel()
-					continue
-				}
-				if event.Type == watch.Added || event.Type == watch.Modified {
-					theChannel <- watchEvent{
-						evtType: eventTypeAddedOrModified,
-						service: newDefaultServiceWrapper(svc),
+		stopCh := make(chan struct{})
+		go func(stopCh <-chan struct{}, s cache.SharedIndexInformer) {
+			handlers := cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					for _, event := range repository.onAddedOrModified(obj) {
+						theChannel <- event
 					}
-				} else if event.Type == watch.Deleted {
-					theChannel <- watchEvent{
-						evtType: eventTypeDeleted,
-						service: newDefaultServiceWrapper(svc),
+				},
+				UpdateFunc: func(oldObj, obj interface{}) {
+					for _, event := range repository.onAddedOrModified(obj) {
+						theChannel <- event
 					}
-				}
+				},
+				DeleteFunc: func(obj interface{}) {
+					for _, event := range repository.onDeleted(obj) {
+						theChannel <- event
+					}
+				},
 			}
-			cancel()
-		}
+			s.AddEventHandler(handlers)
+			s.Run(stopCh)
+		}(stopCh, informer.Informer())
+		sigCh := make(chan os.Signal, 0)
+		signal.Notify(sigCh, os.Kill, os.Interrupt)
+		<-sigCh
+		close(stopCh)
 	}()
 	return theChannel
 }
 
+func (repository defaultServiceRepository) onAddedOrModified(informerObject interface{}) []watchEvent {
+	return repository.dispatchEvents(eventTypeAddedOrModified, informerObject)
+}
+
+func (repository defaultServiceRepository) onDeleted(informerObject interface{}) []watchEvent {
+	return repository.dispatchEvents(eventTypeDeleted, informerObject)
+}
+
+func (repository defaultServiceRepository) dispatchEvents(eventType int, informerObject interface{}) []watchEvent {
+	u := informerObject.(*unstructured.Unstructured)
+	svc := corev1.Service{}
+	if convertError := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &svc); convertError != nil {
+		logrus.Errorf("Received invalid type when trying to dispatch informer events: %v", convertError)
+		return []watchEvent{}
+	}
+	return []watchEvent{
+		{
+			evtType: eventType,
+			service: newDefaultServiceWrapper(&svc),
+		},
+	}
+}
+
 // NewDefaultServiceRepository creates ServiceRepository instances
-func NewDefaultServiceRepository(client clientcorev1.ServiceInterface) ServiceRepository {
+func NewDefaultServiceRepository(client dynamic.Interface) ServiceRepository {
 	return &defaultServiceRepository{
 		client: client,
 	}

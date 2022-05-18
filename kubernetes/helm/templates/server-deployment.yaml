@@ -1,0 +1,94 @@
+
+{{- if .Values.server.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    application: {{ template "name-server" . }}
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: {{ template "name-server" . }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        application: {{ template "name-server" . }}
+    spec:
+      {{- if .Values.server.priorityClassName }}
+      priorityClassName: {{ .Values.server.priorityClassName }}
+      {{- end }}
+      {{- with .Values.server.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.affinity }}
+      affinity:
+        {{- toYaml .Values.server.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.server.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml .Values.server.tolerations | nindent 6 }}
+      {{- end }}
+      serviceAccountName: {{ template "name-server" . }}
+      volumes:
+      - name: {{ template "name-server" . }}-tmp
+      {{- if .Values.server.pvc.enabled }}
+      - name: {{ template "name-server" . }}-persistent
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}
+      {{- end }}
+      containers:
+        - image: {{ $.Values.docker.registry }}/{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
+          name: wormhole
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
+          {{- with .Values.server.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8090
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8090
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          volumeMounts:
+          - mountPath: "/tmp"
+            name: {{ template "name-server" . }}-tmp
+      {{- if .Values.server.pvc.enabled }}
+          - mountPath: "/storage"
+            name: {{ template "name-server" . }}-persistent
+      {{- end }}
+          command:
+            - /usr/bin/wormhole
+            - --metrics
+            - mesh
+            - listen
+            - --acceptor
+            - {{ $.Values.server.acceptor }}
+      {{- if .Values.server.pvc.enabled }}
+            - --acceptor-storage-file-path
+            - /storage
+      {{- end }}
+            - --labels
+            - 'application={{ template "name-server" . }}'
+            - --kubernetes
+            - --kubernetes-namespace
+            - {{ $.Release.Namespace }}
+{{ end }}

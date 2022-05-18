@@ -1,6 +1,5 @@
-import requests
 import pymysql
-
+import requests
 
 from .fixtures import Client, launched_in_background
 

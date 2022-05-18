@@ -11,7 +11,7 @@ import (
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -70,13 +70,12 @@ func getAppStateManager(c *cli.Context) client.AppStateManager {
 		if inClusterConfigErr != nil {
 			logrus.Fatal(inClusterConfigErr)
 		}
-		clientset, clientSetErr := kubernetes.NewForConfig(config)
+		dynamicClient, clientSetErr := dynamic.NewForConfig(config)
 		if clientSetErr != nil {
 			logrus.Fatal(clientSetErr)
 		}
-		servicesClient := clientset.CoreV1().Services("")
 		return svcdetector.NewK8sAppStateManager(
-			svcdetector.NewDefaultServiceRepository(servicesClient),
+			svcdetector.NewDefaultServiceRepository(dynamicClient),
 			time.Second*30,
 		)
 	}

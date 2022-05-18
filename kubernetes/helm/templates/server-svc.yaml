@@ -1,0 +1,37 @@
+{{- if .Values.server.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  ports:
+  - name: data
+    port: 8080
+    targetPort: 8080
+  selector:
+    application: {{ template "name-server" . }}
+  sessionAffinity: None
+  type: {{ $.Values.server.service.type }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "name-server" . }}-admin
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  ports:
+  - name: admin
+    port: 8081
+    targetPort: 8081
+  selector:
+    application: {{ template "name-server" . }}
+  sessionAffinity: None
+  type: ClusterIP
+
+{{ end }}

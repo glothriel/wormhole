@@ -2,12 +2,9 @@ import pytest
 import requests
 from retry import retry
 
-from .fixtures import (
-    Client,
-    get_number_of_opened_files,
-    get_number_of_running_goroutines,
-    launched_in_background,
-)
+from .fixtures import (Client, get_number_of_opened_files,
+                       get_number_of_running_goroutines,
+                       launched_in_background)
 
 
 class LeakTestOptions:
@@ -44,13 +41,13 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
 
             @retry(delay=0.05, tries=20)
             def _ensure_mock_app_status(exposed=True):
-                assert len(
-                    requests.get(server.admin('/v1/apps')).json()
-                ) == (1 if exposed else 0)
+                assert len(requests.get(server.admin("/v1/apps")).json()) == (
+                    1 if exposed else 0
+                )
 
             _ensure_mock_app_status(exposed=True)
             # List the apps
-            apps = requests.get(server.admin('/v1/apps')).json()
+            apps = requests.get(server.admin("/v1/apps")).json()
             # Call the proxied app
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
         _ensure_mock_app_status(exposed=False)
@@ -94,12 +91,12 @@ def test_resource_leaks_when_passing_messages(executable, server, mock_server, o
 
         @retry(delay=0.05, tries=20)
         def _ensure_mock_app_exposed():
-            assert requests.get(server.admin('/v1/apps')).json()
+            assert requests.get(server.admin("/v1/apps")).json()
 
         _ensure_mock_app_exposed()
 
         # List the apps
-        apps = requests.get(server.admin('/v1/apps')).json()
+        apps = requests.get(server.admin("/v1/apps")).json()
 
         starting_resources = opts.counter_func(client, server)
 

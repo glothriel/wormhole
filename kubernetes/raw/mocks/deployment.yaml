@@ -4,6 +4,7 @@ kind: Deployment
 metadata:
   labels:
     application: wormhole-mocks
+  namespace: mocks
   name: wormhole-mocks
 spec:
   replicas: 1

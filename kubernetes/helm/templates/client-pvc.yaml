@@ -1,0 +1,18 @@
+{{- if and .Values.server.enabled .Values.server.pvc.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  {{- if .Values.server.pvc.storageClassName }}
+  storageClassName: {{ .Values.server.pvc.storageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.server.pvc.storage }}
+{{- end }}
