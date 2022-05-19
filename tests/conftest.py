@@ -6,8 +6,15 @@ import tempfile
 
 import pytest
 
-from .fixtures import (Client, Helm, KindCluster, Kubectl, MockServer,
-                       MySQLServer, Server)
+from .fixtures import (
+    Client,
+    Helm,
+    KindCluster,
+    Kubectl,
+    MockServer,
+    MySQLServer,
+    Server,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +69,8 @@ def client(executable, server):
 def server(executable):
     server = Server(executable)
     try:
-        yield server.start()
+        server.start()
+        yield server
     finally:
         server.stop()
 

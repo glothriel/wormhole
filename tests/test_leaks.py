@@ -2,9 +2,12 @@ import pytest
 import requests
 from retry import retry
 
-from .fixtures import (Client, get_number_of_opened_files,
-                       get_number_of_running_goroutines,
-                       launched_in_background)
+from .fixtures import (
+    Client,
+    get_number_of_opened_files,
+    get_number_of_running_goroutines,
+    launched_in_background,
+)
 
 
 class LeakTestOptions:
