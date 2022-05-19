@@ -15,8 +15,7 @@ from retry import retry
 
 def is_port_opened(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(("127.0.0.1", int(port)))
-    is_opened = result == 0
+    is_opened = sock.connect_ex(("127.0.0.1", int(port)))
     sock.close()
     return is_opened
 
@@ -52,9 +51,11 @@ class Server:
 
         @retry(delay=0.1, tries=10 * 5)
         def _check_if_is_already_opened():
-            assert is_port_opened(8080)
+            # All three ports are opened
+            assert len(psutil.Process(self.process.pid).connections()) == 3
 
         _check_if_is_already_opened()
+
         return self
 
     def stop(self):

@@ -39,7 +39,7 @@ def test_client_is_disconnected_and_terminated_when_fingerprint_is_discarded(
 
             @retry(tries=3, delay=0.1)
             def _ensure_client_is_terminated():
-                client.process.poll() is None
+                assert client.process.poll() is not None
 
             _ensure_client_is_terminated()
 
@@ -51,10 +51,12 @@ def test_first_client_is_disconnected_when_second_with_the_same_key_attempts_to_
         with launched_in_background(
             Client(executable, [mock_server.endpoint()])
         ) as first_client:
-            with launched_in_background(Client(executable, [mock_server.endpoint()])):
+            with launched_in_background(
+                Client(executable, [mock_server.endpoint()], metrics_port=8092)
+            ):
 
-                @retry(tries=3, delay=0.1)
+                @retry(tries=10, delay=0.5)
                 def _ensure_client_is_terminated():
-                    first_client.process.poll() is None
+                    assert first_client.process.poll() is not None
 
                 _ensure_client_is_terminated()
