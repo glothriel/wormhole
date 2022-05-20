@@ -20,7 +20,7 @@ var joinCommand *cli.Command = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "server",
-			Value: "ws://127.0.0.1:8080",
+			Value: "ws://127.0.0.1:8080/wh/tunnel",
 		},
 		&cli.StringSliceFlag{
 			Name: "expose",

@@ -1,6 +1,5 @@
 import logging
 import os
-import socket
 import subprocess
 import tempfile
 
@@ -19,14 +18,6 @@ from .fixtures import (
 logger = logging.getLogger(__name__)
 
 TEST_SERVER_PORT = 1234
-
-
-def is_port_opened(port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(("127.0.0.1", int(port)))
-    is_opened = result == 0
-    sock.close()
-    return is_opened
 
 
 def run_process(process, **kwargs):

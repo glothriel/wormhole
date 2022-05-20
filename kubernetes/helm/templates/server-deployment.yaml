@@ -86,9 +86,9 @@ spec:
             - --acceptor-storage-file-path
             - /storage
       {{- end }}
-            - --labels
-            - 'application={{ template "name-server" . }}'
             - --kubernetes
             - --kubernetes-namespace
             - {{ $.Release.Namespace }}
+            - --kubernetes-labels
+            - 'application={{ template "name-server" . }}'
 {{ end }}

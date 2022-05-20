@@ -18,37 +18,53 @@ var listenCommand *cli.Command = &cli.Command{
 		&cli.StringFlag{
 			Name:  "host",
 			Value: "0.0.0.0",
+			Usage: "Host the tunnel server will be listening on",
 		},
 		&cli.IntFlag{
 			Name:  "port",
 			Value: 8080,
+			Usage: "Port the tunnel server will be listening on",
 		},
 		&cli.StringFlag{
-			Name:  "labels",
-			Value: "application=wormhole-server",
+			Name:  "path",
+			Value: "/wh/tunnel",
+			Usage: "Path under which the tunnel server will expose the tunnel entrypoint. All other paths will be 404",
 		},
 		&cli.BoolFlag{
-			Name: "kubernetes",
+			Name:  "kubernetes",
+			Usage: "Enables kubernetes integration",
 		},
 		&cli.StringFlag{
 			Name:  "kubernetes-namespace",
 			Value: "wormhole",
+			Usage: "Namespace to create the proxy services in",
 		},
 		&cli.IntFlag{
 			Name:  "kubernetes-pod-port-range-min",
 			Value: 30000,
+			Usage: "Port range for allocations of new proxy services",
 		},
 		&cli.IntFlag{
 			Name:  "kubernetes-pod-port-range-max",
 			Value: 30499,
+			Usage: "Port range for allocations of new proxy services",
+		},
+		&cli.StringFlag{
+			Name:  "kubernetes-labels",
+			Value: "application=wormhole-server",
+			Usage: "Labels that will be set on proxy service, must match the labels of wormhole server pod",
 		},
 		&cli.StringFlag{
 			Name:  "acceptor",
 			Value: "server",
+			Usage: "How would you like to accept pairing requests? `server` waits for approval, every " +
+				"other value triggers DummyAcceptor, that automatically blindly accepts all pairing requests",
 		},
 		&cli.StringFlag{
 			Name:  "acceptor-storage-file-path",
 			Value: "",
+			Usage: "A file, that holds information about previously accepted fingerprints. If left entry, " +
+				"the information will be stored in memory",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -56,6 +72,7 @@ var listenCommand *cli.Command = &cli.Command{
 		wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
 			c.String("host"),
 			strconv.Itoa(c.Int("port")),
+			c.String("path"),
 		)
 		if wsTransportFactoryErr != nil {
 			return wsTransportFactoryErr
@@ -74,7 +91,7 @@ var listenCommand *cli.Command = &cli.Command{
 		if c.Bool("kubernetes") {
 			portOpenerFactory = server.NewK8sServicePortOpenerFactory(
 				c.String("kubernetes-namespace"),
-				server.CSVToMap(c.String("labels")),
+				server.CSVToMap(c.String("kubernetes-labels")),
 				server.NewPerAppPortOpenerFactory(
 					ports.RandomPortFromARangeAllocator{
 						Min: c.Int("kubernetes-pod-port-range-min"),
