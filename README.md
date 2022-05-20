@@ -33,7 +33,7 @@ This command allows installing client in the same cluster as server, for testing
 
 ```
 kubectl create namespace wormhole-client
-helm install -n wormhole-client wormhole-client kubernetes/helm --set client.name=testclient --set client.enabled=true --set client.serverDsn=ws://wormhole-whserver-server.wormhole-server:8080
+helm install -n wormhole-client wormhole-client kubernetes/helm --set client.name=testclient --set client.enabled=true --set client.serverDsn=ws://wormhole-whserver-server.wormhole-server:8080/wh/tunnel
 ```
 
 ## Authorization & SSL
@@ -80,7 +80,7 @@ client.securityContext.fsGroup | | 1337
 client.securityContext.runAsGroup | | 1337
 client.securityContext.runAsNonRoot | | True
 client.securityContext.runAsUser | | 1337
-client.serverDsn | | ws://wormhole-server:8080
+client.serverDsn | | ws://wormhole-server:8080/wh/tunnel
 client.tolerations | | None
 
 ### docker

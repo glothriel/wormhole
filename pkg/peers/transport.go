@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/glothriel/wormhole/pkg/messages"
@@ -66,8 +65,6 @@ func CreateMockTransportPair() (*MockTransport, *MockTransport) {
 	return first, second
 }
 
-const wsDataExchangeEndpoint = "/data"
-
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -77,15 +74,6 @@ var wsUpgrader = websocket.Upgrader{
 type wsWriteChanRequest struct {
 	message messages.Message
 	errChan chan error
-}
-
-func wsParseServerAddr(serverAddr string) (string, string, error) {
-	re := regexp.MustCompile(`(wss|ws):\/\/([a-z\.0-9\-]*:\d*)`)
-	matches := re.FindAllStringSubmatch(serverAddr, -1)
-	if len(matches) == 0 {
-		return "", "", fmt.Errorf("Invalid server address, must match %s, received %s", re.String(), serverAddr)
-	}
-	return matches[0][1], matches[0][2], nil
 }
 
 type websocketTransport struct {
@@ -196,16 +184,15 @@ func NewWebsocketTransport(
 func NewWebsocketClientTransport(
 	serverAddr string,
 ) (Transport, error) {
-	protocol, theAddr, parseErr := wsParseServerAddr(serverAddr)
+	URL, parseErr := url.Parse(serverAddr)
 	if parseErr != nil {
 		return nil, parseErr
 	}
 	u := url.URL{
-		Scheme: protocol,
-		Host:   theAddr,
-		Path:   wsDataExchangeEndpoint,
+		Scheme: URL.Scheme,
+		Host:   URL.Host,
+		Path:   URL.Path,
 	}
-
 	c, _, dialErr := websocket.DefaultDialer.Dial(u.String(), nil)
 	if dialErr != nil {
 		return nil, dialErr
@@ -228,10 +215,10 @@ func (wsTransportFactory *websocketTransportFactory) Transports() (chan Transpor
 }
 
 // NewWebsocketTransportFactory allows creating peers, that are servers, waiting for clients to connect to them
-func NewWebsocketTransportFactory(host, port string) (TransportFactory, error) {
+func NewWebsocketTransportFactory(host, port, path string) (TransportFactory, error) {
 	transportsChan := make(chan Transport)
 	router := mux.NewRouter()
-	router.HandleFunc(wsDataExchangeEndpoint,
+	router.HandleFunc(path,
 		func(w http.ResponseWriter, r *http.Request) {
 			websocketConnection, err := wsUpgrader.Upgrade(w, r, nil)
 			if err != nil {

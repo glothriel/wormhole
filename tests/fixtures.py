@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 import signal
-import socket
 import subprocess
 import uuid
 from contextlib import contextmanager
@@ -11,13 +10,6 @@ import psutil
 import pymysql
 import requests
 from retry import retry
-
-
-def is_port_opened(port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    is_opened = sock.connect_ex(("127.0.0.1", int(port)))
-    sock.close()
-    return is_opened
 
 
 def run_process(command, *args, **kwargs):
@@ -49,7 +41,7 @@ class Server:
             shell=False,
         )
 
-        @retry(delay=0.1, tries=10 * 5)
+        @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
             # All three ports are opened
             assert len(psutil.Process(self.process.pid).connections()) == 3
@@ -167,9 +159,9 @@ class MockServer:
             stderr=subprocess.PIPE,
         )
 
-        @retry(delay=0.1, tries=10 * 5)
+        @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
-            assert is_port_opened(self.port)
+            assert requests.get("http://localhost:1234").status_code == 200
 
         _check_if_is_already_opened()
         return self

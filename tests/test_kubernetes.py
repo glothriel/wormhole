@@ -19,7 +19,7 @@ def test_helm_chart_is_installable(
             "client.enabled": True,
             "client.pvc.enabled": pvc,
             "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080",
+            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
         },
     )
 
@@ -44,7 +44,7 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
             "client.enabled": True,
             "client.pvc.enabled": True,
             "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080",
+            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
         },
     )
 
@@ -111,7 +111,7 @@ def test_client_disconnect_causes_deletion_of_related_proxy_services(
         {
             "client.enabled": True,
             "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080",
+            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
         },
     )
 
