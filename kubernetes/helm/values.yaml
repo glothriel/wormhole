@@ -85,5 +85,5 @@ server:
 docker:
   registry: ghcr.io
   image: glothriel/wormhole
-  version: "0.6.0"
+  version: latest
 
