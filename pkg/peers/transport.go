@@ -290,7 +290,7 @@ func (transport *aesTransport) Receive() (chan messages.Message, error) {
 			)
 			if decryptErr != nil {
 				logrus.Errorf("Could not decrypt BodyString of incoming message: %v", decryptErr)
-				// continue
+				continue
 			}
 			localChan <- messages.WithBody(remoteMessage, string(plainText))
 		}

@@ -86,6 +86,10 @@ spec:
             - --acceptor-storage-file-path
             - /storage
       {{- end }}
+      {{- if .Values.server.path }}
+            - --path
+            - {{ .Values.server.path | quote }}
+      {{- end }}
             - --kubernetes
             - --kubernetes-namespace
             - {{ $.Release.Namespace }}
