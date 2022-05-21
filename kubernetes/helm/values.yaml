@@ -81,6 +81,7 @@ server:
     storage: 1Gi
 
   acceptor: "server"
+  path: ""
 
 docker:
   registry: ghcr.io

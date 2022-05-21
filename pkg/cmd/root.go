@@ -24,6 +24,7 @@ func Run() {
 				},
 			},
 			testserverCommand,
+			requestsCommand,
 		},
 		Version: projectVersion,
 		Flags: []cli.Flag{
