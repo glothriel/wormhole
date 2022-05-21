@@ -33,7 +33,24 @@ This command allows installing client in the same cluster as server, for testing
 
 ```
 kubectl create namespace wormhole-client
-helm install -n wormhole-client wormhole-client kubernetes/helm --set client.name=testclient --set client.enabled=true --set client.serverDsn=ws://wormhole-whserver-server.wormhole-server:8080/wh/tunnel
+helm install -n wormhole-client whclient kubernetes/helm --set client.name=testclient --set client.enabled=true --set client.serverDsn=ws://wormhole-whserver-server.wormhole-server:8080/wh/tunnel
+```
+
+### Approve pairing request
+
+Client when connects to server generates a RSA key pair (in-depth description below in "Authorization & SSL" section). You need to tell the server, that the client is trusted in order for them to start exchanging messages.
+
+In order to do that, review the client logs, you should see something like this:
+
+```
+INFO[0000] Log level set to info
+INFO[0000] Sending public key to the server, please make sure, that the fingerprint matches: <FINGERPRINT>
+```
+
+Please copy the fingerprint to clipboard and accept the connection request using the CLI:
+
+```
+kubectl exec -it -n wormhole-client wormhole-whclient-client -- wormhole requests accept <FINGERPRINT>
 ```
 
 ## Authorization & SSL
