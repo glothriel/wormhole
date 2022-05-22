@@ -60,11 +60,9 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 		appName: appName,
 	}
 
-	logger := logrus.WithField("session_id", theConnection.sessionID)
-
 	go func() {
 		defer func() {
-			logger.Debug("Closing TCP connection outbox")
+			logrus.Debug("Closing TCP connection outbox")
 		}()
 		for msg := range theConnection.outbox() {
 			theBody := messages.Body(msg)
@@ -78,9 +76,9 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Debugf("Recovered in %s", r)
+				logrus.Debugf("Recovered in %s", r)
 			}
-			logger.Debug("Closing TCP connection inbox")
+			logrus.Debug("Closing TCP connection inbox")
 		}()
 		for {
 			buf := make([]byte, 1024*64)
@@ -90,7 +88,7 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 				if errors.Is(err, io.EOF) {
 					theConnection.terminate()
 				} else if !strings.Contains(err.Error(), "use of closed network connection") {
-					logger.Errorf("Failed to read TCP connection: %v", err)
+					logrus.Errorf("Failed to read TCP connection: %v", err)
 				}
 				return
 			}

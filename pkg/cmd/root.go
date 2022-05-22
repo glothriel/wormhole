@@ -21,10 +21,10 @@ func Run() {
 				Subcommands: []*cli.Command{
 					listenCommand,
 					joinCommand,
+					requestsCommand,
 				},
 			},
 			testserverCommand,
-			requestsCommand,
 		},
 		Version: projectVersion,
 		Flags: []cli.Flag{
