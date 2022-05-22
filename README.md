@@ -66,6 +66,82 @@ kubectl -n default annotate svc kubernetes wormhole.glothriel.github.com/exposed
 
 A proxy service should be created in namespace `wormhole-server`: `testclient-default-kubernetes`. All the TCP connections made to the proxy service will be tunelled between the server and client to the destination service.
 
+## APIs
+
+### Client annotation API
+
+You can expose a service that is deployed on Client's cluster by annotating it. Here are the annotations you can use:
+
+| Annotation                            | Purpose                                                                                                                           | Example value                     |
+|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| wormhole.glothriel.github.com/exposed | Marks a service as exposed. By default all the ports will be exposed on the destination, as separate apps - so separate services. | "1", "yes", "true", "no", "false" |
+| wormhole.glothriel.github.com/name    | Name under which the app will be exposed. If the annotation is not present, the name of the service is used.                      | "prometheus", "loki", "my-app"    |
+| wormhole.glothriel.github.com/ports   | List of ports for given service, that should be exposed. Can use both names and numbers, remember to use strings.                 | "metrics", "1337", "web"          |
+
+### Server Admin API
+
+Server admin API is exposed on port 8081.
+
+#### GET /v1/apps
+
+Returns list of apps exposed by connected clients.
+
+**Example response**:
+
+```
+HTTP 200
+Content-Type: application/json
+
+[
+    {
+        "app": "prometheus",
+        "endpoint": "prometheus-infraone.wormhole-server:8080",
+        "peer": "infraone"
+    },
+    {
+        "app": "prometheus",
+        "endpoint": "prometheus-infratwo.wormhole-server:8080",
+        "peer": "infratwo"
+    }
+]
+```
+
+#### GET /v1/requests
+
+Displays list of pairing requests - fingerprints only.
+
+**Example response**:
+
+```
+HTTP 200
+Content-Type: application/json
+
+[
+    "231::46::1::217::196",
+    "5::12::142::62::4",
+]
+```
+
+#### POST /v1/requests/{fingerprint}
+
+Accepts pairing requests
+
+**Example response**:
+
+```
+HTTP 204
+```
+
+#### DELETE /v1/requests/{fingerprint}
+
+Declines pairing requests
+
+**Example response**:
+
+```
+HTTP 204
+```
+
 
 ## Authorization & SSL
 
@@ -159,4 +235,7 @@ No. Maybe someday.
 It's super slow. It's websockets. The tunnel code itself is closer to a POC than production solution - a lot of allocations, conversions between byte-arrays to strings, encodings, etc. This will definitely be improved once core functionality is finished up, but please note, that very high performance will never be the goal of this project.
 
 **Why websockets?**
-Stubborn on-prem clients are easier to persuade to open an outbound port to a 443 web server, than a random TCP socket. As funny as it seams, this is really the reason.
+Stubborn on-prem clients are easier to persuade to open an outbound port to a 443 web server, than a random TCP socket. As funny as it seems, this is really the reason.
+
+**Is exposing services from server to client possible?**
+Currently - no. In the future, if i have enough determination - yes.

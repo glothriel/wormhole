@@ -19,10 +19,11 @@ import (
 )
 
 type k8sServicePortOpener struct {
-	client      clientcorev1.ServiceInterface
-	childOpener portOpener
-	servicePort int32
-	serviceName string
+	client           clientcorev1.ServiceInterface
+	childOpener      portOpener
+	servicePort      int32
+	serviceName      string
+	serviceNamespace string
 }
 
 func (sm *k8sServicePortOpener) connections() chan appConnection {
@@ -30,7 +31,7 @@ func (sm *k8sServicePortOpener) connections() chan appConnection {
 }
 
 func (sm *k8sServicePortOpener) listenAddr() string {
-	return fmt.Sprintf("%s:%d", sm.serviceName, sm.servicePort)
+	return fmt.Sprintf("%s.%s:%d", sm.serviceName, sm.serviceNamespace, sm.servicePort)
 }
 
 func (sm *k8sServicePortOpener) close() error {
@@ -108,10 +109,11 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		return nil, multierr.Combine(fmt.Errorf("Unable to upsert the service: %v", upsertErr), childOpener.close())
 	}
 	return &k8sServicePortOpener{
-		serviceName: serviceName,
-		client:      servicesClient,
-		servicePort: int32(originalPort),
-		childOpener: childOpener,
+		serviceName:      serviceName,
+		serviceNamespace: factory.namespace,
+		client:           servicesClient,
+		servicePort:      int32(originalPort),
+		childOpener:      childOpener,
 	}, nil
 }
 
