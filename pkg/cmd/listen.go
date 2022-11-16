@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/glothriel/wormhole/pkg/admin"
@@ -25,10 +26,30 @@ var listenCommand *cli.Command = &cli.Command{
 			Value: 8080,
 			Usage: "Port the tunnel server will be listening on",
 		},
+		&cli.IntFlag{
+			Name:  "admin-port",
+			Value: 8081,
+			Usage: "Port the admin server will be listening on",
+		},
 		&cli.StringFlag{
 			Name:  "path",
 			Value: "/wh/tunnel",
 			Usage: "Path under which the tunnel server will expose the tunnel entrypoint. All other paths will be 404",
+		},
+		&cli.BoolFlag{
+			Name:  "port-use-range",
+			Value: false,
+			Usage: "Uses fixed port range for allocations",
+		},
+		&cli.IntFlag{
+			Name:  "port-range-min",
+			Value: 30000,
+			Usage: "Port range for allocations of new proxy services",
+		},
+		&cli.IntFlag{
+			Name:  "port-range-max",
+			Value: 30499,
+			Usage: "Port range for allocations of new proxy services",
 		},
 		&cli.BoolFlag{
 			Name:  "kubernetes",
@@ -38,16 +59,6 @@ var listenCommand *cli.Command = &cli.Command{
 			Name:  "kubernetes-namespace",
 			Value: "wormhole",
 			Usage: "Namespace to create the proxy services in",
-		},
-		&cli.IntFlag{
-			Name:  "kubernetes-pod-port-range-min",
-			Value: 30000,
-			Usage: "Port range for allocations of new proxy services",
-		},
-		&cli.IntFlag{
-			Name:  "kubernetes-pod-port-range-max",
-			Value: 30499,
-			Usage: "Port range for allocations of new proxy services",
 		},
 		&cli.StringFlag{
 			Name:  "kubernetes-labels",
@@ -94,14 +105,23 @@ var listenCommand *cli.Command = &cli.Command{
 				server.CSVToMap(c.String("kubernetes-labels")),
 				server.NewPerAppPortOpenerFactory(
 					ports.RandomPortFromARangeAllocator{
-						Min: c.Int("kubernetes-pod-port-range-min"),
-						Max: c.Int("kubernetes-pod-port-range-max"),
+						Min: c.Int("port-range-min"),
+						Max: c.Int("port-range-max"),
 					},
 				),
 			)
 		} else {
+			var allocator ports.Allocator
+			if c.Bool("port-use-range") {
+				allocator = ports.RandomPortFromARangeAllocator{
+					Min: c.Int("port-range-min"),
+					Max: c.Int("port-range-max"),
+				}
+			} else {
+				allocator = ports.RandomPortAllocator{}
+			}
 			portOpenerFactory = server.NewPerAppPortOpenerFactory(
-				ports.RandomPortAllocator{},
+				allocator,
 			)
 		}
 		appExposer := server.NewDefaultAppExposer(
@@ -112,7 +132,7 @@ var listenCommand *cli.Command = &cli.Command{
 			appExposer,
 		)
 		adminServer := admin.NewWormholeAdminServer(
-			":8081",
+			fmt.Sprintf(":%d", c.Int("admin-port")),
 			server.NewServerAppsListAdapter(appExposer),
 			consentGatherer,
 		)

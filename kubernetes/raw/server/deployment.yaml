@@ -27,7 +27,6 @@ spec:
             - containerPort: 8081
           command:
             - /usr/bin/wormhole
-            - mesh
             - listen
             - --kubernetes
             - --kubernetes-namespace

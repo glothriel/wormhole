@@ -30,9 +30,7 @@ def test_client_is_disconnected_and_terminated_when_fingerprint_is_discarded(
     executable, mock_server
 ):
     with launched_in_background(Server(executable, acceptor="server")) as server:
-        with launched_in_background(
-            Client(executable, [mock_server.endpoint()])
-        ) as client:
+        with launched_in_background(Client(executable, [mock_server.endpoint()])) as client:
             assert len(requests.get(server.admin("/v1/requests")).json()) == 1
             fingerprint = requests.get(server.admin("/v1/requests")).json()[0]
             requests.delete(server.admin(f"/v1/requests/{fingerprint}"))
@@ -48,9 +46,7 @@ def test_first_client_is_disconnected_when_second_with_the_same_key_attempts_to_
     executable, mock_server
 ):
     with launched_in_background(Server(executable, acceptor="server")):
-        with launched_in_background(
-            Client(executable, [mock_server.endpoint()])
-        ) as first_client:
+        with launched_in_background(Client(executable, [mock_server.endpoint()])) as first_client:
             with launched_in_background(
                 Client(executable, [mock_server.endpoint()], metrics_port=8092)
             ):

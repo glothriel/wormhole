@@ -75,7 +75,6 @@ spec:
           command:
             - /usr/bin/wormhole
             - --metrics
-            - mesh
             - join
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}

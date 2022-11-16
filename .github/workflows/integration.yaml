@@ -18,3 +18,15 @@ jobs:
 
       - name: Run integration tests
         run: py.test -v --tb=short
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Run linters
+        uses: PiwikPRO/actions/python/lint@master
+        with:
+          use-black: true
+          use-flake: true
+          use-isort: true

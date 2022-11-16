@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 )
@@ -83,7 +82,7 @@ func (storage *inFileCachingAcceptor) locked(fn func() error) error {
 
 func (storage *inFileCachingAcceptor) getCache() (map[string]bool, error) {
 	cacheMap := map[string]bool{}
-	readBytes, readErr := ioutil.ReadFile(storage.path)
+	readBytes, readErr := os.ReadFile(storage.path)
 	if readErr != nil {
 		if !os.IsNotExist(readErr) {
 			return cacheMap, fmt.Errorf("Failed to read acceptor cache file: %w", readErr)
@@ -103,7 +102,7 @@ func (storage *inFileCachingAcceptor) setCache(cacheMap map[string]bool) error {
 	if marshalErr != nil {
 		return fmt.Errorf("Failed to encode acceptor cache to JSON: %w", marshalErr)
 	}
-	if writeErr := ioutil.WriteFile(storage.path, theData, 0600); writeErr != nil {
+	if writeErr := os.WriteFile(storage.path, theData, 0600); writeErr != nil {
 		return fmt.Errorf("Failed to write acceptor cache to file: %w", writeErr)
 	}
 	return nil

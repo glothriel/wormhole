@@ -2,12 +2,6 @@ package messages
 
 import "strings"
 
-// AppStatusChanged is event emmited when application status is changed
-type AppStatusChanged struct {
-	App    string
-	Status string
-}
-
 // AppAddedEncode encodes appName and address into message
 func AppAddedEncode(appName, address string) string {
 	return strings.Join([]string{appName, address}, ",")

@@ -11,7 +11,6 @@ setup(
     python_requires=">=3.10.0",
     install_requires=[
         "cryptography==36.0.2",
-        "pylama==8.3.7",
         "pytest==7.0.1",
         "psutil==5.9.0",
         "PyMySQL==1.0.2",

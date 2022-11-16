@@ -24,7 +24,6 @@ spec:
           imagePullPolicy: Always
           command:
             - /usr/bin/wormhole
-            - mesh
             - join
             - --name
             - tagi

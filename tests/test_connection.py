@@ -10,9 +10,7 @@ from .fixtures import Client, MockServer, launched_in_background
 def test_hello_world_is_returned_via_tunnel(mock_server, client, server):
     apps = requests.get(server.admin("/v1/apps")).json()
     assert len(apps) == 1, "One app should be registered"
-    assert (
-        requests.get(f'http://{apps[0]["endpoint"]}', timeout=2).text == "Hello world!"
-    )
+    assert requests.get(f'http://{apps[0]["endpoint"]}', timeout=2).text == "Hello world!"
 
 
 def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_api(
@@ -22,16 +20,12 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
         MockServer(executable, response="Bla!", port=4321)
     ) as second_mock_server:
         with launched_in_background(
-            Client(
-                executable, exposes=[f"localhost:{mock_server.port}"], metrics_port=8091
-            )
+            Client(executable, exposes=[f"localhost:{mock_server.port}"], metrics_port=8091)
         ):
             with launched_in_background(
                 Client(
                     executable,
-                    exposes=[
-                        ("app-from-client-two", f"localhost:{second_mock_server.port}")
-                    ],
+                    exposes=[("app-from-client-two", f"localhost:{second_mock_server.port}")],
                     metrics_port=8092,
                 )
             ):
@@ -60,9 +54,7 @@ def test_two_distinct_clients_can_be_connected_and_are_properly_visible_in_the_a
                 )
 
 
-def test_peer_disappears_from_api_when_client_disconnects(
-    executable, server, mock_server
-):
+def test_peer_disappears_from_api_when_client_disconnects(executable, server, mock_server):
     @retry(delay=0.1, tries=10)
     def _ensure_this_clients_app_is_delisted():
         assert len(requests.get(server.admin("/v1/apps")).json()) == 0
@@ -110,9 +102,7 @@ def test_apps_belonging_to_peer_no_longer_listen_on_the_port_after_peer_disconne
 
 
 def test_nothing_crashes_when_app_client_exposes_is_not_available(executable, server):
-    with launched_in_background(
-        Client(executable, exposes=["localhost:1337"])
-    ) as client:
+    with launched_in_background(Client(executable, exposes=["localhost:1337"])) as client:
 
         @retry(delay=0.1, tries=10)
         def _try_downloading_app_list():

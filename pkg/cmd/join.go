@@ -117,7 +117,7 @@ func getExposedApps(c *cli.Context) []peers.App {
 	}
 	if len(upstreams) < 1 {
 		logrus.Fatal(
-			"You need to provide at least one app, that will be exposed on this host to join the mesh",
+			"You need to provide at least one app, that will be exposed on this host",
 		)
 	}
 	return upstreams

@@ -78,7 +78,6 @@ spec:
           command:
             - /usr/bin/wormhole
             - --metrics
-            - mesh
             - listen
             - --acceptor
             - {{ $.Values.server.acceptor }}

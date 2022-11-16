@@ -23,9 +23,7 @@ class LeakTestOptions:
 @pytest.mark.parametrize(
     "opts",
     (
-        LeakTestOptions(
-            "Server, opened files", lambda server: get_number_of_opened_files(server)
-        ),
+        LeakTestOptions("Server, opened files", lambda server: get_number_of_opened_files(server)),
         LeakTestOptions(
             "Server, running goroutines",
             lambda server: get_number_of_running_goroutines(server.metrics_port),
@@ -38,15 +36,11 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
     starting_resources = opts.counter_func(server)
 
     for _ in range(10):
-        with launched_in_background(
-            Client(executable, exposes=[f"localhost:{mock_server.port}"])
-        ):
+        with launched_in_background(Client(executable, exposes=[f"localhost:{mock_server.port}"])):
 
             @retry(delay=0.05, tries=20)
             def _ensure_mock_app_status(exposed=True):
-                assert len(requests.get(server.admin("/v1/apps")).json()) == (
-                    1 if exposed else 0
-                )
+                assert len(requests.get(server.admin("/v1/apps")).json()) == (1 if exposed else 0)
 
             _ensure_mock_app_status(exposed=True)
             # List the apps
@@ -71,9 +65,7 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
         ),
         LeakTestOptions(
             "Client, running goroutines",
-            lambda client, server: get_number_of_running_goroutines(
-                client.metrics_port
-            ),
+            lambda client, server: get_number_of_running_goroutines(client.metrics_port),
         ),
         LeakTestOptions(
             "Server, opened files",
@@ -81,9 +73,7 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
         ),
         LeakTestOptions(
             "Server, running goroutines",
-            lambda client, server: get_number_of_running_goroutines(
-                server.metrics_port
-            ),
+            lambda client, server: get_number_of_running_goroutines(server.metrics_port),
         ),
     ),
 )

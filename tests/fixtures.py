@@ -33,7 +33,6 @@ class Server:
                 "--metrics",
                 "--metrics-port",
                 str(self.metrics_port),
-                "mesh",
                 "listen",
                 "--acceptor",
                 self.acceptor,
@@ -56,7 +55,9 @@ class Server:
             return os.kill(self.process.pid, signal.SIGINT)
 
     def admin(self, path):
-        return f'http://localhost:{self.admin_port}/{path if not path.startswith("/") else path[1:]}'
+        return (
+            f'http://localhost:{self.admin_port}/{path if not path.startswith("/") else path[1:]}'
+        )
 
 
 class MySQLServer:
@@ -118,7 +119,6 @@ class Client:
             "--metrics",
             "--metrics-port",
             str(self.metrics_port),
-            "mesh",
             "join",
             "--name",
             uuid.uuid4().hex,
@@ -191,9 +191,7 @@ def get_number_of_running_goroutines(port=8090):
     return int(
         [
             metrics
-            for metrics in requests.get(f"http://localhost:{port}/metrics").text.split(
-                "\n"
-            )
+            for metrics in requests.get(f"http://localhost:{port}/metrics").text.split("\n")
             if metrics.strip().startswith("go_goroutines")
         ][0].split(" ")[1]
     )
@@ -248,9 +246,7 @@ class KindCluster:
 
     @property
     def exists(self):
-        result = run_process(
-            ["docker", "ps", "--format", "{{ .Names }}"], stdout=subprocess.PIPE
-        )
+        result = run_process(["docker", "ps", "--format", "{{ .Names }}"], stdout=subprocess.PIPE)
         assert not result.returncode, "Could not list running docker containers"
         exists = f"{self.name}-control-plane" in result.stdout.decode()
         return exists
