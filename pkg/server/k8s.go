@@ -66,10 +66,6 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 	if portErr != nil {
 		return nil, multierr.Combine(portErr, childOpener.close())
 	}
-	labelsMap := map[string]string{}
-	for sKey, sVal := range factory.ownSelectors {
-		labelsMap[sKey] = sVal
-	}
 	originalPort, originalPortErr := extractPortFromAddr(app.Address)
 	if portErr != nil {
 		return nil, multierr.Combine(originalPortErr, childOpener.close())
@@ -79,7 +75,7 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: factory.namespace,
-			Labels:    labelsMap,
+			Labels:    factory.buildLabelsForSvc(),
 			Annotations: map[string]string{
 				"x-wormhole-app":  app.Name,
 				"x-wormhole-peer": peer.Name(),
@@ -115,6 +111,14 @@ func (factory *k8sServicePortOpenerFactory) Create(app peers.App, peer peers.Pee
 		servicePort:      int32(originalPort),
 		childOpener:      childOpener,
 	}, nil
+}
+
+func (factory *k8sServicePortOpenerFactory) buildLabelsForSvc() map[string]string {
+	labelsMap := map[string]string{}
+	for sKey, sVal := range factory.ownSelectors {
+		labelsMap[sKey] = sVal
+	}
+	return labelsMap
 }
 
 // NewK8sServicePortOpenerFactory implements PortOpenerFactory as a decorator over existing PortOpenerFactory, that

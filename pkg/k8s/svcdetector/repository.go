@@ -108,8 +108,8 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 			s.AddEventHandler(handlers)
 			s.Run(stopCh)
 		}(stopCh, informer.Informer())
-		sigCh := make(chan os.Signal, 0)
-		signal.Notify(sigCh, os.Kill, os.Interrupt)
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt)
 		<-sigCh
 		close(stopCh)
 	}()

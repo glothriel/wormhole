@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -24,7 +23,7 @@ type storedInFilesKeypairProvider struct {
 }
 
 func (keypairProvier storedInFilesKeypairProvider) Private() (*rsa.PrivateKey, error) {
-	privkeyPemBytes, readErr := ioutil.ReadFile(keypairProvier.privateKeyPath)
+	privkeyPemBytes, readErr := os.ReadFile(keypairProvier.privateKeyPath)
 	if readErr != nil {
 		return nil, fmt.Errorf("Failed to read private RSA key: %w", readErr)
 	}
@@ -61,7 +60,7 @@ func generateRSAAndSaveAsPem(privKey string) error {
 		return fmt.Errorf("Failed to generate RSA private key: %w", generateKeyErr)
 	}
 
-	privateWriteErr := ioutil.WriteFile(privKey, PrivateKeyToBytes(privatekey), 0600)
+	privateWriteErr := os.WriteFile(privKey, PrivateKeyToBytes(privatekey), 0600)
 	if privateWriteErr != nil {
 		return fmt.Errorf("Failed to save RSA private key: %w", privateWriteErr)
 	}

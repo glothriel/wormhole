@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -28,8 +29,9 @@ func NewWormholeAdminServer(
 	mux.HandleFunc("/v1/requests/{fingerprint}", updateAcceptRequest(gatherer))
 	return &WormholeAdminServer{
 		server: &http.Server{
-			Addr:    addr,
-			Handler: mux,
+			Addr:              addr,
+			Handler:           mux,
+			ReadHeaderTimeout: time.Second * 5,
 		},
 	}
 }

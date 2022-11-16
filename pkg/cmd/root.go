@@ -15,15 +15,9 @@ func Run() {
 		Usage:                "Wormhole is an utility to create reverse websocket tunnels, similar to ngrok",
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
-			{
-				Name:  "mesh",
-				Usage: "Allows listening and joining wormhole mesh",
-				Subcommands: []*cli.Command{
-					listenCommand,
-					joinCommand,
-					requestsCommand,
-				},
-			},
+			listenCommand,
+			joinCommand,
+			requestsCommand,
 			testserverCommand,
 		},
 		Version: projectVersion,

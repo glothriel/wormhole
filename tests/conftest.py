@@ -5,15 +5,7 @@ import tempfile
 
 import pytest
 
-from .fixtures import (
-    Client,
-    Helm,
-    KindCluster,
-    Kubectl,
-    MockServer,
-    MySQLServer,
-    Server,
-)
+from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +14,7 @@ TEST_SERVER_PORT = 1234
 
 def run_process(process, **kwargs):
     logger.info(" ".join(process))
-    rt = subprocess.run(
-        process, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
-    )
+    rt = subprocess.run(process, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     try:
         rt.check_returncode()
     finally:
@@ -104,19 +94,13 @@ def kubectl(kind_cluster):
 def fresh_cluster(kind_cluster):
     kubectl = Kubectl(kind_cluster)
     starting_namespaces = set(
-        [
-            item["metadata"]["name"]
-            for item in kubectl.json(["get", "namespaces"])["items"]
-        ]
+        [item["metadata"]["name"] for item in kubectl.json(["get", "namespaces"])["items"]]
     )
     try:
         yield kind_cluster
     finally:
         finishing_namespaces = set(
-            [
-                item["metadata"]["name"]
-                for item in kubectl.json(["get", "namespaces"])["items"]
-            ]
+            [item["metadata"]["name"] for item in kubectl.json(["get", "namespaces"])["items"]]
         )
         for namespace_to_be_deleted in finishing_namespaces - starting_namespaces:
             print(f"Deleting namespace {namespace_to_be_deleted}")
