@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option go_package = "pkg/messages";
+
+message NMessage {
+
+  enum MessageType {
+    PING = 0;
+    FRAME = 1;
+    SESSION_STATUS_CHANGE = 2;
+    APP_STATUS_CHANGE = 3;
+    INTRODUCTION = 4;
+    DISCONNECT = 5;
+  }
+
+  MessageType type = 1;
+
+  oneof body { PingMessage ping = 2; }
+}
+
+message PingMessage {}
+
+message DisconnectMessage {}
+
+message IntroductionMessage { string peer_name = 1; }
+
+message AppStatusChange {
+  string app_name = 1;
+  enum AppStatus {
+    ADDED = 0;
+    WITHDRAWN = 1;
+    CONFIRMED = 2;
+  }
+  AppStatus status = 2;
+  optional string address = 3;
+}
+
+message SessionStatusChange {
+  string app_name = 1;
+  optional string session_id = 2;
+  enum SessionStatus {
+    OPENED = 0;
+    CLOSED = 1;
+  }
+  SessionStatus status = 3;
+}
+
+message FrameMessage {
+  string session_id = 1;
+  bytes body = 2;
+}
