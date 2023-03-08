@@ -4,28 +4,29 @@ import (
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/messages"
+	"github.com/sirupsen/logrus"
 )
 
-// MessageRouter implements server.messageRouter
+// PacketRouter implements server.messageRouter
 // It routes messages comming from peers to per-session sub-channels, so they cay be later piped
 // directly to TCP connections
-type MessageRouter struct {
+type PacketRouter struct {
 	perSessionMailboxes map[string]chan messages.Message
 
 	lock *sync.Mutex
 }
 
-func (router *MessageRouter) put(msg messages.Message) {
+func (router *PacketRouter) put(msg messages.Message) {
 	router.ensureMailbox(msg.SessionID) <- msg
 }
 
 // Get allows retrieving a channel for specific session ID
-func (router *MessageRouter) Get(sessionID string) chan messages.Message {
+func (router *PacketRouter) Get(sessionID string) chan messages.Message {
 	return router.ensureMailbox(sessionID)
 }
 
 // Done can be sued to mark the channel for sessionID for deletion
-func (router *MessageRouter) Done(sessionID string) {
+func (router *PacketRouter) Done(sessionID string) {
 	router.locked(func() {
 		_, mailboxExists := router.perSessionMailboxes[sessionID]
 		if mailboxExists {
@@ -35,7 +36,7 @@ func (router *MessageRouter) Done(sessionID string) {
 	})
 }
 
-func (router *MessageRouter) ensureMailbox(sessionID string) chan messages.Message {
+func (router *PacketRouter) ensureMailbox(sessionID string) chan messages.Message {
 	var mailbox chan messages.Message
 	router.locked(func() {
 		_, mailboxExists := router.perSessionMailboxes[sessionID]
@@ -47,22 +48,24 @@ func (router *MessageRouter) ensureMailbox(sessionID string) chan messages.Messa
 	return mailbox
 }
 
-func (router *MessageRouter) locked(f func()) {
+func (router *PacketRouter) locked(f func()) {
 	router.lock.Lock()
 	defer router.lock.Unlock()
 	f()
 }
 
-// NewMessageRouter creates MessageRouter instances
-func NewMessageRouter(allMessages chan messages.Message) *MessageRouter {
-	theRouter := &MessageRouter{
+// NewPacketRouter creates MessageRouter instances
+func NewPacketRouter(allMessages chan messages.Message) *PacketRouter {
+	theRouter := &PacketRouter{
 		lock:                &sync.Mutex{},
 		perSessionMailboxes: make(map[string]chan messages.Message),
 	}
-	go func(router *MessageRouter, msgs chan messages.Message) {
+	go func(router *PacketRouter, msgs chan messages.Message) {
 		for message := range msgs {
-			if messages.IsFrame(message) {
+			if messages.IsPacket(message) {
 				router.put(message)
+			} else {
+				logrus.Errorf("Unexpected message type %s passed to PacketRouter", message.Type)
 			}
 		}
 		// Once the upstream channel closes, remove all remaining sessions

@@ -13,7 +13,7 @@ type DefaultPeer struct {
 	remoteName string
 
 	transport     Transport
-	framesChan    chan messages.Message
+	packetsChan   chan messages.Message
 	sessionsChan  chan messages.Message
 	appsChan      chan AppEvent
 	closePingChan chan bool
@@ -24,9 +24,9 @@ func (o *DefaultPeer) Name() string {
 	return o.remoteName
 }
 
-// Frames returns messages that are used to interchange app data
-func (o *DefaultPeer) Frames() chan messages.Message {
-	return o.framesChan
+// Packets returns messages that are used to interchange app data
+func (o *DefaultPeer) Packets() chan messages.Message {
+	return o.packetsChan
 }
 
 // AppEvents immplements Peer
@@ -78,12 +78,12 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	o.remoteName = introductionMessage.BodyString
 	go o.startPinging()
 	for message := range messagesChan {
-		if messages.IsFrame(message) || messages.IsSessionClosed(message) {
-			o.framesChan <- message
+		if messages.IsPacket(message) || messages.IsSessionClosed(message) {
+			o.packetsChan <- message
 		} else if messages.IsAppAdded(message) || messages.IsAppWithdrawn(message) {
 			var app App
 			if messages.IsAppAdded(message) {
-				name, address := messages.AppAddedDecode(message.BodyString)
+				name, address := messages.AppEventsDecode(message.BodyString)
 				app = App{Name: name, Address: address}
 			} else {
 				app = App{Name: message.BodyString}
@@ -95,11 +95,14 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 			o.sessionsChan <- message
 		} else if messages.IsPing(message) {
 			logrus.Tracef("Received ping message from %s", o.remoteName)
+		} else if messages.IsAppConfirmed(message) {
+			name, address := messages.AppEventsDecode(message.BodyString)
+			logrus.Infof("Server confirmed app `%s` exposed on `%s`", name, address)
 		} else {
-			logrus.Warnf("Droping message of unknown type `%s`", message.Type)
+			logrus.Warnf("Dropping message of unknown type `%s`", message.Type)
 		}
 	}
-	close(o.framesChan)
+	close(o.packetsChan)
 	close(o.appsChan)
 	close(o.sessionsChan)
 	close(o.closePingChan)
@@ -131,7 +134,7 @@ func (o *DefaultPeer) startPinging() {
 func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, error) {
 	theConnection := &DefaultPeer{
 		transport:     transport,
-		framesChan:    make(chan messages.Message),
+		packetsChan:   make(chan messages.Message),
 		appsChan:      make(chan AppEvent),
 		sessionsChan:  make(chan messages.Message),
 		closePingChan: make(chan bool),

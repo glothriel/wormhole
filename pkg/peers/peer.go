@@ -8,7 +8,7 @@ import (
 type Peer interface {
 	Name() string
 	Send(messages.Message) error
-	Frames() chan messages.Message
+	Packets() chan messages.Message
 	SessionEvents() chan messages.Message
 	AppEvents() chan AppEvent
 }

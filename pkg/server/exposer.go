@@ -7,7 +7,7 @@ import (
 
 // AppExposer is responsible for keeping track of which apps are registered and their endpoints exported
 type AppExposer interface {
-	Expose(peer peers.Peer, app peers.App, router messageRouter) error
+	Expose(peer peers.Peer, app peers.App, router messageRouter) (ExposedApp, error)
 	Unexpose(peer peers.Peer, app peers.App) error
 	Apps() []ExposedApp
 	Terminate(peer peers.Peer) error
@@ -35,11 +35,12 @@ type PortOpenerFactory interface {
 	Create(app peers.App, peer peers.Peer) (portOpener, error)
 }
 
-func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router messageRouter) error {
+func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router messageRouter) (ExposedApp, error) {
 	portOpener, portOpenerErr := exposer.portOpenerFactory.Create(app, peer)
 	if portOpenerErr != nil {
-		return portOpenerErr
+		return ExposedApp{}, portOpenerErr
 	}
+	// TODO: not a goot idea mutating this
 	app.Address = portOpener.listenAddr()
 
 	logrus.Infof("App `%s`.`%s`: listening on %s", peer.Name(), app.Name, portOpener.listenAddr())
@@ -55,7 +56,10 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 		}
 		exposer.registry.delete(peer, app)
 	}()
-	return nil
+	return ExposedApp{
+		App:  app,
+		Peer: peer,
+	}, nil
 }
 
 func (exposer *defaultAppExposer) Unexpose(peer peers.Peer, app peers.App) error {

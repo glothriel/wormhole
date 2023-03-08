@@ -1,10 +1,13 @@
 package messages
 
-const typeFrame = "data"
+const typePacket = "data"
 const typeIntroduction = "introduction"
 
 // TypeAppAdded is message type set when given app is exposed
 const TypeAppAdded = "app-added"
+
+// TypeAppConfirmed is sent by server to client when app is exposed
+const TypeAppConfirmed = "app-confirmed"
 
 // TypeAppWithdrawn is message type set when given app is withdrawn
 const TypeAppWithdrawn = "app-withdrawn"
@@ -14,9 +17,9 @@ const typePing = "ping"
 const typeSessionClosed = "session-closed"
 const typeSessionOpened = "session-opened"
 
-// IsFrame checks if message contains raw packet data
-func IsFrame(m Message) bool {
-	return m.Type == typeFrame
+// IsPacket checks if message contains raw packet data
+func IsPacket(m Message) bool {
+	return m.Type == typePacket
 }
 
 // IsIntroduction checks if message contains peer name
@@ -27,6 +30,11 @@ func IsIntroduction(m Message) bool {
 // IsAppAdded checks if message contains information about added app
 func IsAppAdded(m Message) bool {
 	return m.Type == TypeAppAdded
+}
+
+// IsAppConfirmed checks if message contains information about confirmed app
+func IsAppConfirmed(m Message) bool {
+	return m.Type == TypeAppConfirmed
 }
 
 // IsAppWithdrawn checks if message contains message about withdrawn app
@@ -54,11 +62,11 @@ func IsSessionClosed(m Message) bool {
 	return m.Type == typeSessionClosed
 }
 
-// NewFrame Allows creating new message that carries raw packet data
-func NewFrame(sessionID string, d []byte) Message {
+// NewPacket Allows creating new message that carries raw packet data
+func NewPacket(sessionID string, d []byte) Message {
 	return Message{
 		SessionID:  sessionID,
-		Type:       typeFrame,
+		Type:       typePacket,
 		BodyString: string(d),
 	}
 }
@@ -89,7 +97,15 @@ func NewIntroduction(peerName string) Message {
 func NewAppAdded(appName string, address string) Message {
 	return Message{
 		Type:       TypeAppAdded,
-		BodyString: AppAddedEncode(appName, address),
+		BodyString: AppEventsEncode(appName, address),
+	}
+}
+
+// NewAppConfirmed allows adding app confirmed messages
+func NewAppConfirmed(appName string, address string) Message {
+	return Message{
+		Type:       TypeAppConfirmed,
+		BodyString: AppEventsEncode(appName, address),
 	}
 }
 

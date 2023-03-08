@@ -41,7 +41,7 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 		}
 	}()
 
-	for theMsg := range e.Peer.Frames() {
+	for theMsg := range e.Peer.Packets() {
 		if messages.IsPing(theMsg) {
 			continue
 		}
@@ -60,7 +60,7 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 			return retryErr
 		}
 
-		if messages.IsFrame(theMsg) {
+		if messages.IsPacket(theMsg) {
 			theConnection.outbox() <- theMsg
 		}
 		if messages.IsSessionClosed(theMsg) {

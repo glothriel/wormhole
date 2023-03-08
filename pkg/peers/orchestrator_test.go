@@ -39,9 +39,9 @@ func TestPeerConnectionProperlyPassesFramesToRemote(t *testing.T) {
 	// given
 	connection, remoteTransport := generateLocalConnectionAndRemoteTransport()
 	theMessages := []messages.Message{
-		messages.NewFrame("session-1", []byte("foo")),
-		messages.NewFrame("session-1", []byte("bar")),
-		messages.NewFrame("session-2", []byte("baz")),
+		messages.NewPacket("session-1", []byte("foo")),
+		messages.NewPacket("session-1", []byte("bar")),
+		messages.NewPacket("session-2", []byte("baz")),
 	}
 
 	// when
@@ -62,16 +62,16 @@ func TestPeerConnectionProperlyPassesFramesFromRemote(t *testing.T) {
 	// given
 	connection, remoteTransport := generateLocalConnectionAndRemoteTransport()
 	theMessages := []messages.Message{
-		messages.NewFrame("session-1", []byte("foo")),
-		messages.NewFrame("session-1", []byte("bar")),
-		messages.NewFrame("session-2", []byte("baz")),
+		messages.NewPacket("session-1", []byte("foo")),
+		messages.NewPacket("session-1", []byte("bar")),
+		messages.NewPacket("session-2", []byte("baz")),
 	}
 
 	// when
 	for i := range theMessages {
 		assert.Nil(t, remoteTransport.Send(theMessages[i]))
 	}
-	messagesCommingFromRemoteToConnection := connection.Frames()
+	messagesCommingFromRemoteToConnection := connection.Packets()
 
 	// then
 	for i := range theMessages {

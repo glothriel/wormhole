@@ -41,8 +41,8 @@ func (wt *MockPeer) Name() string {
 	return "mock"
 }
 
-// Frames implements Peer
-func (wt *MockPeer) Frames() chan messages.Message {
+// Packets implements Peer
+func (wt *MockPeer) Packets() chan messages.Message {
 	return wt.MessagesFromPeer
 }
 

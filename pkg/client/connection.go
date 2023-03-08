@@ -98,7 +98,7 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 				msgBody[i] = buf[i]
 			}
 
-			theConnection.inbox() <- messages.NewFrame(theConnection.sessionID, msgBody)
+			theConnection.inbox() <- messages.NewPacket(theConnection.sessionID, msgBody)
 		}
 	}()
 

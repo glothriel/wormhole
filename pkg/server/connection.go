@@ -38,7 +38,7 @@ type appConnectionHandler struct {
 
 func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) {
 	for message := range router.Get(handler.appConnection.sessionID()) {
-		if messages.IsFrame(message) {
+		if messages.IsPacket(message) {
 			if writeErr := handler.appConnection.write(message); writeErr != nil {
 				logrus.Fatal(writeErr)
 			}
@@ -101,7 +101,7 @@ func (s *tcpAppConnection) receive() (messages.Message, error) {
 	for i := 0; i < readBytes; i++ {
 		msgBody[i] = buf[i]
 	}
-	return messages.NewFrame(s.theSessionID, msgBody), nil
+	return messages.NewPacket(s.theSessionID, msgBody), nil
 }
 
 func (s *tcpAppConnection) write(m messages.Message) error {

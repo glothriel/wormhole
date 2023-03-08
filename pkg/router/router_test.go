@@ -13,7 +13,7 @@ import (
 
 func TestMessagesAreProperlyRouted(t *testing.T) {
 	messagesChannel := make(chan messages.Message)
-	theRouter := NewMessageRouter(messagesChannel)
+	theRouter := NewPacketRouter(messagesChannel)
 
 	sessionIDs := []string{}
 	for i := 0; i < 10000; i++ {
@@ -31,7 +31,7 @@ func TestMessagesAreProperlyRouted(t *testing.T) {
 
 func TestMailboxesAreClosedOnceMasterChannelIsClosed(t *testing.T) {
 	messagesChannel := make(chan messages.Message)
-	theRouter := NewMessageRouter(messagesChannel)
+	theRouter := NewPacketRouter(messagesChannel)
 
 	go func() { theRouter.Get("bla") <- messages.Message{SessionID: "bla"} }()
 	<-theRouter.Get("bla")
