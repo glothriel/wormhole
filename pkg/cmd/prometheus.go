@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,12 @@ func startPrometheusServer(c *cli.Context) {
 	http.Handle("/metrics", promhttp.Handler())
 	logrus.Infof("Starting prometheus metrics server on %s", metricsAddr)
 	go func() {
-		if listenErr := http.ListenAndServe(metricsAddr, nil); listenErr != nil {
+		server := &http.Server{
+			Addr:              metricsAddr,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+
+		if listenErr := server.ListenAndServe(); listenErr != nil {
 			logrus.Fatalf("Failed to start prometheus metrics server: %v", listenErr)
 		}
 	}()

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/gorilla/mux"
@@ -237,7 +238,12 @@ func NewWebsocketTransportFactory(host, port, path string) (TransportFactory, er
 	serverAddr := fmt.Sprintf("%s:%s", host, port)
 	logrus.Info(fmt.Sprintf("Starting HTTP server at %s", serverAddr))
 	go func() {
-		logrus.Info(http.ListenAndServe(serverAddr, router))
+		server := &http.Server{
+			Addr:              serverAddr,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		server.Handler = router
+		logrus.Info(server.ListenAndServe())
 	}()
 
 	return &websocketTransportFactory{
