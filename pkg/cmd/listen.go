@@ -8,6 +8,7 @@ import (
 	"github.com/glothriel/wormhole/pkg/auth"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/glothriel/wormhole/pkg/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -97,6 +98,7 @@ var listenCommand *cli.Command = &cli.Command{
 				wsTransportFactory,
 				getAcceptor(c, consentGatherer),
 			),
+			ps.NewInMemoryPubSub(),
 		)
 		var portOpenerFactory server.PortOpenerFactory
 		if c.Bool("kubernetes") {

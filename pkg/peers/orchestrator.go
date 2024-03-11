@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/events"
 	"github.com/glothriel/wormhole/pkg/messages"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,6 +19,7 @@ type DefaultPeer struct {
 	sessionsChan  chan messages.Message
 	appsChan      chan AppEvent
 	closePingChan chan bool
+	pubSub        ps.PubSub
 }
 
 // Name implements Peer
@@ -78,8 +81,9 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 	o.remoteName = introductionMessage.BodyString
 	go o.startPinging()
 	for message := range messagesChan {
-		if messages.IsPacket(message) || messages.IsSessionClosed(message) {
-			o.packetsChan <- message
+
+		if messages.IsPacket(message) {
+			o.pubSub.Publish(events.SessionClientDataSentTopic(message.SessionID, message.AppName), ps.NewContext(), message)
 		} else if messages.IsAppAdded(message) || messages.IsAppWithdrawn(message) {
 			var app App
 			if messages.IsAppAdded(message) {
@@ -91,10 +95,12 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 			o.appsChan <- AppEvent{Type: message.Type, App: app}
 		} else if messages.IsDisconnect(message) {
 			break
-		} else if messages.IsSessionOpened(message) || messages.IsSessionClosed(message) {
-			o.sessionsChan <- message
+		} else if messages.IsSessionOpened(message) {
+			o.pubSub.Publish(events.SessionStartedTopic(message.SessionID), ps.NewContext(), message)
+		} else if messages.IsSessionClosed(message) {
+			o.pubSub.Publish(events.SessionFinishedTopic(message.SessionID), ps.NewContext(), message)
 		} else if messages.IsPing(message) {
-			logrus.Tracef("Received ping message from %s", o.remoteName)
+			o.pubSub.Publish(events.PingTopic, ps.NewContext(), message)
 		} else if messages.IsAppConfirmed(message) {
 			name, address := messages.AppEventsDecode(message.BodyString)
 			logrus.Infof("Server confirmed app `%s` exposed on `%s`", name, address)
@@ -131,13 +137,14 @@ func (o *DefaultPeer) startPinging() {
 }
 
 // NewDefaultPeer creates PeerConnection instances
-func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, error) {
+func NewDefaultPeer(introduceAsName string, transport Transport, pubSub ps.PubSub) (*DefaultPeer, error) {
 	theConnection := &DefaultPeer{
 		transport:     transport,
 		packetsChan:   make(chan messages.Message),
 		appsChan:      make(chan AppEvent),
 		sessionsChan:  make(chan messages.Message),
 		closePingChan: make(chan bool),
+		pubSub:        pubSub,
 	}
 	orchestrationFailed := make(chan error)
 	go theConnection.startRouting(orchestrationFailed, introduceAsName)
@@ -151,6 +158,7 @@ func NewDefaultPeer(introduceAsName string, transport Transport) (*DefaultPeer, 
 type DefaultPeerFactory struct {
 	ownName          string
 	transportFactory TransportFactory
+	pubsSub          ps.PubSub
 }
 
 // Peers implements PeerFactory
@@ -164,7 +172,7 @@ func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
 				continue
 			}
 			for newTransport := range transports {
-				newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport)
+				newPeer, newPeerErr := NewDefaultPeer(defaultPeerFactory.ownName, newTransport, defaultPeerFactory.pubsSub)
 				if newPeerErr != nil {
 					logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
 					continue
@@ -177,6 +185,6 @@ func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
 }
 
 // NewDefaultPeerFactory creates PeerConnectionFactory instances
-func NewDefaultPeerFactory(ownName string, transportFactory TransportFactory) PeerFactory {
-	return &DefaultPeerFactory{transportFactory: transportFactory, ownName: ownName}
+func NewDefaultPeerFactory(ownName string, transportFactory TransportFactory, pubSub ps.PubSub) PeerFactory {
+	return &DefaultPeerFactory{transportFactory: transportFactory, ownName: ownName, pubsSub: pubSub}
 }

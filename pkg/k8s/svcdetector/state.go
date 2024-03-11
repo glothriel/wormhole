@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/client"
+	"github.com/glothriel/wormhole/pkg/events"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/sirupsen/logrus"
 )
 
@@ -12,10 +14,11 @@ type stateManager struct {
 	notifier          *exposedServicesNotifier
 	errorWaitInterval time.Duration
 	registry          exposedServicesRegistry
-	stateChangeChan   chan client.AppStateChange
+	bus               ps.PubSub
 }
 
-func (manager *stateManager) Changes() chan client.AppStateChange {
+func (manager *stateManager) Register(bus ps.PubSub) {
+	manager.bus = bus
 	go func() {
 		for {
 			select {
@@ -23,10 +26,9 @@ func (manager *stateManager) Changes() chan client.AppStateChange {
 				if createdService.shouldBeExposed() {
 					for _, app := range createdService.apps() {
 						if !manager.registry.isExposed(app, createdService) {
-							manager.stateChangeChan <- client.AppStateChange{
-								App:   app,
-								State: client.AppStateChangeAdded,
-							}
+							manager.bus.Publish(
+								events.LocalAppExposedTopic, ps.NewContext(), app,
+							)
 							manager.registry.markAsExposed(app, createdService)
 						}
 					}
@@ -36,8 +38,6 @@ func (manager *stateManager) Changes() chan client.AppStateChange {
 			}
 		}
 	}()
-
-	return manager.stateChangeChan
 }
 
 func (manager *stateManager) cleanupRemoved() {
@@ -64,10 +64,9 @@ func (manager *stateManager) cleanupRemoved() {
 	for _, itemToDelete := range itemsToDelete {
 		for _, app := range itemToDelete.apps {
 			manager.registry.markAsWithdrawn(app, itemToDelete.service)
-			manager.stateChangeChan <- client.AppStateChange{
-				App:   app,
-				State: client.AppStateChangeWithdrawn,
-			}
+			manager.bus.Publish(
+				events.LocalAppWithdrawnTopic, ps.NewContext(), app,
+			)
 		}
 	}
 }
@@ -82,7 +81,6 @@ func NewK8sAppStateManager(
 		repository:        svcRepository,
 		notifier:          newExposedServicesNotifier(svcRepository),
 		errorWaitInterval: time.Second * 30,
-		stateChangeChan:   make(chan client.AppStateChange),
 		registry:          newDefaultExposedServicesRegistry(),
 	}
 	ticker := time.NewTicker(cleanupInterval)
@@ -91,7 +89,9 @@ func NewK8sAppStateManager(
 		for {
 			select {
 			case <-ticker.C:
-				theManager.cleanupRemoved()
+				if theManager.bus != nil {
+					theManager.cleanupRemoved()
+				}
 			case <-quit:
 				ticker.Stop()
 				return

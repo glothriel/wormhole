@@ -40,7 +40,6 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 	if portOpenerErr != nil {
 		return ExposedApp{}, portOpenerErr
 	}
-	// TODO: not a goot idea mutating this
 	app.Address = portOpener.listenAddr()
 
 	logrus.Infof("App `%s`.`%s`: listening on %s", peer.Name(), app.Name, portOpener.listenAddr())

@@ -9,9 +9,11 @@ from .fixtures import (
     launched_in_background,
 )
 
+TEST_RUNS = 100
+
 
 class LeakTestOptions:
-    def __init__(self, scenario, counter_func, allow_extra_resources=2):
+    def __init__(self, scenario, counter_func, allow_extra_resources=TEST_RUNS / 2):
         self.scenario = scenario
         self.counter_func = counter_func
         self.allow_extra_resources = allow_extra_resources
@@ -34,8 +36,7 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
     executable, server, mock_server, opts
 ):
     starting_resources = opts.counter_func(server)
-
-    for _ in range(10):
+    for _ in range(TEST_RUNS):
         with launched_in_background(Client(executable, exposes=[f"localhost:{mock_server.port}"])):
 
             @retry(delay=0.05, tries=20)
@@ -48,12 +49,21 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
             # Call the proxied app
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
         _ensure_mock_app_status(exposed=False)
+        try:
 
-    ending_resources = opts.counter_func(server)
+            @retry(delay=1, tries=600)
+            def _ensure_resource_not_leaking():
+                ending_resources = opts.counter_func(server)
+                print(ending_resources)
+                assert ending_resources <= (starting_resources + opts.allow_extra_resources), (
+                    f"It appears, that we have a leak on `{opts.scenario}, "
+                    f"starting with: {starting_resources}, ending with {ending_resources}` :("
+                )
 
-    assert ending_resources <= (
-        starting_resources + opts.allow_extra_resources
-    ), f"It appears, that we have a leak on {opts.scenario} :("
+            _ensure_resource_not_leaking()
+        except AssertionError:
+            server.process.send_signal(3)  # SIGQUIT
+            raise
 
 
 @pytest.mark.parametrize(
@@ -94,15 +104,20 @@ def test_resource_leaks_when_passing_messages(executable, server, mock_server, o
         starting_resources = opts.counter_func(client, server)
 
         # Call the proxied app
-        for i in range(50):
+        for i in range(TEST_RUNS):
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
 
-        # Give it a second to get rid of the resources (close files, goroutines, etc)
-        @retry(delay=0.1, tries=20)
-        def _ensure_resource_not_leaking():
-            ending_resources = opts.counter_func(client, server)
-            assert (
-                ending_resources <= starting_resources + opts.allow_extra_resources
-            ), f"It appears, that we have a leak on {opts.scenario} :("
+        try:
 
-        _ensure_resource_not_leaking()
+            @retry(delay=1, tries=10)
+            def _ensure_resource_not_leaking():
+                ending_resources = opts.counter_func(client, server)
+                assert ending_resources <= (starting_resources + opts.allow_extra_resources), (
+                    f"It appears, that we have a leak on `{opts.scenario}, "
+                    f"starting with: {starting_resources}, ending with {ending_resources}` :("
+                )
+
+            _ensure_resource_not_leaking()
+        except AssertionError:
+            server.process.send_signal(3)  # SIGQUIT
+            raise

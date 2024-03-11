@@ -9,6 +9,7 @@ import (
 	"github.com/glothriel/wormhole/pkg/client"
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/dynamic"
@@ -39,6 +40,7 @@ var joinCommand *cli.Command = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
+		pubSub := ps.NewInMemoryPubSub()
 		transport, transportErr := peers.NewWebsocketClientTransport(c.String("server"))
 		if transportErr != nil {
 			return transportErr
@@ -56,11 +58,15 @@ var joinCommand *cli.Command = &cli.Command{
 		peer, peerErr := peers.NewDefaultPeer(
 			c.String("name"),
 			rsaTransport,
+			pubSub,
 		)
 		if peerErr != nil {
 			return peerErr
 		}
-		return client.NewExposer(peer).Expose(getAppStateManager(c))
+		err := client.NewExposer(peer, pubSub).Expose(getAppStateManager(c))
+		// Block forever
+		<-make(chan bool)
+		return err
 	},
 }
 

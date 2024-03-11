@@ -2,13 +2,13 @@ package client
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strings"
-	"sync"
 
+	"github.com/glothriel/wormhole/pkg/events"
 	"github.com/glothriel/wormhole/pkg/messages"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,12 +18,7 @@ type appConnection struct {
 
 	connection net.Conn
 
-	theInbox  chan messages.Message
 	theOutbox chan messages.Message
-}
-
-func (e *appConnection) inbox() chan messages.Message {
-	return e.theInbox
 }
 
 func (e *appConnection) outbox() chan messages.Message {
@@ -39,12 +34,11 @@ func (e *appConnection) terminate() {
 	if closeErr := e.connection.Close(); closeErr != nil {
 		logrus.Errorf("Failed closing TCP connection: %v", closeErr)
 	}
-	close(e.theInbox)
 	close(e.theOutbox)
 }
 
-func newAppConnection(sessionID, address, appName string) (*appConnection, error) {
-	logrus.Debugf("Dial %s", address)
+func newAppConnection(sessionID, address, appName string, bus ps.PubSub) (*appConnection, error) {
+	logrus.Tracef("Dial %s", address)
 	conn, dialErr := net.Dial("tcp", address)
 	if dialErr != nil {
 		return nil, dialErr
@@ -53,9 +47,7 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 	theConnection := &appConnection{
 		sessionID:  sessionID,
 		connection: conn,
-
-		theInbox:  make(chan messages.Message),
-		theOutbox: make(chan messages.Message),
+		theOutbox:  make(chan messages.Message),
 
 		appName: appName,
 	}
@@ -97,60 +89,10 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 			for i := 0; i < readBytes; i++ {
 				msgBody[i] = buf[i]
 			}
+			bus.Publish(events.SessionAppDataSentTopic(sessionID, appName), ps.NewContext(), messages.NewPacket(theConnection.sessionID, msgBody))
 
-			theConnection.inbox() <- messages.NewPacket(theConnection.sessionID, msgBody)
 		}
 	}()
 
 	return theConnection, nil
-}
-
-type appConnectionsRegistry struct {
-	upstreamConnections sync.Map
-	addresses           *appAddressRegistry
-}
-
-func (registry *appConnectionsRegistry) create(
-	sessionID, appName string,
-) (*appConnection, error) {
-	session, found := registry.upstreamConnections.Load(sessionID)
-	if !found {
-		destination, upstreamNameFound := registry.addresses.get(appName)
-		if !upstreamNameFound {
-			return nil, fmt.Errorf("Could not find app with name %s", appName)
-		}
-		logrus.WithField("session_id", sessionID).Infof("Creating new client session on %s", destination)
-		theSession, sessionErr := newAppConnection(sessionID, destination, appName)
-		if sessionErr != nil {
-			return nil, sessionErr
-		}
-		registry.upstreamConnections.Store(sessionID, theSession)
-		return theSession, nil
-	}
-	return session.(*appConnection), nil
-}
-
-func (registry *appConnectionsRegistry) get(
-	sessionID string,
-) (*appConnection, error) {
-	session, found := registry.upstreamConnections.Load(sessionID)
-	if !found {
-		return nil, fmt.Errorf("Could not find connection with ID %s", sessionID)
-	}
-	return session.(*appConnection), nil
-}
-
-func (registry *appConnectionsRegistry) delete(sessionID string) {
-	session, found := registry.upstreamConnections.Load(sessionID)
-	if found {
-		session.(*appConnection).terminate()
-		registry.upstreamConnections.Delete(sessionID)
-	}
-}
-
-func newAppConnectionRegistry(addresses *appAddressRegistry) *appConnectionsRegistry {
-	return &appConnectionsRegistry{
-		upstreamConnections: sync.Map{},
-		addresses:           addresses,
-	}
 }

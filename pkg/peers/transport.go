@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/gorilla/mux"
@@ -106,7 +107,7 @@ func (transport *websocketTransport) Send(message messages.Message) (theErr erro
 func (transport *websocketTransport) sendWorker() {
 	for request := range transport.writeChan {
 		theBytes := messages.SerializeBytes(request.message)
-		logrus.Debugf("Sending message: %s", string(theBytes))
+		logrus.Tracef("Sending message: %s", string(theBytes))
 		writeErr := transport.Connection.WriteMessage(websocket.BinaryMessage, theBytes)
 		if writeErr != nil {
 			request.errChan <- fmt.Errorf("Failed writing message to websocket: %w", writeErr)
@@ -134,7 +135,7 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 				}
 				return
 			}
-			logrus.Debugf("Received message: %s", string(msg))
+			logrus.Tracef("Received message: %s", string(msg))
 			theMsg, deserializeErr := messages.DeserializeMessageBytes(msg)
 			if deserializeErr != nil {
 				logrus.Error(deserializeErr)
@@ -237,7 +238,13 @@ func NewWebsocketTransportFactory(host, port, path string) (TransportFactory, er
 	serverAddr := fmt.Sprintf("%s:%s", host, port)
 	logrus.Info(fmt.Sprintf("Starting HTTP server at %s", serverAddr))
 	go func() {
-		logrus.Info(http.ListenAndServe(serverAddr, router))
+		server := &http.Server{
+			Addr:              serverAddr,
+			Handler:           router,
+			ReadHeaderTimeout: 1 * time.Second,
+			IdleTimeout:       1 * time.Minute,
+		}
+		logrus.Info(server.ListenAndServe())
 	}()
 
 	return &websocketTransportFactory{

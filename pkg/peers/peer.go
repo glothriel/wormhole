@@ -9,7 +9,7 @@ type Peer interface {
 	Name() string
 	Send(messages.Message) error
 	Packets() chan messages.Message
-	SessionEvents() chan messages.Message
+	// SessionEvents() chan messages.Message
 	AppEvents() chan AppEvent
 }
 

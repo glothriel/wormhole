@@ -113,7 +113,7 @@ class Client:
         self.metrics_port = metrics_port
         self.process = None
 
-    def start(self):
+    def start(self, wait=True):
         command = [
             self.executable,
             "--metrics",
@@ -129,11 +129,7 @@ class Client:
             else:
                 command += ["--expose", f"name={expose[0]},address={expose[1]}"]
 
-        self.process = subprocess.Popen(command, shell=False)
-        # TODO: Replace with retry once it supports multiple connections
-        import time
-
-        time.sleep(2)
+        self.process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
 
         return self
 
@@ -237,7 +233,6 @@ class Kubectl:
 
 
 class KindCluster:
-
     KIND_VERSION = "v0.11.1"
 
     def __init__(self, name):
@@ -297,7 +292,6 @@ class KindCluster:
 
 
 class Helm:
-
     HELM_VERSION = "v3.8.2"
 
     def __init__(self, cluster):

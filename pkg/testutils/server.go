@@ -3,6 +3,7 @@ package testutils
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,5 +16,9 @@ func RunTestServer(port int, response string) error {
 			logrus.Errorf("Failed to write message: %s", writeErr)
 		}
 	})
-	return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), nil)
+	server := &http.Server{
+		Addr:              fmt.Sprintf("0.0.0.0:%d", port),
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	return server.ListenAndServe()
 }
