@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/glothriel/wormhole/pkg/events"
@@ -9,8 +10,8 @@ import (
 	"github.com/glothriel/wormhole/pkg/ps"
 )
 
-func OnLocalAppExposed(pubSub ps.PubSub, cb func(ctx *ps.Context, v peers.App) error) {
-	pubSub.Subscribe(events.LocalAppExposedTopic, func(ctx *ps.Context, v any) error {
+func OnLocalAppExposed(pubSub ps.PubSub, cb func(ctx context.Context, v peers.App) error) {
+	pubSub.Subscribe(events.LocalAppExposedTopic, func(ctx context.Context, v any) error {
 		vAsApp, ok := v.(peers.App)
 		if !ok {
 			return fmt.Errorf("expected peers.App, got %T", v)
@@ -19,8 +20,8 @@ func OnLocalAppExposed(pubSub ps.PubSub, cb func(ctx *ps.Context, v peers.App) e
 	})
 }
 
-func OnLocalAppWithdrawn(pubSub ps.PubSub, cb func(ctx *ps.Context, v peers.App) error) {
-	pubSub.Subscribe(events.LocalAppWithdrawnTopic, func(ctx *ps.Context, v any) error {
+func OnLocalAppWithdrawn(pubSub ps.PubSub, cb func(ctx context.Context, v peers.App) error) {
+	pubSub.Subscribe(events.LocalAppWithdrawnTopic, func(ctx context.Context, v any) error {
 		vAsApp, ok := v.(peers.App)
 		if !ok {
 			return fmt.Errorf("expected peers.App, got %T", v)
@@ -29,8 +30,8 @@ func OnLocalAppWithdrawn(pubSub ps.PubSub, cb func(ctx *ps.Context, v peers.App)
 	})
 }
 
-func OnSessionStarted(pubSub ps.PubSub, cb func(ctx *ps.Context, sessionID, appName string) error) {
-	pubSub.Subscribe(events.SessionStartedTopic(".*"), func(ctx *ps.Context, v any) error {
+func OnSessionStarted(pubSub ps.PubSub, cb func(ctx context.Context, sessionID, appName string) error) {
+	pubSub.Subscribe(events.RemoteSessionStartedTopic(".*"), func(ctx context.Context, v any) error {
 		vsAsMsg, ok := v.(messages.Message)
 		if !ok {
 			return fmt.Errorf("expected messages.Message, got %T", v)
@@ -39,8 +40,8 @@ func OnSessionStarted(pubSub ps.PubSub, cb func(ctx *ps.Context, sessionID, appN
 	})
 }
 
-func OnSessionFinished(pubSub ps.PubSub, sessionID string, cb func(ctx *ps.Context, sessionID string) error) {
-	pubSub.Subscribe(events.SessionFinishedTopic(".*"), func(ctx *ps.Context, v any) error {
+func OnSessionFinished(pubSub ps.PubSub, sessionID string, cb func(ctx context.Context, sessionID string) error) {
+	pubSub.Subscribe(events.RemoteSessionFinishedTopic(sessionID), func(ctx context.Context, v any) error {
 		vsAsMsg, ok := v.(messages.Message)
 		if !ok {
 			return fmt.Errorf("expected messages.Message, got %T", v)
@@ -49,8 +50,8 @@ func OnSessionFinished(pubSub ps.PubSub, sessionID string, cb func(ctx *ps.Conte
 	}, sessionID)
 }
 
-func OnSessionClientData(pubSub ps.PubSub, sessionID string, appName string, cb func(ctx *ps.Context, msg messages.Message) error) {
-	pubSub.Subscribe(events.SessionClientDataSentTopic(sessionID, appName), func(ctx *ps.Context, v any) error {
+func OnSessionClientData(pubSub ps.PubSub, sessionID string, appName string, cb func(ctx context.Context, msg messages.Message) error) {
+	pubSub.Subscribe(events.RemoteSessionClientDataSentTopic(sessionID, appName), func(ctx context.Context, v any) error {
 		vsAsMsg, ok := v.(messages.Message)
 		if !ok {
 			return fmt.Errorf("expected messages.Message, got %T", v)
@@ -59,8 +60,8 @@ func OnSessionClientData(pubSub ps.PubSub, sessionID string, appName string, cb 
 	}, sessionID)
 }
 
-func OnSessionAppData(pubSub ps.PubSub, sessionID string, appName string, cb func(ctx *ps.Context, msg messages.Message) error) {
-	pubSub.Subscribe(events.SessionAppDataSentTopic(sessionID, appName), func(ctx *ps.Context, v any) error {
+func OnLocalSessionAppData(pubSub ps.PubSub, sessionID string, appName string, cb func(ctx context.Context, msg messages.Message) error) {
+	pubSub.Subscribe(events.LocalSessionAppDataSentTopic(sessionID, appName), func(ctx context.Context, v any) error {
 		vsAsMsg, ok := v.(messages.Message)
 		if !ok {
 			return fmt.Errorf("expected messages.Message, got %T", v)
@@ -69,8 +70,14 @@ func OnSessionAppData(pubSub ps.PubSub, sessionID string, appName string, cb fun
 	}, sessionID)
 }
 
-func OnPing(pubSub ps.PubSub, cb func(ctx *ps.Context) error) {
-	pubSub.Subscribe(events.PingTopic, func(ctx *ps.Context, v any) error {
+func OnSessionAppEOF(pubSub ps.PubSub, sessionID string, appName string, cb func(ctx context.Context) error) {
+	pubSub.Subscribe(events.LocalSessionAppEOFTopic(sessionID, appName), func(ctx context.Context, v any) error {
+		return cb(ctx)
+	}, sessionID)
+}
+
+func OnPing(pubSub ps.PubSub, cb func(ctx context.Context) error) {
+	pubSub.Subscribe(events.PingTopic, func(ctx context.Context, v any) error {
 		return cb(ctx)
 	})
 }

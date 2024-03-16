@@ -2,12 +2,13 @@ import time
 import requests
 
 while True:
-    time.sleep(5)
-    apps = requests.get("https://karagiorgis.pl/v1/apps").json()
+    apps = requests.get("http://localhost:8081/v1/apps").json()
     if len(apps) == 0:
         print("No app!")
+
+        time.sleep(5)
         continue
-    ep = "http://karagiorgis.pl:" + apps[0]["endpoint"].split(":")[1]
+    ep = "http://localhost:" + apps[0]["endpoint"].split(":")[1]
     try:
       if requests.get(ep, timeout=1).status_code == 200:
           print("Hurra")
@@ -15,4 +16,6 @@ while True:
           print("Nope")
     except requests.exceptions.ReadTimeout:
         print("Timeout!")
+    
+    time.sleep(5)
     

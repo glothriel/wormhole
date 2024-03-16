@@ -1,9 +1,11 @@
 package router
 
 import (
+	"context"
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/messages"
+	"github.com/glothriel/wormhole/pkg/trace"
 	"github.com/sirupsen/logrus"
 )
 
@@ -62,8 +64,13 @@ func NewPacketRouter(allMessages chan messages.Message) *PacketRouter {
 	}
 	go func(router *PacketRouter, msgs chan messages.Message) {
 		for message := range msgs {
+
 			if messages.IsPacket(message) {
-				router.put(message)
+				trace.Trace("[ROUTER] putting message", messages.ParseContext(message), func(newCtx context.Context) error {
+					router.put(message)
+					return nil
+				})
+
 			} else {
 				logrus.Errorf("Unexpected message type %s passed to PacketRouter", message.Type)
 			}

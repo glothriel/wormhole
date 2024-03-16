@@ -1,16 +1,20 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/glothriel/wormhole/pkg/router"
-	"github.com/sirupsen/logrus"
 )
 
 // Server accepts Peers and opens ports for all the apps connected peers expose
 type Server struct {
+	bus         ps.PubSub
 	peerFactory peers.PeerFactory
 	appExposer  AppExposer
 }
@@ -38,34 +42,85 @@ func (server *Server) Start() error {
 	}
 	for peer := range peersChan {
 		go func(peer peers.Peer) {
-			logrus.Infof("Peer `%s` connected", peer.Name())
-			for appEvent := range peer.AppEvents() {
-				handler, ok := map[string]func(peers.Peer, peers.AppEvent) error{
-					peers.EventAppAdded:     server.onAppAdded,
-					peers.EventAppWithdrawn: server.onAppWithdrawn,
-				}[appEvent.Type]
-				if ok {
-					if handlerErr := handler(peer, appEvent); handlerErr != nil {
-						logrus.Error(handlerErr)
-						return
-					}
+
+			OnRemoteAppExposed(server.bus, peer, func(ctx context.Context, app peers.App) error {
+				pckts := make(chan messages.Message)
+				exposedApp, registerErr := server.appExposer.Expose(
+					peer, app, router.NewPacketRouter(pckts),
+				)
+				if registerErr != nil {
+					return registerErr
 				}
-			}
-			if terminateErr := server.appExposer.Terminate(peer); terminateErr != nil {
-				logrus.Warnf("could not terminate peer `%s` gracefully: %v", peer.Name(), terminateErr)
-			} else {
-				logrus.Infof("Peer `%s` disconnected", peer.Name())
-			}
+				OnLocalSessionStarted(server.bus, ".*", app.Name, peer.Name(), func(ctx context.Context, connection appConnection) error {
+					handler := newAppConnectionHandler(
+						peer,
+						app,
+						connection,
+					)
+					if sendErr := peer.Send(messages.WithContext(messages.NewSessionOpened(
+						handler.appConnection.sessionID(),
+						handler.app.Name,
+					), ctx)); sendErr != nil {
+						return sendErr
+					}
+					OnSessionAppData(server.bus, connection.sessionID(), app.Name, func(ctx context.Context, msg messages.Message) error {
+						if messages.IsPacket(msg) {
+							// TODO:This breaks at some point and blocks here
+							pckts <- messages.WithContext(msg, ctx)
+
+						}
+						return nil
+					})
+					for {
+						downstreamMsg, receiveErr := handler.appConnection.receive()
+						if receiveErr != nil {
+							if errors.Is(receiveErr, io.EOF) {
+								if sessionClosedErr := handler.peer.Send(
+									messages.WithContext(messages.NewSessionClosed(handler.appConnection.sessionID(), handler.app.Name), ctx),
+								); sessionClosedErr != nil {
+									return fmt.Errorf(
+										"Failed to notify peer about closed session: %v", sessionClosedErr,
+									)
+								}
+								return nil
+
+							} else {
+								return receiveErr
+							}
+
+						}
+
+						if sendErr := handler.peer.Send(
+							messages.WithContext(messages.WithAppName(downstreamMsg, handler.app.Name), ctx),
+						); sendErr != nil {
+							return sendErr
+						}
+					}
+				})
+				return peer.Send(
+					messages.WithContext(messages.NewAppConfirmed(exposedApp.App.Name, exposedApp.App.Address), ctx),
+				)
+			})
+
+			OnRemoteAppWithdrawn(server.bus, peer, func(ctx context.Context, app peers.App) error {
+				unexposeErr := server.appExposer.Unexpose(peer, app)
+				if unexposeErr != nil {
+					return unexposeErr
+				}
+				return server.appExposer.Terminate(peer)
+			})
+
 		}(peer)
 	}
 	return nil
 }
 
 // NewServer creates Server instances
-func NewServer(peerFactory peers.PeerFactory, appExposer AppExposer) *Server {
+func NewServer(peerFactory peers.PeerFactory, appExposer AppExposer, bus ps.PubSub) *Server {
 	listener := &Server{
 		peerFactory: peerFactory,
 		appExposer:  appExposer,
+		bus:         bus,
 	}
 	return listener
 }

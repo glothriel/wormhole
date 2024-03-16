@@ -1,0 +1,56 @@
+version: '3.4'
+
+
+services:
+  jaeger:
+    network_mode: "host"
+    image: jaegertracing/all-in-one:${JAEGER_VERSION:-1.55.0}
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=9411
+
+  listen:
+    user: $USER_ID:$GROUP_ID
+    network_mode: "host"
+    image: wormhole
+    command: ['-n', '-q', '-r', '-e', 'go,mod,sum', '--',  'sh', '-c', 'while true; do sleep 1 && go run main.go --debug listen --acceptor dummy; done']
+
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile.go
+      target: $TARGET
+      args:
+        - USER_ID=$USER_ID
+        - GROUP_ID=$GROUP_ID
+        - VERSION=$VERSION
+        - PROJECT=..
+    volumes:
+      - listen:/home/go/.cache
+      - ../main.go:/src/main.go
+      - ../pkg:/src/pkg
+    restart: always
+
+
+  join:
+    user: $USER_ID:$GROUP_ID
+    image: wormhole
+    network_mode: "host"
+    command: ['-n', '-q', '-r', '-e', 'go,mod,sum', '--', 'sh', '-c', "while true; do sleep 1 && go run main.go --debug join --name edgeOne --server ws://localhost:8080/wh/tunnel --expose name=my-files,address=localhost:1234; done"]
+
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile.go
+      target: $TARGET
+      args:
+        - USER_ID=$USER_ID
+        - GROUP_ID=$GROUP_ID
+        - VERSION=$VERSION
+        - PROJECT=..
+    volumes:
+      - join:/home/go/.cache
+      - ../main.go:/src/main.go
+      - ../pkg:/src/pkg
+    restart: always
+
+volumes:
+  listen:
+  join:

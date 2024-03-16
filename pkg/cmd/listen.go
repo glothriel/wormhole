@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"strconv"
 
 	"github.com/glothriel/wormhole/pkg/admin"
@@ -80,6 +84,18 @@ var listenCommand *cli.Command = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		otelShutdown, err := setupOTelSDK(ctx, "wormhole-listen")
+		if err != nil {
+			return err
+		}
+		// Handle shutdown properly so nothing leaks.
+		defer func() {
+			logrus.Error(errors.Join(err, otelShutdown(context.Background())))
+		}()
+
+		bus := ps.NewInMemoryPubSub()
 		startPrometheusServer(c)
 		wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
 			c.String("host"),
@@ -89,7 +105,6 @@ var listenCommand *cli.Command = &cli.Command{
 		if wsTransportFactoryErr != nil {
 			return wsTransportFactoryErr
 		}
-
 		consentGatherer := admin.NewConsentGatherer()
 
 		peerFactory := peers.NewDefaultPeerFactory(
@@ -98,7 +113,7 @@ var listenCommand *cli.Command = &cli.Command{
 				wsTransportFactory,
 				getAcceptor(c, consentGatherer),
 			),
-			ps.NewInMemoryPubSub(),
+			bus,
 		)
 		var portOpenerFactory server.PortOpenerFactory
 		if c.Bool("kubernetes") {
@@ -128,10 +143,12 @@ var listenCommand *cli.Command = &cli.Command{
 		}
 		appExposer := server.NewDefaultAppExposer(
 			portOpenerFactory,
+			bus,
 		)
 		transportServer := server.NewServer(
 			peerFactory,
 			appExposer,
+			bus,
 		)
 		adminServer := admin.NewWormholeAdminServer(
 			fmt.Sprintf(":%d", c.Int("admin-port")),

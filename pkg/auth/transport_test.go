@@ -43,11 +43,11 @@ func TestMessagesArePassedTransparentlyToThePeers(t *testing.T) {
 	serverTransport := <-serverTransportChan
 
 	// when
-	assert.Nil(t, serverTransport.Send(messages.NewPacket(
+	assert.Nil(t, serverTransport.Send(messages.NewPacketFromApp(
 		"unknown",
 		[]byte("Cześć!"),
 	)))
-	assert.Nil(t, clientTransport.Send(messages.NewPacket(
+	assert.Nil(t, clientTransport.Send(messages.NewPacketFromApp(
 		"unknown",
 		[]byte("No hej!"),
 	)))

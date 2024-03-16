@@ -1,10 +1,13 @@
 package ps
 
 import (
+	"context"
+	"fmt"
 	"regexp"
 	"sync"
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/trace"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,7 +38,7 @@ func CtxSet(ctx *Context, key string, value any) {
 	ctx.Data.Store(key, value)
 }
 
-type HandlerFunc func(*Context, any) error
+type HandlerFunc func(context.Context, any) error
 
 type Handler struct {
 	ClientID string
@@ -43,8 +46,8 @@ type Handler struct {
 }
 
 type PubSub interface {
-	Subscribe(pattern string, handler func(*Context, any) error, clientID ...string)
-	Publish(topic string, ctx *Context, message any) error
+	Subscribe(pattern string, handler HandlerFunc, clientID ...string)
+	Publish(topic string, ctx context.Context, message any) error
 	Unsubscribe(clientID string)
 }
 
@@ -52,7 +55,7 @@ type InMemoryPubSub struct {
 	subscribers map[*regexp.Regexp][]Handler
 }
 
-func (i *InMemoryPubSub) Subscribe(pattern string, handler func(*Context, any) error, ClientID ...string) {
+func (i *InMemoryPubSub) Subscribe(pattern string, handler HandlerFunc, ClientID ...string) {
 	theClientID := "default"
 	if len(ClientID) > 0 {
 		theClientID = ClientID[0]
@@ -69,21 +72,30 @@ func (i *InMemoryPubSub) Subscribe(pattern string, handler func(*Context, any) e
 	})
 }
 
-func (i *InMemoryPubSub) Publish(topic string, ctx *Context, v any) error {
+func (i *InMemoryPubSub) Publish(topic string, ctx context.Context, v any) error {
 
-	startedAt := time.Now()
-	numHandled := 0
-	for r, handlers := range i.subscribers {
-		if r.MatchString(topic) {
-			for _, handler := range handlers {
-				numHandled++
-				if err := handler.Handler(ctx, v); err != nil {
-					return err
+	logrus.Debugf("[BUS] Publishing %s", topic)
+	trace.Trace(fmt.Sprintf("[BUS] Publish `%s`", topic), ctx, func(newCtx context.Context) error {
+		startedAt := time.Now()
+		numHandled := 0
+		for r, handlers := range i.subscribers {
+			if r.MatchString(topic) {
+				for _, handler := range handlers {
+					trace.Trace(fmt.Sprintf("[BUS] Handle `%s`", topic), newCtx, func(newCtx context.Context) error {
+						numHandled++
+						if err := handler.Handler(newCtx, v); err != nil {
+							return err
+						}
+						return nil
+					})
+
 				}
 			}
 		}
-	}
-	logrus.Debugf("[BUS] Published %s to %d handlers in %dus", topic, numHandled, time.Since(startedAt).Microseconds())
+		logrus.Debugf("[BUS] Published %s to %d handlers in %dus", topic, numHandled, time.Since(startedAt).Microseconds())
+		return nil
+	})
+
 	return nil
 }
 

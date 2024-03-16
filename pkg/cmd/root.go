@@ -4,7 +4,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
+	"github.com/uber/jaeger-client-go"
+	"github.com/uber/jaeger-client-go/config"
 	"github.com/urfave/cli/v2"
 )
 
@@ -39,10 +42,37 @@ func Run() {
 				Name:  "metrics-host",
 				Value: "0.0.0.0",
 			},
+			&cli.StringFlag{
+				Name:  "jaeger-service-name",
+				Value: "default",
+			},
+			&cli.StringFlag{
+				Name:  "jaeger-endpoint",
+				Value: "default",
+			},
 			&cli.IntFlag{
 				Name:  "metrics-port",
 				Value: 8090,
 			},
+		},
+		Action: func(ctx *cli.Context) error {
+			cfg := config.Configuration{
+				ServiceName: ctx.String("jaeger-service-name"),
+				Sampler: &config.SamplerConfig{
+					Type:  jaeger.SamplerTypeConst,
+					Param: 1,
+				},
+				Reporter: &config.ReporterConfig{
+					LogSpans: true,
+				},
+			}
+
+			tracer, _, err := cfg.NewTracer()
+			if err != nil {
+				panic(err)
+			}
+			opentracing.SetGlobalTracer(tracer)
+			return nil
 		},
 
 		Before: setLogLevel,
@@ -52,6 +82,7 @@ func Run() {
 					"Wormhole command failed. For verbose output, please use `wormhole --debug <your-command>`",
 				)
 			}
+
 		},
 	}
 

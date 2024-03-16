@@ -1,6 +1,7 @@
 package svcdetector
 
 import (
+	"context"
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/client"
@@ -27,7 +28,7 @@ func (manager *stateManager) Register(bus ps.PubSub) {
 					for _, app := range createdService.apps() {
 						if !manager.registry.isExposed(app, createdService) {
 							manager.bus.Publish(
-								events.LocalAppExposedTopic, ps.NewContext(), app,
+								events.LocalAppExposedTopic, context.Background(), app,
 							)
 							manager.registry.markAsExposed(app, createdService)
 						}
@@ -65,7 +66,7 @@ func (manager *stateManager) cleanupRemoved() {
 		for _, app := range itemToDelete.apps {
 			manager.registry.markAsWithdrawn(app, itemToDelete.service)
 			manager.bus.Publish(
-				events.LocalAppWithdrawnTopic, ps.NewContext(), app,
+				events.LocalAppWithdrawnTopic, context.Background(), app,
 			)
 		}
 	}

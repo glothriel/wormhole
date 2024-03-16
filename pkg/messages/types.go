@@ -1,6 +1,7 @@
 package messages
 
-const typePacket = "data"
+const typePacketFromApp = "data-from-app"
+const typePacketFromClient = "data-from-client"
 const typeIntroduction = "introduction"
 
 // TypeAppAdded is message type set when given app is exposed
@@ -19,7 +20,15 @@ const typeSessionOpened = "session-opened"
 
 // IsPacket checks if message contains raw packet data
 func IsPacket(m Message) bool {
-	return m.Type == typePacket
+	return m.Type == typePacketFromApp || m.Type == typePacketFromClient
+}
+
+func IsPacketFromApp(m Message) bool {
+	return m.Type == typePacketFromApp
+}
+
+func IsPacketFromClient(m Message) bool {
+	return m.Type == typePacketFromClient
 }
 
 // IsIntroduction checks if message contains peer name
@@ -62,11 +71,18 @@ func IsSessionClosed(m Message) bool {
 	return m.Type == typeSessionClosed
 }
 
-// NewPacket Allows creating new message that carries raw packet data
-func NewPacket(sessionID string, d []byte) Message {
+func NewPacketFromApp(sessionID string, d []byte) Message {
 	return Message{
 		SessionID:  sessionID,
-		Type:       typePacket,
+		Type:       typePacketFromApp,
+		BodyString: string(d),
+	}
+}
+
+func NewPacketFromClient(sessionID string, d []byte) Message {
+	return Message{
+		SessionID:  sessionID,
+		Type:       typePacketFromClient,
 		BodyString: string(d),
 	}
 }

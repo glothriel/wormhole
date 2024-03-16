@@ -33,9 +33,6 @@ func (sm *perAppPortOpener) connections() chan appConnection {
 				return
 			}
 			sessionID := uuid.New().String()[:6]
-			logrus.Infof(
-				"New session ID %s", sessionID,
-			)
 			theSession := &tcpAppConnection{
 				conn:         tcpC,
 				theSessionID: sessionID,

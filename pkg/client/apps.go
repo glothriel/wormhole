@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/events"
@@ -46,7 +47,7 @@ type staticAppStateManager struct {
 func (manager staticAppStateManager) Register(bus ps.PubSub) {
 	for _, app := range manager.Apps {
 		bus.Publish(
-			events.LocalAppExposedTopic, ps.NewContext(), app,
+			events.LocalAppExposedTopic, context.Background(), app,
 		)
 	}
 }

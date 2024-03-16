@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -39,6 +43,16 @@ var joinCommand *cli.Command = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		otelShutdown, setupErr := setupOTelSDK(ctx, "wormhole-join")
+		if setupErr != nil {
+			return setupErr
+		}
+		// Handle shutdown properly so nothing leaks.
+		defer func() {
+			logrus.Error(errors.Join(setupErr, otelShutdown(context.Background())))
+		}()
 		startPrometheusServer(c)
 		pubSub := ps.NewInMemoryPubSub()
 		transport, transportErr := peers.NewWebsocketClientTransport(c.String("server"))

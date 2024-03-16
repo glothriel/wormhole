@@ -75,14 +75,15 @@ func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRou
 }
 
 func (handler *appConnectionHandler) Handle(router messageRouter) {
+
 	if sendErr := handler.peer.Send(messages.NewSessionOpened(
 		handler.appConnection.sessionID(),
 		handler.app.Name,
 	)); sendErr != nil {
 		logrus.Errorf("Could not notify the peer about new opened session")
 	}
-	go handler.handleIncomingPeerMessages(router)
-	go handler.handleIncomingAppMessages(router)
+	// go handler.handleIncomingPeerMessages(router)
+	// go handler.handleIncomingAppMessages(router)
 }
 
 // tcpAppConnection is a wrapper over TCP connection that implements appConnection
@@ -101,7 +102,7 @@ func (s *tcpAppConnection) receive() (messages.Message, error) {
 	for i := 0; i < readBytes; i++ {
 		msgBody[i] = buf[i]
 	}
-	return messages.NewPacket(s.theSessionID, msgBody), nil
+	return messages.NewPacketFromClient(s.theSessionID, msgBody), nil
 }
 
 func (s *tcpAppConnection) write(m messages.Message) error {

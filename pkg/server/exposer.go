@@ -1,7 +1,11 @@
 package server
 
 import (
+	"context"
+
+	"github.com/glothriel/wormhole/pkg/events"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/ps"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,6 +24,7 @@ type ExposedApp struct {
 }
 type defaultAppExposer struct {
 	registry *exposedAppsRegistry
+	bus      ps.PubSub
 
 	portOpenerFactory PortOpenerFactory
 }
@@ -46,12 +51,11 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 	exposer.registry.store(peer, app, portOpener)
 	go func() {
 		for connection := range portOpener.connections() {
-			handler := newAppConnectionHandler(
-				peer,
-				app,
+			exposer.bus.Publish(
+				events.LocalSessionStartedTopic(connection.sessionID(), app.Name, peer.Name()),
+				context.Background(),
 				connection,
 			)
-			go handler.Handle(router)
 		}
 		exposer.registry.delete(peer, app)
 	}()
@@ -98,9 +102,10 @@ func (exposer *defaultAppExposer) Apps() []ExposedApp {
 }
 
 // NewDefaultAppExposer creates defaultAppExposer instances
-func NewDefaultAppExposer(portOpenerFactory PortOpenerFactory) AppExposer {
+func NewDefaultAppExposer(portOpenerFactory PortOpenerFactory, bus ps.PubSub) AppExposer {
 	return &defaultAppExposer{
 		portOpenerFactory: portOpenerFactory,
 		registry:          newExposedAppsRegistry(),
+		bus:               bus,
 	}
 }

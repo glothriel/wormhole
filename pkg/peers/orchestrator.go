@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -44,6 +45,7 @@ func (o *DefaultPeer) SessionEvents() chan messages.Message {
 
 // Send immplements Peer
 func (o *DefaultPeer) Send(msg messages.Message) error {
+	logrus.Debug("[PEER] Sent message: ", msg.Type)
 	return o.transport.Send(msg)
 }
 
@@ -59,7 +61,7 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 		return
 	}
 
-	if sendErr := o.transport.Send(messages.NewIntroduction(localName)); sendErr != nil {
+	if sendErr := o.Send(messages.NewIntroduction(localName)); sendErr != nil {
 		failedChan <- sendErr
 		return
 	}
@@ -77,30 +79,36 @@ func (o *DefaultPeer) startRouting(failedChan chan error, localName string) {
 		)
 		return
 	}
+
 	failedChan <- nil
 	o.remoteName = introductionMessage.BodyString
 	go o.startPinging()
 	for message := range messagesChan {
+		ctx := messages.ParseContext(message)
 
-		if messages.IsPacket(message) {
-			o.pubSub.Publish(events.SessionClientDataSentTopic(message.SessionID, message.AppName), ps.NewContext(), message)
+		logrus.Debug("[PEER] Received message: ", message.Type)
+
+		if messages.IsPacketFromClient(message) {
+			o.pubSub.Publish(events.RemoteSessionClientDataSentTopic(message.SessionID, message.AppName), ctx, message)
+		} else if messages.IsPacketFromApp(message) {
+			o.pubSub.Publish(events.RemoteSessionAppDataSentTopic(message.SessionID, message.AppName), ctx, message)
 		} else if messages.IsAppAdded(message) || messages.IsAppWithdrawn(message) {
-			var app App
+
 			if messages.IsAppAdded(message) {
 				name, address := messages.AppEventsDecode(message.BodyString)
-				app = App{Name: name, Address: address}
+				o.pubSub.Publish(events.RemoteAppExposedTopic(o.Name()), ctx, App{Name: name, Address: address})
 			} else {
-				app = App{Name: message.BodyString}
+				o.pubSub.Publish(events.RemoteAppExposedTopic(o.Name()), ctx, App{Name: message.BodyString})
 			}
-			o.appsChan <- AppEvent{Type: message.Type, App: app}
+
 		} else if messages.IsDisconnect(message) {
 			break
 		} else if messages.IsSessionOpened(message) {
-			o.pubSub.Publish(events.SessionStartedTopic(message.SessionID), ps.NewContext(), message)
+			o.pubSub.Publish(events.RemoteSessionStartedTopic(message.SessionID), ctx, message)
 		} else if messages.IsSessionClosed(message) {
-			o.pubSub.Publish(events.SessionFinishedTopic(message.SessionID), ps.NewContext(), message)
+			o.pubSub.Publish(events.RemoteSessionFinishedTopic(message.SessionID), ctx, message)
 		} else if messages.IsPing(message) {
-			o.pubSub.Publish(events.PingTopic, ps.NewContext(), message)
+			o.pubSub.Publish(events.PingTopic, ctx, message)
 		} else if messages.IsAppConfirmed(message) {
 			name, address := messages.AppEventsDecode(message.BodyString)
 			logrus.Infof("Server confirmed app `%s` exposed on `%s`", name, address)
@@ -122,7 +130,7 @@ func (o *DefaultPeer) startPinging() {
 	for {
 		select {
 		case <-timer.C:
-			if pingErr := o.transport.Send(messages.NewPing()); pingErr != nil {
+			if pingErr := o.Send(messages.NewPing()); pingErr != nil {
 				if closeErr := o.Close(); closeErr != nil {
 					logrus.Errorf(
 						"Failed to send ping to peer %s - closing transport", o.remoteName,
@@ -177,6 +185,7 @@ func (defaultPeerFactory *DefaultPeerFactory) Peers() (chan Peer, error) {
 					logrus.Error(fmt.Errorf("Error when creating peer: %w", newPeerErr))
 					continue
 				}
+				defaultPeerFactory.pubsSub.Publish(events.PeerConnected, context.Background(), newPeer)
 				peersChan <- newPeer
 			}
 		}
