@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -36,53 +37,60 @@ type appConnectionHandler struct {
 	app           peers.App
 }
 
-func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) {
-	for message := range router.Get(handler.appConnection.sessionID()) {
-		if messages.IsFrame(message) {
-			if writeErr := handler.appConnection.write(message); writeErr != nil {
-				logrus.Fatal(writeErr)
-			}
-		}
-	}
-}
-
-func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRouter) {
-	defer router.Done(handler.appConnection.sessionID())
-	for {
-		downstreamMsg, receiveErr := handler.appConnection.receive()
-		if receiveErr != nil {
-			if errors.Is(receiveErr, io.EOF) {
-				if sessionClosedErr := handler.peer.Send(
-					messages.NewSessionClosed(handler.appConnection.sessionID(), handler.app.Name),
-				); sessionClosedErr != nil {
-					logrus.Errorf(
-						"Failed to notify peer about closed session: %v", sessionClosedErr,
-					)
+func (handler *appConnectionHandler) handleIncomingPeerMessages(router messageRouter) func() {
+	return func() {
+		for message := range router.Get(handler.appConnection.sessionID()) {
+			if messages.IsFrame(message) {
+				if writeErr := handler.appConnection.write(message); writeErr != nil {
+					logrus.Fatal(writeErr)
 				}
-			} else {
-				logrus.Error(receiveErr)
 			}
-			return
-		}
-
-		if sendErr := handler.peer.Send(
-			messages.WithAppName(downstreamMsg, handler.app.Name),
-		); sendErr != nil {
-			logrus.Error(sendErr)
-			return
 		}
 	}
 }
 
-func (handler *appConnectionHandler) Handle(router messageRouter) {
-	if sendErr := handler.peer.Send(messages.NewSessionOpened(
-		handler.appConnection.sessionID(),
-		handler.app.Name,
-	)); sendErr != nil {
-		logrus.Errorf("Could not notify the peer about new opened session")
+func (handler *appConnectionHandler) handleIncomingAppMessages(router messageRouter) func() {
+	return func() {
+		defer router.Done(handler.appConnection.sessionID())
+		for {
+			downstreamMsg, receiveErr := handler.appConnection.receive()
+			if receiveErr != nil {
+				if errors.Is(receiveErr, io.EOF) {
+					if sessionClosedErr := handler.peer.Send(
+						messages.NewSessionClosed(handler.appConnection.sessionID(), handler.app.Name),
+					); sessionClosedErr != nil {
+						logrus.Errorf(
+							"Failed to notify peer about closed session: %v", sessionClosedErr,
+						)
+					}
+				} else {
+					logrus.Error(receiveErr)
+				}
+				return
+			}
+
+			if sendErr := handler.peer.Send(
+				messages.WithAppName(downstreamMsg, handler.app.Name),
+			); sendErr != nil {
+				logrus.Error(sendErr)
+				return
+			}
+		}
 	}
-	go handler.handleIncomingPeerMessages(router)
-	go handler.handleIncomingAppMessages(router)
+}
+
+func (handler *appConnectionHandler) Handle(router messageRouter) func() {
+	return func() {
+
+		if sendErr := handler.peer.Send(messages.NewSessionOpened(
+			handler.appConnection.sessionID(),
+			handler.app.Name,
+		)); sendErr != nil {
+			logrus.Errorf("Could not notify the peer about new opened session")
+		}
+		grtn.Go(handler.handleIncomingPeerMessages(router))
+		grtn.Go(handler.handleIncomingAppMessages(router))
+	}
 }
 
 // tcpAppConnection is a wrapper over TCP connection that implements appConnection

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ func (transport *rsaAuthorizedTransport) Receive() (chan messages.Message, error
 			return nil, childReceiveErr
 		}
 	}
-	go func() {
+	grtn.Go(func() {
 		for remoteMessage := range childChan {
 			encryptedBase64, base64Err := base64.RawStdEncoding.DecodeString(remoteMessage.BodyString[len(CiphertextTag):])
 			if base64Err != nil {
@@ -74,7 +75,7 @@ func (transport *rsaAuthorizedTransport) Receive() (chan messages.Message, error
 			localChan <- messages.WithBody(remoteMessage, string(plainText))
 		}
 		close(localChan)
-	}()
+	})
 	return localChan, nil
 }
 
@@ -160,22 +161,24 @@ func (factory *rsaAuthorizedTransportFactory) Transports() (chan peers.Transport
 		return nil, transportErr
 	}
 
-	go func() {
+	grtn.Go(func() {
 		for transport := range childTransports {
-			go func(transport peers.Transport) {
-				initializedTransport, initializeErr := factory.initializeTransport(transport)
+			grtn.GoA[peers.Transport](
+				func(t peers.Transport) {
+					initializedTransport, initializeErr := factory.initializeTransport(transport)
 
-				if initializeErr == nil {
-					myTransports <- initializedTransport
-				} else {
-					logrus.Warnf(
-						"Did not initialize transport: %v", initializeErr,
-					)
-				}
-			}(transport)
+					if initializeErr == nil {
+						myTransports <- initializedTransport
+					} else {
+						logrus.Warnf(
+							"Did not initialize transport: %v", initializeErr,
+						)
+					}
+				}, transport,
+			)
 		}
 		close(myTransports)
-	}()
+	})
 
 	return myTransports, nil
 }

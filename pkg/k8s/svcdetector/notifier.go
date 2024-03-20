@@ -1,5 +1,7 @@
 package svcdetector
 
+import "github.com/glothriel/wormhole/pkg/grtn"
+
 type exposedServicesNotifier struct {
 	createUpdateChan chan serviceWrapper
 	deleteChan       chan serviceWrapper
@@ -18,7 +20,7 @@ func newExposedServicesNotifier(repository ServiceRepository) *exposedServicesNo
 		createUpdateChan: make(chan serviceWrapper),
 		deleteChan:       make(chan serviceWrapper),
 	}
-	go func() {
+	grtn.Go(func() {
 		for event := range repository.watch() {
 			if event.isAddedOrModified() {
 				theNotifier.createUpdateChan <- event.service
@@ -26,6 +28,6 @@ func newExposedServicesNotifier(repository ServiceRepository) *exposedServicesNo
 				theNotifier.deleteChan <- event.service
 			}
 		}
-	}()
+	})
 	return theNotifier
 }

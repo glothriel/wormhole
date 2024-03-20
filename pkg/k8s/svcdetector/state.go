@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/client"
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,7 +17,7 @@ type stateManager struct {
 }
 
 func (manager *stateManager) Changes() chan client.AppStateChange {
-	go func() {
+	grtn.Go(func() {
 		for {
 			select {
 			case createdService := <-manager.notifier.modifiedServices():
@@ -35,7 +36,7 @@ func (manager *stateManager) Changes() chan client.AppStateChange {
 				manager.cleanupRemoved()
 			}
 		}
-	}()
+	})
 
 	return manager.stateChangeChan
 }
@@ -87,7 +88,7 @@ func NewK8sAppStateManager(
 	}
 	ticker := time.NewTicker(cleanupInterval)
 	quit := make(chan struct{})
-	go func() {
+	grtn.Go(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -97,6 +98,6 @@ func NewK8sAppStateManager(
 				return
 			}
 		}
-	}()
+	})
 	return theManager
 }

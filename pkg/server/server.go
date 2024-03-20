@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/router"
 	"github.com/sirupsen/logrus"
@@ -22,7 +23,7 @@ func (l *Server) Start() error {
 	}
 	for peer := range peersChan {
 		messageRouter := router.NewMessageRouter(peer.Frames())
-		go func(peer peers.Peer) {
+		grtn.GoA[peers.Peer](func(peer peers.Peer) {
 			logrus.Infof("Peer `%s` connected", peer.Name())
 			for appEvent := range peer.AppEvents() {
 				if appEvent.Type == peers.EventAppAdded {
@@ -42,7 +43,7 @@ func (l *Server) Start() error {
 			} else {
 				logrus.Infof("Peer `%s` disconnected", peer.Name())
 			}
-		}(peer)
+		}, peer)
 	}
 	return nil
 }

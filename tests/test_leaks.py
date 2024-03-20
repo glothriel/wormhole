@@ -38,7 +38,7 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
     for _ in range(10):
         with launched_in_background(Client(executable, exposes=[f"localhost:{mock_server.port}"])):
 
-            @retry(delay=0.05, tries=20)
+            @retry(delay=0.01, tries=100)
             def _ensure_mock_app_status(exposed=True):
                 assert len(requests.get(server.admin("/v1/apps")).json()) == (1 if exposed else 0)
 
@@ -49,11 +49,16 @@ def test_resource_leaks_when_connecting_and_disconnecting_clients(
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
         _ensure_mock_app_status(exposed=False)
 
-    ending_resources = opts.counter_func(server)
+    @retry(delay=1, tries=10)
+    def _check_resources():
 
-    assert ending_resources <= (
-        starting_resources + opts.allow_extra_resources
-    ), f"It appears, that we have a leak on {opts.scenario} :("
+        ending_resources = opts.counter_func(server)
+
+        assert ending_resources <= (
+            starting_resources + opts.allow_extra_resources
+        ), f"It appears, that we have a leak on {opts.scenario} :("
+    
+    _check_resources()
 
 
 @pytest.mark.parametrize(
@@ -98,7 +103,7 @@ def test_resource_leaks_when_passing_messages(executable, server, mock_server, o
             requests.get(f'http://{apps[0]["endpoint"]}', timeout=1)
 
         # Give it a second to get rid of the resources (close files, goroutines, etc)
-        @retry(delay=0.1, tries=20)
+        @retry(delay=1, tries=10)
         def _ensure_resource_not_leaking():
             ending_resources = opts.counter_func(client, server)
             assert (

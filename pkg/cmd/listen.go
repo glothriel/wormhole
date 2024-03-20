@@ -6,6 +6,7 @@ import (
 
 	"github.com/glothriel/wormhole/pkg/admin"
 	"github.com/glothriel/wormhole/pkg/auth"
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/glothriel/wormhole/pkg/server"
@@ -136,11 +137,11 @@ var listenCommand *cli.Command = &cli.Command{
 			server.NewServerAppsListAdapter(appExposer),
 			consentGatherer,
 		)
-		go func() {
+		grtn.Go(func() {
 			if listenErr := adminServer.Listen(); listenErr != nil {
 				logrus.Fatal(listenErr)
 			}
-		}()
+		})
 		return transportServer.Start()
 	},
 }

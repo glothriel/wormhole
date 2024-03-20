@@ -3,6 +3,7 @@ package router
 import (
 	"sync"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 )
 
@@ -59,7 +60,7 @@ func NewMessageRouter(allMessages chan messages.Message) *MessageRouter {
 		lock:                &sync.Mutex{},
 		perSessionMailboxes: make(map[string]chan messages.Message),
 	}
-	go func(router *MessageRouter, msgs chan messages.Message) {
+	grtn.GoA2[*MessageRouter, chan messages.Message](func(router *MessageRouter, msgs chan messages.Message) {
 		for message := range msgs {
 			if messages.IsFrame(message) {
 				router.put(message)
@@ -69,6 +70,6 @@ func NewMessageRouter(allMessages chan messages.Message) *MessageRouter {
 		for sessionID := range router.perSessionMailboxes {
 			router.Done(sessionID)
 		}
-	}(theRouter, allMessages)
+	}, theRouter, allMessages)
 	return theRouter
 }

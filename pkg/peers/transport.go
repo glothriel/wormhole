@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -103,15 +104,17 @@ func (transport *websocketTransport) Send(message messages.Message) (theErr erro
 	return theErr
 }
 
-func (transport *websocketTransport) sendWorker() {
-	for request := range transport.writeChan {
-		theBytes := messages.SerializeBytes(request.message)
-		logrus.Debugf("Sending message: %s", string(theBytes))
-		writeErr := transport.Connection.WriteMessage(websocket.BinaryMessage, theBytes)
-		if writeErr != nil {
-			request.errChan <- fmt.Errorf("Failed writing message to websocket: %w", writeErr)
-		} else {
-			request.errChan <- nil
+func (transport *websocketTransport) sendWorker() func() {
+	return func() {
+		for request := range transport.writeChan {
+			theBytes := messages.SerializeBytes(request.message)
+			logrus.Debugf("Sending message: `%s`", request.message.Type)
+			writeErr := transport.Connection.WriteMessage(websocket.BinaryMessage, theBytes)
+			if writeErr != nil {
+				request.errChan <- fmt.Errorf("Failed writing message to websocket: %w", writeErr)
+			} else {
+				request.errChan <- nil
+			}
 		}
 	}
 }
@@ -119,7 +122,7 @@ func (transport *websocketTransport) sendWorker() {
 func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 	theChannel := make(chan messages.Message)
 	transport.readChans = append(transport.readChans, theChannel)
-	go func() {
+	grtn.Go(func() {
 		for {
 			_, msg, readMessageErr := transport.Connection.ReadMessage()
 
@@ -134,15 +137,16 @@ func (transport *websocketTransport) Receive() (chan messages.Message, error) {
 				}
 				return
 			}
-			logrus.Debugf("Received message: %s", string(msg))
+
 			theMsg, deserializeErr := messages.DeserializeMessageBytes(msg)
 			if deserializeErr != nil {
 				logrus.Error(deserializeErr)
 				continue
 			}
+			logrus.Debugf("Received message: `%s`", theMsg.Type)
 			theChannel <- theMsg
 		}
-	}()
+	})
 	return theChannel, nil
 }
 
@@ -176,7 +180,7 @@ func NewWebsocketTransport(
 		Connection: connection,
 		writeChan:  make(chan wsWriteChanRequest),
 	}
-	go peer.sendWorker()
+	grtn.Go(peer.sendWorker())
 	return peer
 }
 
@@ -202,7 +206,7 @@ func NewWebsocketClientTransport(
 		Connection: c,
 		writeChan:  make(chan wsWriteChanRequest),
 	}
-	go peer.sendWorker()
+	grtn.Go(peer.sendWorker())
 	return peer, nil
 }
 
@@ -236,9 +240,9 @@ func NewWebsocketTransportFactory(host, port, path string) (TransportFactory, er
 	http.Handle("/", router)
 	serverAddr := fmt.Sprintf("%s:%s", host, port)
 	logrus.Info(fmt.Sprintf("Starting HTTP server at %s", serverAddr))
-	go func() {
+	grtn.Go(func() {
 		logrus.Info(http.ListenAndServe(serverAddr, router))
-	}()
+	})
 
 	return &websocketTransportFactory{
 		transports: transportsChan,
@@ -278,7 +282,7 @@ func (transport *aesTransport) Receive() (chan messages.Message, error) {
 	if childReceiveErr != nil {
 		return nil, childReceiveErr
 	}
-	go func() {
+	grtn.Go(func() {
 		for remoteMessage := range childChan {
 			encryptedBase64, base64Err := base64.RawStdEncoding.DecodeString(remoteMessage.BodyString[len(CiphertextTag):])
 			if base64Err != nil {
@@ -295,7 +299,7 @@ func (transport *aesTransport) Receive() (chan messages.Message, error) {
 			localChan <- messages.WithBody(remoteMessage, string(plainText))
 		}
 		close(localChan)
-	}()
+	})
 	return localChan, nil
 }
 
@@ -324,7 +328,7 @@ func (factory *aesTransportFactory) Transports() (chan Transport, error) {
 	if transportErr != nil {
 		return nil, transportErr
 	}
-	go func() {
+	grtn.Go(func() {
 		for childTransport := range childTransports {
 			myTransports <- &aesTransport{
 				password: factory.password,
@@ -332,7 +336,7 @@ func (factory *aesTransportFactory) Transports() (chan Transport, error) {
 			}
 		}
 		close(myTransports)
-	}()
+	})
 	return myTransports, nil
 }
 

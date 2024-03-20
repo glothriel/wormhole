@@ -88,3 +88,6 @@ docker:
   image: glothriel/wormhole
   version: latest
 
+# Dev mode expects dev image with watchexec + go run instead of binary
+devMode:
+  enabled: true

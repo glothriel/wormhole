@@ -239,3 +239,7 @@ Stubborn on-prem clients are easier to persuade to open an outbound port to a 44
 
 **Is exposing services from server to client possible?**
 Currently - no. In the future, if i have enough determination - yes.
+
+## Development
+
+```k3d cluster create wormhole --registry-create wormhole```

@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+    
+  dev:
+    cmds:
+      - USER_ID=$UID GROUP_ID=$GID VERSION=dev TARGET=dev docker-compose -f docker/docker-compose.yml up --build --remove-orphans
+  
+  build:
+    cmds:
+      - USER_ID=$UID GROUP_ID=$GID VERSION=prod TARGET=prod docker-compose -f docker/docker-compose.yml build
+
+  test:
+    cmds:
+      - cd src/suggestions-api && go test -v ./...
+      - cd src/vid-uploader-api && go test -v ./...
+

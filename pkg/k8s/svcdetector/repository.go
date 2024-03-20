@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,9 +86,9 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 		Resource: "services",
 	})
 	theChannel := make(chan watchEvent)
-	go func() {
+	grtn.Go(func() {
 		stopCh := make(chan struct{})
-		go func(stopCh <-chan struct{}, s cache.SharedIndexInformer) {
+		grtn.GoA2[<-chan struct{}, cache.SharedIndexInformer](func(stopCh <-chan struct{}, s cache.SharedIndexInformer) {
 			handlers := cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					for _, event := range repository.onAddedOrModified(obj) {
@@ -107,12 +108,12 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 			}
 			s.AddEventHandler(handlers)
 			s.Run(stopCh)
-		}(stopCh, informer.Informer())
+		}, stopCh, informer.Informer())
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt)
 		<-sigCh
 		close(stopCh)
-	}()
+	})
 	return theChannel
 }
 

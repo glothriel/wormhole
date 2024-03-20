@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -20,10 +21,10 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 	connectionRegistry := newAppConnectionRegistry(appRegistry)
 
 	peerDisconnected := make(chan bool)
-	go e.manageRegisteringAndUnregisteringOfApps(appManager, appRegistry, peerDisconnected)
+	grtn.Go(e.manageRegisteringAndUnregisteringOfApps(appManager, appRegistry, peerDisconnected))
 	defer func() { peerDisconnected <- true }()
 
-	go func() {
+	grtn.Go(func() {
 		for theMsg := range e.Peer.SessionEvents() {
 			if messages.IsSessionClosed(theMsg) {
 				connectionRegistry.delete(theMsg.SessionID)
@@ -36,10 +37,10 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 					logrus.Errorf("Error when creating connection to app %s: %s", theMsg.AppName, createErr)
 					continue
 				}
-				go e.forwardMessagesFromConnectionToPeer(theConnection)
+				grtn.Go(e.forwardMessagesFromConnectionToPeer(theConnection))
 			}
 		}
-	}()
+	})
 
 	for theMsg := range e.Peer.Frames() {
 		if messages.IsPing(theMsg) {
@@ -73,43 +74,47 @@ func (e *Exposer) Expose(appManager AppStateManager) error {
 
 func (e *Exposer) manageRegisteringAndUnregisteringOfApps(
 	appManager AppStateManager, appRegistry *appAddressRegistry, peerDisconnected chan bool,
-) {
-	changes := appManager.Changes()
-	for {
-		select {
-		case change := <-changes:
-			if change.State == AppStateChangeAdded {
-				logrus.Infof("New app added: %s on %s", change.App.Name, change.App.Address)
-				if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name, change.App.Address)); sendErr != nil {
-					logrus.Errorf("Could not send app added message to the peer: %v", sendErr)
+) func() {
+	return func() {
+		changes := appManager.Changes()
+		for {
+			select {
+			case change := <-changes:
+				if change.State == AppStateChangeAdded {
+					logrus.Infof("New app added: %s on %s", change.App.Name, change.App.Address)
+					if sendErr := e.Peer.Send(messages.NewAppAdded(change.App.Name, change.App.Address)); sendErr != nil {
+						logrus.Errorf("Could not send app added message to the peer: %v", sendErr)
+					}
+					appRegistry.register(change.App.Name, change.App.Address)
+				} else if change.State == AppStateChangeWithdrawn {
+					logrus.Infof("App withdrawn: %s", change.App.Name)
+					if sendErr := e.Peer.Send(messages.NewAppWithdrawn(change.App.Name)); sendErr != nil {
+						logrus.Errorf("Could not send app withdrawn message to the peer: %v", sendErr)
+					}
+					appRegistry.unregister(change.App.Name)
+				} else {
+					logrus.Errorf("Unknown app state change: %s", change.State)
 				}
-				appRegistry.register(change.App.Name, change.App.Address)
-			} else if change.State == AppStateChangeWithdrawn {
-				logrus.Infof("App withdrawn: %s", change.App.Name)
-				if sendErr := e.Peer.Send(messages.NewAppWithdrawn(change.App.Name)); sendErr != nil {
-					logrus.Errorf("Could not send app withdrawn message to the peer: %v", sendErr)
-				}
-				appRegistry.unregister(change.App.Name)
-			} else {
-				logrus.Errorf("Unknown app state change: %s", change.State)
+			case <-peerDisconnected:
+				return
 			}
-		case <-peerDisconnected:
-			return
 		}
 	}
 }
 
-func (e *Exposer) forwardMessagesFromConnectionToPeer(connection *appConnection) {
-	defer func() {
-		logrus.Debug("Stopped orchestrating TCP connection")
-	}()
-	for theMsg := range connection.inbox() {
-		logrus.Debug("Received message over TCP")
-		writeErr := e.Peer.Send(messages.WithAppName(theMsg, connection.appName))
-		if writeErr != nil {
-			logrus.Errorf("Could not send the message to peer: %v", writeErr)
+func (e *Exposer) forwardMessagesFromConnectionToPeer(connection *appConnection) func() {
+	return func() {
+		defer func() {
+			logrus.Debug("Stopped orchestrating TCP connection")
+		}()
+		for theMsg := range connection.inbox() {
+			logrus.Debug("Received message over TCP")
+			writeErr := e.Peer.Send(messages.WithAppName(theMsg, connection.appName))
+			if writeErr != nil {
+				logrus.Errorf("Could not send the message to peer: %v", writeErr)
+			}
+			logrus.Debug("Transimitted message to peer")
 		}
-		logrus.Debug("Transimitted message to peer")
 	}
 }
 

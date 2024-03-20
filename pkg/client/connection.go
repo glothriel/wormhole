@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/sirupsen/logrus"
 )
@@ -33,11 +34,13 @@ func (e *appConnection) outbox() chan messages.Message {
 func (e *appConnection) terminate() {
 	defer func() {
 		if r := recover(); r != nil {
-			logrus.Debugf("Recovered in %s", r)
+			logrus.Tracef("Recovered in %s", r)
 		}
 	}()
 	if closeErr := e.connection.Close(); closeErr != nil {
-		logrus.Errorf("Failed closing TCP connection: %v", closeErr)
+		if !strings.Contains(closeErr.Error(), "use of closed network connection") {
+			logrus.Errorf("Failed closing TCP connection: %v", closeErr)
+		}
 	}
 	close(e.theInbox)
 	close(e.theOutbox)
@@ -60,7 +63,7 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 		appName: appName,
 	}
 
-	go func() {
+	grtn.Go(func() {
 		defer func() {
 			logrus.Debug("Closing TCP connection outbox")
 		}()
@@ -71,9 +74,9 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 				logrus.Debugf("Failed writing message: %s", msg.Type)
 			}
 		}
-	}()
+	})
 
-	go func() {
+	grtn.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logrus.Debugf("Recovered in %s", r)
@@ -100,7 +103,7 @@ func newAppConnection(sessionID, address, appName string) (*appConnection, error
 
 			theConnection.inbox() <- messages.NewFrame(theConnection.sessionID, msgBody)
 		}
-	}()
+	})
 
 	return theConnection, nil
 }

@@ -40,15 +40,22 @@ spec:
         {{- toYaml .Values.server.tolerations | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ template "name-server" . }}
+      {{- if .Values.devMode.enabled }}
+      terminationGracePeriodSeconds: 1
+      {{- end }}
       volumes:
       - name: {{ template "name-server" . }}-tmp
+      {{- if .Values.devMode.enabled }}
+      - name: {{ template "name-server" . }}-dev
+      {{- end }}
       {{- if .Values.server.pvc.enabled }}
       - name: {{ template "name-server" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}
       {{- end }}
       containers:
-        - image: {{ $.Values.docker.registry }}/{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
+          # slash after registry only if registry is non-empty
+        - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           imagePullPolicy: {{ $.Values.server.pullPolicy }}
           {{- with .Values.server.containerSecurityContext }}
@@ -69,14 +76,18 @@ spec:
             - containerPort: 8080
             - containerPort: 8081
           volumeMounts:
+
+          {{- if .Values.devMode.enabled }}
+          - mountPath: "/home/go/.cache"
+            name: {{ template "name-server" . }}-dev
+          {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-server" . }}-tmp
       {{- if .Values.server.pvc.enabled }}
           - mountPath: "/storage"
             name: {{ template "name-server" . }}-persistent
       {{- end }}
-          command:
-            - /usr/bin/wormhole
+          args:
             - --metrics
             - listen
             - --acceptor

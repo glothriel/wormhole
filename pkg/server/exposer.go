@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 )
@@ -44,17 +45,17 @@ func (exposer *defaultAppExposer) Expose(peer peers.Peer, app peers.App, router 
 
 	logrus.Infof("App `%s`.`%s`: listening on %s", peer.Name(), app.Name, portOpener.listenAddr())
 	exposer.registry.store(peer, app, portOpener)
-	go func() {
+	grtn.Go(func() {
 		for connection := range portOpener.connections() {
 			handler := newAppConnectionHandler(
 				peer,
 				app,
 				connection,
 			)
-			go handler.Handle(router)
+			grtn.Go(handler.Handle(router))
 		}
 		exposer.registry.delete(peer, app)
-	}()
+	})
 	return nil
 }
 

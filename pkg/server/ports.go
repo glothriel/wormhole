@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/ports"
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ type perAppPortOpener struct {
 
 func (sm *perAppPortOpener) connections() chan appConnection {
 	theChan := make(chan appConnection)
-	go func(theChan chan appConnection) {
+	grtn.GoA[chan appConnection](func(theChan chan appConnection) {
 		defer func() { close(theChan) }()
 		for {
 			tcpC, acceptErr := sm.listener.Accept()
@@ -42,7 +43,7 @@ func (sm *perAppPortOpener) connections() chan appConnection {
 			}
 			theChan <- theSession
 		}
-	}(theChan)
+	}, theChan)
 
 	return theChan
 }

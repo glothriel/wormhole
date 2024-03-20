@@ -3,6 +3,7 @@ package auth
 import (
 	"testing"
 
+	"github.com/glothriel/wormhole/pkg/grtn"
 	"github.com/glothriel/wormhole/pkg/messages"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -15,9 +16,9 @@ type mockTransportFactory struct {
 
 func (mock *mockTransportFactory) Transports() (chan peers.Transport, error) {
 	transports := make(chan peers.Transport)
-	go func() {
+	grtn.Go(func() {
 		transports <- mock.createdTransport
-	}()
+	})
 	return transports, nil
 }
 
