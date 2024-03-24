@@ -1,18 +1,11 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/auth"
-	"github.com/glothriel/wormhole/pkg/client"
-	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 )
 
 var joinCommand *cli.Command = &cli.Command{
@@ -39,86 +32,16 @@ var joinCommand *cli.Command = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
-		transport, transportErr := peers.NewWebsocketClientTransport(c.String("server"))
-		if transportErr != nil {
-			return transportErr
+		helloClient := hello.NewClient(c.String("server"), "dev1")
+		for {
+			if _, err := helloClient.Hello(); err != nil {
+				logrus.Error(err)
+				time.Sleep(time.Second * 5)
+				continue
+			}
+			break
 		}
-		keyPairProvider, keyPairProviderErr := auth.NewStoredInFilesKeypairProvider(
-			c.String("keypair-storage-path"),
-		)
-		if keyPairProviderErr != nil {
-			return fmt.Errorf("Failed to initialize key pair provider: %w", keyPairProviderErr)
-		}
-		rsaTransport, rsaTransportErr := auth.NewRSAAuthorizedTransport(transport, keyPairProvider)
-		if rsaTransportErr != nil {
-			return rsaTransportErr
-		}
-		peer, peerErr := peers.NewDefaultPeer(
-			c.String("name"),
-			rsaTransport,
-		)
-		if peerErr != nil {
-			return peerErr
-		}
-		return client.NewExposer(peer).Expose(getAppStateManager(c))
+		time.Sleep(time.Hour * 24)
+		return nil
 	},
-}
-
-func getAppStateManager(c *cli.Context) client.AppStateManager {
-	if c.Bool("kubernetes") {
-		config, inClusterConfigErr := rest.InClusterConfig()
-		if inClusterConfigErr != nil {
-			logrus.Fatal(inClusterConfigErr)
-		}
-		dynamicClient, clientSetErr := dynamic.NewForConfig(config)
-		if clientSetErr != nil {
-			logrus.Fatal(clientSetErr)
-		}
-		return svcdetector.NewK8sAppStateManager(
-			svcdetector.NewDefaultServiceRepository(dynamicClient),
-			time.Second*30,
-		)
-	}
-	return client.NewStaticAppStateManager(getExposedApps(c))
-}
-
-func getExposedApps(c *cli.Context) []peers.App {
-	upstreams := []peers.App{}
-	for _, upstreamDefinition := range c.StringSlice("expose") {
-		splitDefinition := strings.Split(upstreamDefinition, ",")
-		if len(splitDefinition) == 1 && len(strings.Split(upstreamDefinition, "=")) == 1 {
-			upstreams = append(upstreams, peers.App{
-				Name:    splitDefinition[0],
-				Address: splitDefinition[0],
-			})
-			continue
-		}
-		var name, address string
-		for _, wholeDef := range splitDefinition {
-			fields := strings.Split(wholeDef, "=")
-			if len(fields) != 2 {
-				logrus.Fatalf("Invalid expose value %s: should consist of comma-separated key=value pairs", wholeDef)
-			}
-			if fields[0] == "name" {
-				name = fields[1]
-			} else if fields[0] == "address" {
-				address = fields[1]
-			} else {
-				logrus.Fatalf("Invalid expose value %s: could not recognize `%s` field", wholeDef, fields[0])
-			}
-		}
-		if name == "" || address == "" {
-			logrus.Fatalf("You need to set both `name` and `address` fields, got: %s", upstreamDefinition)
-		}
-		upstreams = append(upstreams, peers.App{
-			Name:    name,
-			Address: address,
-		})
-	}
-	if len(upstreams) < 1 {
-		logrus.Fatal(
-			"You need to provide at least one app, that will be exposed on this host",
-		)
-	}
-	return upstreams
 }

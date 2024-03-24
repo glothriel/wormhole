@@ -17,7 +17,7 @@ func Run() {
 		Commands: []*cli.Command{
 			listenCommand,
 			joinCommand,
-			requestsCommand,
+			// requestsCommand,
 			testserverCommand,
 		},
 		Version: projectVersion,

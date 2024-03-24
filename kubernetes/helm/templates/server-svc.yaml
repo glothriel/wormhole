@@ -10,8 +10,9 @@ metadata:
 spec:
   ports:
   - name: data
-    port: 8080
-    targetPort: 8080
+    port: 51820
+    protocol: UDP
+    targetPort: 51820
   selector:
     application: {{ template "name-server" . }}
   sessionAffinity: None

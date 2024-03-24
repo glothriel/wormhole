@@ -1,0 +1,171 @@
+---
+# Source: wormhole/templates/client-deployment.yaml
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    application: wormhole-client-dev1
+  name: wormhole-client-dev1
+  namespace: dev1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: wormhole-client-dev1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        application: wormhole-client-dev1
+    spec:
+      securityContext:
+        fsGroup: 1337
+        runAsGroup: 0
+        runAsNonRoot: false
+        runAsUser: 0
+      serviceAccountName: wormhole-client-dev1
+      terminationGracePeriodSeconds: 1
+      volumes:
+      - name: nginx-config-volume
+        configMap:
+          name: wormhole-client-dev1-nginx-config
+      - name: wireguard-config
+        secret:
+          secretName: wormhole-client-dev1-wireguard-config
+
+      - name: lib-modules
+      - name: wormhole-client-dev1-dev
+      - name: wormhole-client-dev1-tmp
+      containers:
+       - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 9000
+          volumeMounts:
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+       - name: wireguard
+          image: lscr.io/linuxserver/wireguard:latest
+          volumeMounts:
+          - name: wireguard-config
+            mountPath: /config/wg_confs
+            readOnly: true
+          - name: lib-modules
+            mountPath: /lib/modules
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+          env:
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          - name: PERSISTENTKEEPALIVE_PEERS
+            value: ""
+          - name: LOG_CONFS
+            value: "true"
+        - image: wormhole:latest
+          name: wormhole
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              drop:
+              - ALL
+            privileged: true
+            readOnlyRootFilesystem: false
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8090
+            initialDelaySeconds: 30
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8090
+          resources:
+            limits:
+              cpu: 0
+              memory: 2Gi
+            requests:
+              cpu: 0
+              memory: 128Mi
+
+          volumeMounts:
+          - mountPath: "/home/go/.cache"
+            name: wormhole-client-dev1-dev
+          - mountPath: "/tmp"
+            name: wormhole-client-dev1-tmp
+          args:
+            - --metrics
+            - join
+            - --name
+            - dev1
+            - --kubernetes
+            - --server
+            - ws://wormhole-server-chart.server.svc.cluster.local:8080/wh/tunnel
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wormhole-client-dev1-wireguard-config
+type: Opaque
+stringData:
+  wg0.conf: |
+    [Interface]
+    Address = 10.185.1.1/32
+    PrivateKey = eBfCZOQVf7Lmg52NxbFugprifw0Qj8RftXkqGuRlGlU=
+
+
+    [Peer]
+    PublicKey = mDJhPXbcIZBhFfOQUljBFEzTK95+mwpiMShPC68oXTc=
+    AllowedIPs = 10.185.0.1/32
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wormhole-client-dev1-nginx-config
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+
+    stream {
+        server {
+            listen 9000;
+            proxy_pass 192.168.11.2:1234;
+        }
+    }
+
+
+

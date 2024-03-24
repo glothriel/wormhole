@@ -3,7 +3,7 @@ client:
 
   name: ""
 
-  serverDsn: "ws://wormhole-server:8080"
+  serverDsn: "ws://wormhole-server:8080/wh/tunnel"
 
   priorityClassName: ""
   pullPolicy: Always
@@ -35,7 +35,6 @@ client:
   tolerations: null
 
   pvc:
-    enabled: false
     storageClassName: ""
     storage: 1Gi
 
@@ -76,7 +75,6 @@ server:
   tolerations: null
 
   pvc:
-    enabled: false
     storageClassName: ""
     storage: 1Gi
 
@@ -87,6 +85,8 @@ docker:
   registry: ghcr.io
   image: glothriel/wormhole
   version: latest
+  wgImage: glothriel/wireguard
+  wgVersion: latest
 
 # Dev mode expects dev image with watchexec + go run instead of binary
 devMode:

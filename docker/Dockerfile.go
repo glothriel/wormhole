@@ -41,7 +41,7 @@ WORKDIR /tmp
 USER root
 COPY --from=we /usr/local/bin/watchexec /usr/local/bin/watchexec
 USER go
-COPY ${PROJECT}/docker/dev-entrypoint.sh /dev-entrypoint.sh
+COPY ${PROJECT}/docker/go/dev-entrypoint.sh /dev-entrypoint.sh
 WORKDIR /src
 RUN mkdir -p /home/go/.cache/go-build
 ARG VERSION=dev

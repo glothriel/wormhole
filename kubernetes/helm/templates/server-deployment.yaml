@@ -19,7 +19,7 @@ spec:
     metadata:
       labels:
         application: {{ template "name-server" . }}
-    spec:
+    spec: 
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName }}
       {{- end }}
@@ -48,13 +48,28 @@ spec:
       {{- if .Values.devMode.enabled }}
       - name: {{ template "name-server" . }}-dev
       {{- end }}
-      {{- if .Values.server.pvc.enabled }}
       - name: {{ template "name-server" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}
-      {{- end }}
       containers:
-          # slash after registry only if registry is non-empty
+        - name: nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 9000
+        - name: wireguard
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          ports:
+            - containerPort: 51820
+              protocol: UDP
+          volumeMounts:
+          - mountPath: "/etc/wireguard"
+            name: {{ template "name-server" . }}-persistent
+            subPath: wireguard
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+       
         - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           imagePullPolicy: {{ $.Values.server.pullPolicy }}
@@ -66,6 +81,8 @@ spec:
             httpGet:
               path: /metrics
               port: 8090
+            initialDelaySeconds: 30
+            failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /metrics
@@ -83,19 +100,15 @@ spec:
           {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-server" . }}-tmp
-      {{- if .Values.server.pvc.enabled }}
           - mountPath: "/storage"
             name: {{ template "name-server" . }}-persistent
-      {{- end }}
           args:
             - --metrics
             - listen
             - --acceptor
             - {{ $.Values.server.acceptor }}
-      {{- if .Values.server.pvc.enabled }}
             - --acceptor-storage-file-path
             - /storage
-      {{- end }}
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}
@@ -105,4 +118,46 @@ spec:
             - {{ $.Release.Namespace }}
             - --kubernetes-labels
             - 'application={{ template "name-server" . }}'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "name-server" . }}-nginx-config
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+
+    stream {
+        server {
+            listen 9000;
+            proxy_pass 192.168.11.2:1234;
+        }
+    }
+
+
 {{ end }}

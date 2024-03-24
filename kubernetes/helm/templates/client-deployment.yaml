@@ -39,15 +39,34 @@ spec:
         {{- toYaml .Values.client.tolerations | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ template "name-client" . }}
+      {{- if .Values.devMode.enabled }}
+      terminationGracePeriodSeconds: 1
+      {{- end }}
       volumes:
+      {{- if .Values.devMode.enabled }}
+      - name: {{ template "name-client" . }}-dev
+      {{- end }}
       - name: {{ template "name-client" . }}-tmp
-      {{- if .Values.client.pvc.enabled }}
       - name: {{ template "name-client" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-client" . }}
-      {{- end }}
       containers:
-        - image: {{ $.Values.docker.registry }}/{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
+        - name: nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 9000
+        - name: wireguard
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          volumeMounts:
+          - mountPath: "/etc/wireguard"
+            name: {{ template "name-client" . }}-persistent
+            subPath: wireguard
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+         
+        - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           imagePullPolicy: {{ $.Values.client.pullPolicy }}
           {{- with .Values.client.containerSecurityContext }}
@@ -58,6 +77,8 @@ spec:
             httpGet:
               path: /metrics
               port: 8090
+            initialDelaySeconds: 30
+            failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /metrics
@@ -66,14 +87,15 @@ spec:
             {{- toYaml .Values.client.resources | nindent 12 }}
 
           volumeMounts:
+          {{- if .Values.devMode.enabled }}
+          - mountPath: "/home/go/.cache"
+            name: {{ template "name-client" . }}-dev
+          {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-client" . }}-tmp
-      {{- if .Values.client.pvc.enabled }}
           - mountPath: "/storage"
             name: {{ template "name-client" . }}-persistent
-      {{- end }}
-          command:
-            - /usr/bin/wormhole
+          args:
             - --metrics
             - join
             - --name
@@ -85,4 +107,46 @@ spec:
             - --keypair-storage-path
             - /storage
       {{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "name-client" . }}-nginx-config
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+
+    stream {
+        server {
+            listen 9000;
+            proxy_pass 192.168.11.2:1234;
+        }
+    }
+
+
 {{ end }}

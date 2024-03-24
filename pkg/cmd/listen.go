@@ -1,17 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-	"strconv"
-
-	"github.com/glothriel/wormhole/pkg/admin"
-	"github.com/glothriel/wormhole/pkg/auth"
-	"github.com/glothriel/wormhole/pkg/grtn"
-	"github.com/glothriel/wormhole/pkg/peers"
-	"github.com/glothriel/wormhole/pkg/ports"
-	"github.com/glothriel/wormhole/pkg/server"
-	"github.com/sirupsen/logrus"
+	"github.com/glothriel/wormhole/pkg/hello"
+	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/urfave/cli/v2"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 var listenCommand *cli.Command = &cli.Command{
@@ -78,84 +71,41 @@ var listenCommand *cli.Command = &cli.Command{
 			Usage: "A file, that holds information about previously accepted fingerprints. If left entry, " +
 				"the information will be stored in memory",
 		},
+		&cli.StringFlag{
+			Name:  "wg-address",
+			Value: "10.188.0.1",
+		},
+		&cli.StringFlag{
+			Name:  "wg-subnet",
+			Value: "24",
+		},
+		&cli.StringFlag{
+			Name:  "wg-privkey",
+			Value: "",
+		},
+		&cli.IntFlag{
+			Name:  "wg-port",
+			Value: 51820,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
-		wsTransportFactory, wsTransportFactoryErr := peers.NewWebsocketTransportFactory(
-			c.String("host"),
-			strconv.Itoa(c.Int("port")),
-			c.String("path"),
-		)
-		if wsTransportFactoryErr != nil {
-			return wsTransportFactoryErr
-		}
 
-		consentGatherer := admin.NewConsentGatherer()
-
-		peerFactory := peers.NewDefaultPeerFactory(
-			"my-server",
-			auth.NewRSAAuthorizedTransportFactory(
-				wsTransportFactory,
-				getAcceptor(c, consentGatherer),
-			),
-		)
-		var portOpenerFactory server.PortOpenerFactory
-		if c.Bool("kubernetes") {
-			portOpenerFactory = server.NewK8sServicePortOpenerFactory(
-				c.String("kubernetes-namespace"),
-				server.CSVToMap(c.String("kubernetes-labels")),
-				server.NewPerAppPortOpenerFactory(
-					ports.RandomPortFromARangeAllocator{
-						Min: c.Int("port-range-min"),
-						Max: c.Int("port-range-max"),
-					},
-				),
-			)
-		} else {
-			var allocator ports.Allocator
-			if c.Bool("port-use-range") {
-				allocator = ports.RandomPortFromARangeAllocator{
-					Min: c.Int("port-range-min"),
-					Max: c.Int("port-range-max"),
-				}
-			} else {
-				allocator = ports.RandomPortAllocator{}
-			}
-			portOpenerFactory = server.NewPerAppPortOpenerFactory(
-				allocator,
-			)
+		pkey, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return err
 		}
-		appExposer := server.NewDefaultAppExposer(
-			portOpenerFactory,
-		)
-		transportServer := server.NewServer(
-			peerFactory,
-			appExposer,
-		)
-		adminServer := admin.NewWormholeAdminServer(
-			fmt.Sprintf(":%d", c.Int("admin-port")),
-			server.NewServerAppsListAdapter(appExposer),
-			consentGatherer,
-		)
-		grtn.Go(func() {
-			if listenErr := adminServer.Listen(); listenErr != nil {
-				logrus.Fatal(listenErr)
-			}
-		})
-		return transportServer.Start()
+		hello.NewServer(
+			"0.0.0.0:8081",
+			pkey.PublicKey().String(),
+			"wormhole-server-chart.server.svc.cluster.local:51820",
+			&wg.Cfg{
+				Address:    c.String("wg-address"),
+				Subnet:     c.String("wg-subnet"),
+				ListenPort: c.Int("wg-port"),
+				PrivateKey: pkey.String(),
+			},
+		).Listen()
+		return nil
 	},
-}
-
-func getAcceptor(c *cli.Context, consentGatherer *admin.ConsentGatherer) auth.Acceptor {
-	if c.String("acceptor") != "server" {
-		return auth.DummyAcceptor{}
-	}
-	serverAcceptor := admin.NewServerAcceptor(consentGatherer)
-	if c.String("acceptor-storage-file-path") == "" {
-		return auth.NewInMemoryCachingAcceptor(serverAcceptor)
-	}
-	return auth.NewInFileCachingAcceptor(
-		c.String("acceptor-storage-file-path"),
-		serverAcceptor,
-	)
 }

@@ -7,6 +7,6 @@ import (
 
 //nolint:funlen
 func main() {
-	logrus.Error("Starting wormhol...")
+	logrus.Error("Starting wormhole...")
 	cmd.Run()
 }

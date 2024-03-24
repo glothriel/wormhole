@@ -15,28 +15,82 @@ docker_build(
         'USER_ID': str(local('id -u')),
         'GROUP_ID': str(local('id -g')),
         'VERSION': 'dev',
-        # You might need to adjust 'PROJECT' or remove it depending on your Dockerfile and context
         'PROJECT': '..'
     },
-    # Specify the live update configuration if you want Tilt to update containers without rebuilding images
     live_update=[
         sync('./main.go', '/src/main.go'),
         sync('./pkg', '/src/pkg')
     ]
-    #     run('go build -o app ./src'),  # Adjust according to your actual build command
-    #     restart_container()
 )
 
-k8s_yaml(helm("./kubernetes/helm", set=[
-    "server.enabled=true",
-    "server.resources.limits.memory=1024Mi",
-    "server.securityContext.runAsUser=0",
-    "server.securityContext.runAsGroup=0",
-    "server.securityContext.runAsNonRoot=false",
-    "server.containerSecurityContext.readOnlyRootFilesystem=false",
-    "server.containerSecurityContext.privileged=true",
-    "server.containerSecurityContext.allowPrivilegeEscalation=true",
-    "docker.image=wormhole",
-    "docker.registry=",
-    "devMode.enabled=true",
-]))
+# Define the Docker image build
+docker_build(
+    'wireguard', 
+    context='docker',
+    dockerfile='./docker/Dockerfile.wg',
+)
+
+servers = ["server"]
+clients = ["dev1", "dev2"]
+
+[k8s_yaml(blob("""
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {ns}
+""".replace("{ns}", ns))) for ns in (servers + clients)]
+
+for server in servers:
+    k8s_yaml(helm("./kubernetes/helm", namespace=server, set=[
+        "server.enabled=true",
+        "server.acceptor=dummy",
+        "server.resources.limits.memory=2Gi",
+        "server.securityContext.runAsUser=0",
+        "server.securityContext.runAsGroup=0",
+        "server.securityContext.runAsNonRoot=false",
+        "server.containerSecurityContext.readOnlyRootFilesystem=false",
+        "server.containerSecurityContext.privileged=true",
+        "server.containerSecurityContext.allowPrivilegeEscalation=true",
+        "docker.image=wormhole",
+        "docker.wgImage=wireguard",
+        "docker.registry=",
+        "devMode.enabled=true",
+    ]))
+
+for client in clients:
+    k8s_yaml(helm("./kubernetes/helm", namespace=client, name=client, set=[
+        "client.enabled=true",
+        "client.name=" + client,
+        "client.serverDsn=http://wormhole-server-chart-admin.server.svc.cluster.local:8081",
+        "client.resources.limits.memory=2Gi",
+        "client.securityContext.runAsUser=0",
+        "client.securityContext.runAsGroup=0",
+        "client.securityContext.runAsNonRoot=false",
+        "client.containerSecurityContext.readOnlyRootFilesystem=false",
+        "client.containerSecurityContext.privileged=true",
+        "client.containerSecurityContext.allowPrivilegeEscalation=true",
+        "docker.image=wormhole",
+        "docker.wgImage=wireguard",
+        "docker.registry=",
+        "devMode.enabled=true",
+    ]))
+
+
+
+# k8s_yaml(helm("./kubernetes/helm", namespace="dev2", name="dev2", set=[
+#     "client.enabled=true",
+#     "client.name=dev2",
+#     "client.serverDsn=ws://wormhole-server-chart.server.svc.cluster.local:8080/wh/tunnel",
+#     "client.resources.limits.memory=2Gi",
+#     "client.securityContext.runAsUser=0",
+#     "client.securityContext.runAsGroup=0",
+#     "client.securityContext.runAsNonRoot=false",
+#     "client.containerSecurityContext.readOnlyRootFilesystem=false",
+#     "client.containerSecurityContext.privileged=true",
+#     "client.containerSecurityContext.allowPrivilegeEscalation=true",
+#     "docker.image=wormhole",
+#     "docker.registry=",
+#     "devMode.enabled=true",
+# ]))
+
+
