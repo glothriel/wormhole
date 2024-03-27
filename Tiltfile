@@ -75,22 +75,3 @@ for client in clients:
         "devMode.enabled=true",
     ]))
 
-
-
-# k8s_yaml(helm("./kubernetes/helm", namespace="dev2", name="dev2", set=[
-#     "client.enabled=true",
-#     "client.name=dev2",
-#     "client.serverDsn=ws://wormhole-server-chart.server.svc.cluster.local:8080/wh/tunnel",
-#     "client.resources.limits.memory=2Gi",
-#     "client.securityContext.runAsUser=0",
-#     "client.securityContext.runAsGroup=0",
-#     "client.securityContext.runAsNonRoot=false",
-#     "client.containerSecurityContext.readOnlyRootFilesystem=false",
-#     "client.containerSecurityContext.privileged=true",
-#     "client.containerSecurityContext.allowPrivilegeEscalation=true",
-#     "docker.image=wormhole",
-#     "docker.registry=",
-#     "devMode.enabled=true",
-# ]))
-
-

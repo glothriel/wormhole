@@ -20,6 +20,7 @@ spec:
       labels:
         application: {{ template "name-server" . }}
     spec: 
+      shareProcessNamespace: true
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName }}
       {{- end }}
@@ -44,9 +45,16 @@ spec:
       terminationGracePeriodSeconds: 1
       {{- end }}
       volumes:
+      - name: nginx-conf
+        configMap:
+        
+          name: {{ template "name-server" . }}-nginx
       - name: {{ template "name-server" . }}-tmp
       {{- if .Values.devMode.enabled }}
       - name: {{ template "name-server" . }}-dev
+      - name: {{ template "name-server" . }}-build-cache
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-build-cache
       {{- end }}
       - name: {{ template "name-server" . }}-persistent
         persistentVolumeClaim:
@@ -54,6 +62,14 @@ spec:
       containers:
         - name: nginx
           image: nginx:alpine
+          volumeMounts:
+          - mountPath: "/etc/nginx/nginx.conf"
+            name: nginx-conf
+            subPath: nginx.conf
+            readOnly: true
+          - mountPath: "/etc/nginx/conf.d"
+            name: {{ template "name-server" . }}-persistent
+            subPath: nginx
           ports:
           - containerPort: 9000
         - name: wireguard
@@ -96,7 +112,7 @@ spec:
 
           {{- if .Values.devMode.enabled }}
           - mountPath: "/home/go/.cache"
-            name: {{ template "name-server" . }}-dev
+            name: {{ template "name-server" . }}-build-cache
           {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-server" . }}-tmp
@@ -123,7 +139,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "name-server" . }}-nginx-config
+  name: {{ template "name-server" . }}-nginx
 data:
   nginx.conf: |
     user  nginx;
@@ -135,28 +151,9 @@ data:
     events {
         worker_connections  1024;
     }
-
-    http {
-        include       /etc/nginx/mime.types;
-        default_type  application/octet-stream;
-
-        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                          '$status $body_bytes_sent "$http_referer" '
-                          '"$http_user_agent" "$http_x_forwarded_for"';
-
-        access_log  /var/log/nginx/access.log  main;
-
-        sendfile        on;
-        keepalive_timeout  65;
-
-        include /etc/nginx/conf.d/*.conf;
-    }
-
+    
     stream {
-        server {
-            listen 9000;
-            proxy_pass 192.168.11.2:1234;
-        }
+      include /etc/nginx/conf.d/*.conf;
     }
 
 

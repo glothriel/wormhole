@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"sync"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
@@ -18,18 +19,34 @@ type Peer struct {
 	PersistentKeepalive int
 }
 
-type Cfg struct {
+type Config struct {
 	Address    string
 	Subnet     string
 	ListenPort int
 	PrivateKey string
 
 	Peers []Peer
+	lock  sync.Mutex
+}
+
+func (c *Config) Upsert(p Peer) {
+	// Replace if AllowedIPs is the same
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for i, peer := range c.Peers {
+		if peer.AllowedIPs == p.AllowedIPs {
+			logrus.Warnf("Peer with AllowedIPs %s already exists, replacing with new one", p.AllowedIPs)
+			c.Peers[i] = p
+			return
+		}
+	}
+
+	c.Peers = append(c.Peers, p)
 }
 
 var theTemplate string = `[Interface]
 Address = {{.Address}}/{{.Subnet}}
-{{-if .ListenPort}}ListenPort = {{.ListenPort}}{{end}}
+{{if .ListenPort}}ListenPort = {{.ListenPort}}{{end}}
 PrivateKey = {{.PrivateKey}}
 
 {{range .Peers}}
@@ -42,7 +59,7 @@ AllowedIPs = {{ .AllowedIPs }}
 {{end}}
 `
 
-func RenderTemplate(settings Cfg) (string, error) {
+func RenderTemplate(settings Config) (string, error) {
 	tmpl, parseErr := template.New("greeting").Parse(theTemplate)
 	if parseErr != nil {
 		return "", parseErr
@@ -63,7 +80,7 @@ type Watcher struct {
 	lastWrittenTemplate string
 }
 
-func (w *Watcher) Update(settings Cfg) error {
+func (w *Watcher) Update(settings Config) error {
 	content, renderErr := RenderTemplate(settings)
 	if renderErr != nil {
 		return renderErr
@@ -72,7 +89,6 @@ func (w *Watcher) Update(settings Cfg) error {
 		return nil
 	}
 
-	logrus.Infof("Updating wireguard config file %s: %s", w.path, content)
 	writeErr := afero.WriteFile(w.fs, w.path, []byte(content), 0644)
 	if writeErr != nil {
 		return writeErr

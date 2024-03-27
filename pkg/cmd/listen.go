@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/glothriel/wormhole/pkg/hello"
+	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
+	"github.com/glothriel/wormhole/pkg/nginx"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/urfave/cli/v2"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -95,16 +97,24 @@ var listenCommand *cli.Command = &cli.Command{
 		if err != nil {
 			return err
 		}
+		g := nginx.NewNginxConfigGuard(
+			"/storage/nginx",
+			"local",
+			nginx.NewConfigReloader(),
+		)
+
+		go g.Watch(getStateManager(svcdetector.NewStaticPeerDetector(c.String("wg-address"))).Changes(), make(chan bool))
 		hello.NewServer(
 			"0.0.0.0:8081",
 			pkey.PublicKey().String(),
 			"wormhole-server-chart.server.svc.cluster.local:51820",
-			&wg.Cfg{
+			&wg.Config{
 				Address:    c.String("wg-address"),
 				Subnet:     c.String("wg-subnet"),
 				ListenPort: c.Int("wg-port"),
 				PrivateKey: pkey.String(),
 			},
+			g,
 		).Listen()
 		return nil
 	},

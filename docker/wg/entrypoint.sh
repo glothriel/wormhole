@@ -21,9 +21,21 @@ wg-quick up /etc/wireguard/wg0.conf
 # Monitor /etc/wireguard for changes and reload wg0 if changes are detected
 inotifywait -m -e create -e delete -e modify -e moved_to -e moved_from --format '%w%f' /etc/wireguard | while read FILE
 do
-    wg syncconf wg0 <(wg-quick strip wg0)
-    # If for some reason the above doesn't work, you can stick to
-    # wg-quick down wg0
-    # wg-quick up /etc/wireguard/wg0.conf
+    CURRENT_IP_ADDRESS=$(ip -br addr show wg0 | awk '{print $3}')
+    ADDRESS_FROM_CONFIG=$(grep "Address" $FILE | cut -d ' ' -f 3)
+    echo "Current IP address of wg0 interface: $CURRENT_IP_ADDRESS"
+    echo "Address from config: $ADDRESS_FROM_CONFIG"
+
+    # If address from config is different from current IP address, hard reload using wg-quick down/up, otherwise use wg syncconf
+
+    if [ "$CURRENT_IP_ADDRESS" != "$ADDRESS_FROM_CONFIG" ]; then
+        echo "Hard reloading Wireguard configuration..."
+        wg-quick down wg0
+        wg-quick up $FILE
+    else
+        wg syncconf wg0 <(wg-quick strip wg0)
+        echo "Soft reloading Wireguard configuration..."
+    fi
+
     echo "Wireguard configuration reloaded from $FILE..."
 done

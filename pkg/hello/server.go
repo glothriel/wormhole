@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/nginx"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -16,21 +18,21 @@ type Server struct {
 	server    *http.Server
 	publicKey string
 	endpoint  string
-	cfg       *wg.Cfg
+	cfg       *wg.Config
 	cfgWriter *wg.Watcher
 	lastIP    net.IP
-}
+	m         sync.Mutex
 
-type helloBody struct {
-	Name      string `json:"name"`
-	PublicKey string `json:"public_key"`
+	nginxConfig *nginx.ConfigGuard
 }
 
 func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
+	s.m.Lock()
 	ip := nextIP(s.lastIP, 1)
 	s.lastIP = ip
+	s.m.Unlock()
 
-	var body helloBody
+	var body helloRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&body); err != nil {
 		logrus.Errorf("Failed to decode request body: %v", err)
@@ -38,7 +40,7 @@ func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.cfg.Peers = append(s.cfg.Peers, wg.Peer{
+	s.cfg.Upsert(wg.Peer{
 		PublicKey:  body.PublicKey,
 		AllowedIPs: ip.String() + "/32," + s.cfg.Address + "/32",
 	})
@@ -62,7 +64,49 @@ func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseBody)
 
-	s.cfgWriter.Update(*s.cfg)
+	updateErr := s.cfgWriter.Update(*s.cfg)
+	if updateErr != nil {
+		logrus.Errorf("Failed to update config: %v", updateErr)
+	}
+
+}
+
+func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
+	s.m.Lock()
+	ip := nextIP(s.lastIP, 1)
+	s.lastIP = ip
+	s.m.Unlock()
+
+	var body syncRequestAndResponse
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&body); err != nil {
+		logrus.Errorf("Failed to decode request body: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	logrus.Infof("Received sync request: %v, %s", body, r.RemoteAddr)
+
+	apps := []syncRequestApp{}
+	for _, server := range s.nginxConfig.Servers {
+		apps = append(apps, syncRequestApp{
+			Name: server.App.Name,
+			Peer: server.App.Peer,
+			Port: server.ListenPort,
+		})
+	}
+	reqBodyJSON := syncRequestAndResponse{
+		Apps: apps,
+	}
+	respBody, marshalErr := json.Marshal(reqBodyJSON)
+	if marshalErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respBody)
+
 }
 
 // Listen starts the server
@@ -76,7 +120,8 @@ func NewServer(
 	addr string,
 	publicKey string,
 	endpoint string,
-	cfg *wg.Cfg,
+	cfg *wg.Config,
+	nginxConfig *nginx.ConfigGuard,
 ) *Server {
 	mux := mux.NewRouter()
 	s := &Server{
@@ -85,13 +130,16 @@ func NewServer(
 			Handler:           mux,
 			ReadHeaderTimeout: time.Second * 5,
 		},
-		publicKey: publicKey,
-		endpoint:  endpoint,
-		cfg:       cfg,
-		lastIP:    nextIP(net.ParseIP(cfg.Address), 1),
-		cfgWriter: wg.NewWriter("/storage/wireguard/wg0.conf"),
+		publicKey:   publicKey,
+		endpoint:    endpoint,
+		cfg:         cfg,
+		lastIP:      nextIP(net.ParseIP(cfg.Address), 1),
+		cfgWriter:   wg.NewWriter("/storage/wireguard/wg0.conf"),
+		m:           sync.Mutex{},
+		nginxConfig: nginxConfig,
 	}
 	mux.HandleFunc("/v1/hello", s.handleHello).Methods(http.MethodPost)
+	mux.HandleFunc("/v1/sync", s.handleSync).Methods(http.MethodPost)
 	return s
 }
 

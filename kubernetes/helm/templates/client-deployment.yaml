@@ -19,6 +19,7 @@ spec:
       labels:
         application: {{ template "name-client" . }}
     spec:
+      shareProcessNamespace: true
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName }}
       {{- end }}
@@ -43,16 +44,38 @@ spec:
       terminationGracePeriodSeconds: 1
       {{- end }}
       volumes:
+      - name: nginx-conf
+        configMap:
+          defaultMode: 0755
+          name: {{ template "name-client" . }}-nginx
       {{- if .Values.devMode.enabled }}
       - name: {{ template "name-client" . }}-dev
+      - name: {{ template "name-client" . }}-build-cache
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-build-cache
       {{- end }}
       - name: {{ template "name-client" . }}-tmp
       - name: {{ template "name-client" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-client" . }}
+      - name: {{ template "name-client" . }}-tmp
       containers:
         - name: nginx
           image: nginx:alpine
+          volumeMounts:
+          - mountPath: "/etc/nginx/nginx.conf"
+            name: nginx-conf
+            subPath: nginx.conf
+            readOnly: true
+          - mountPath: "/docker-entrypoint.d/50-reload-if-confd-changes.conf"
+            name: nginx-conf
+            
+            subPath: 50-reload-if-confd-changes.conf
+            readOnly: true
+          - mountPath: "/etc/nginx/conf.d"
+            name: {{ template "name-client" . }}-persistent
+            subPath: nginx
+
           ports:
           - containerPort: 9000
         - name: wireguard
@@ -89,7 +112,7 @@ spec:
           volumeMounts:
           {{- if .Values.devMode.enabled }}
           - mountPath: "/home/go/.cache"
-            name: {{ template "name-client" . }}-dev
+            name: {{ template "name-client" . }}-build-cache
           {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-client" . }}-tmp
@@ -103,16 +126,14 @@ spec:
             - --kubernetes
             - --server
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
-      {{- if .Values.client.pvc.enabled }}
             - --keypair-storage-path
             - /storage
-      {{- end }}
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "name-client" . }}-nginx-config
+  name: {{ template "name-client" . }}-nginx
 data:
   nginx.conf: |
     user  nginx;
@@ -125,28 +146,12 @@ data:
         worker_connections  1024;
     }
 
-    http {
-        include       /etc/nginx/mime.types;
-        default_type  application/octet-stream;
-
-        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                          '$status $body_bytes_sent "$http_referer" '
-                          '"$http_user_agent" "$http_x_forwarded_for"';
-
-        access_log  /var/log/nginx/access.log  main;
-
-        sendfile        on;
-        keepalive_timeout  65;
-
-        include /etc/nginx/conf.d/*.conf;
-    }
-
     stream {
-        server {
-            listen 9000;
-            proxy_pass 192.168.11.2:1234;
-        }
+      include /etc/nginx/conf.d/*.conf;
     }
+  50-reload-if-confd-changes.conf: |
+    #!/bin/sh
 
+    inotifyd "sh -c '/usr/sbin/nginx -s reload && echo reloaded'" /etc/nginx/conf.d
 
 {{ end }}
