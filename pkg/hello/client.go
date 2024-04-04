@@ -7,9 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/nginx"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -25,12 +26,17 @@ type Client struct {
 	currentWgConfig *wg.Config
 	wgConfigWatcher *wg.Watcher
 
-	nginxConfig *nginx.ConfigGuard
+	apps         appRegistry
+	syncInterval time.Duration
+
+	remoteNginxAdapter *AppStateChangeGenerator
+	remoteGatewayIP    string
 }
 
 func (c *Client) Hello() (string, error) {
 
 	URL := c.publicServerURL + "/v1/hello"
+	logrus.Infof("Registering as `%s` on server `%s`", c.name, URL)
 	reqBodyJSON := helloRequest{
 		Name:      c.name,
 		PublicKey: c.publicKey,
@@ -77,7 +83,7 @@ func (c *Client) Hello() (string, error) {
 		"endpoint":   respBody.Peer.Endpoint,
 	}).Info("Hello completed")
 	c.currentWgConfig.Peers = []wg.Peer{peer}
-
+	c.remoteGatewayIP = respBody.GatewayIP
 	c.wgConfigWatcher.Update(*c.currentWgConfig)
 
 	return respBody.GatewayIP, nil
@@ -89,11 +95,19 @@ func (c *Client) SyncForever() {
 			URL := c.internalServerURL + "/v1/sync"
 
 			apps := []syncRequestApp{}
-			for _, server := range c.nginxConfig.Servers {
+			for _, app := range c.apps.Apps() {
+
+				port, parseErr := strconv.Atoi(strings.Split(app.Address, ":")[1])
+				if parseErr != nil {
+
+					return fmt.Errorf("Failed to parse port: %v", parseErr)
+				}
 				apps = append(apps, syncRequestApp{
-					Name: server.App.Name,
-					Peer: server.App.Peer,
-					Port: server.ListenPort,
+					Name:         app.Name,
+					Peer:         app.Peer,
+					Port:         port,
+					OriginalPort: app.OriginalPort,
+					TargetLabels: app.TargetLabels,
 				})
 			}
 			reqBodyJSON := syncRequestAndResponse{
@@ -122,18 +136,23 @@ func (c *Client) SyncForever() {
 			if unmarshalErr := json.Unmarshal(bytes, &respBody); unmarshalErr != nil {
 				return fmt.Errorf("Failed to unmarshal response body: %v", unmarshalErr)
 			}
+			c.remoteNginxAdapter.OnSync(
+				"server",
+				toPeerApps("server", c.remoteGatewayIP, respBody.Apps),
+				nil,
+			)
 			return nil
 		}(); loopErr != nil {
 			logrus.Errorf("Failed to sync: %v", loopErr)
 		}
-		time.Sleep(time.Second * 10)
+		time.Sleep(c.syncInterval)
 	}
 }
 
-func NewClient(serverURL, name string, nginx *nginx.ConfigGuard) *Client {
+func NewClient(serverURL, name string, apps appRegistry, remoteAdapter *AppStateChangeGenerator, wireguardWatcher *wg.Watcher) *Client {
 	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
-		logrus.Fatalf("Failed to generate wireguard private key: %v", err)
+		logrus.Panicf("Failed to generate wireguard private key: %v", err)
 	}
 	cfg := &wg.Config{
 		Address:    "10.188.1.1",
@@ -146,8 +165,11 @@ func NewClient(serverURL, name string, nginx *nginx.ConfigGuard) *Client {
 		client: &http.Client{
 			Timeout: time.Second * 5,
 		},
-		publicKey:       key.PublicKey().String(),
-		wgConfigWatcher: wg.NewWriter("/storage/wireguard/wg0.conf"),
-		nginxConfig:     nginx,
+		name:               name,
+		publicKey:          key.PublicKey().String(),
+		wgConfigWatcher:    wireguardWatcher,
+		apps:               apps,
+		syncInterval:       time.Second * 10,
+		remoteNginxAdapter: remoteAdapter,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"sync"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
@@ -26,13 +25,10 @@ type Config struct {
 	PrivateKey string
 
 	Peers []Peer
-	lock  sync.Mutex
 }
 
 func (c *Config) Upsert(p Peer) {
 	// Replace if AllowedIPs is the same
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	for i, peer := range c.Peers {
 		if peer.AllowedIPs == p.AllowedIPs {
 			logrus.Warnf("Peer with AllowedIPs %s already exists, replacing with new one", p.AllowedIPs)

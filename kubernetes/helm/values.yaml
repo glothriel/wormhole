@@ -1,7 +1,7 @@
 client:
   enabled: false
 
-  name: ""
+  name: "default"
 
   serverDsn: "ws://wormhole-server:8080/wh/tunnel"
 

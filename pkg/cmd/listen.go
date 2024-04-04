@@ -2,93 +2,50 @@ package cmd
 
 import (
 	"github.com/glothriel/wormhole/pkg/hello"
-	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
+	"github.com/glothriel/wormhole/pkg/k8s"
+	"github.com/glothriel/wormhole/pkg/listeners"
 	"github.com/glothriel/wormhole/pkg/nginx"
 	"github.com/glothriel/wormhole/pkg/wg"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+var (
+	wgAddressFlag *cli.StringFlag = &cli.StringFlag{
+		Name:  "wg-address",
+		Value: "10.188.0.1",
+	}
+
+	wgSubnetFlag *cli.StringFlag = &cli.StringFlag{
+		Name:  "wg-subnet-mask",
+		Value: "24",
+	}
+
+	wgPortFlag *cli.IntFlag = &cli.IntFlag{
+		Name:  "wg-port",
+		Value: 51820,
+	}
+
+	helloServerListenAddress *cli.StringFlag = &cli.StringFlag{
+		Name:  "hello-server-listen-address",
+		Value: "0.0.0.0:8081",
+	}
 )
 
 var listenCommand *cli.Command = &cli.Command{
 	Name: "listen",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "host",
-			Value: "0.0.0.0",
-			Usage: "Host the tunnel server will be listening on",
-		},
-		&cli.IntFlag{
-			Name:  "port",
-			Value: 8080,
-			Usage: "Port the tunnel server will be listening on",
-		},
-		&cli.IntFlag{
-			Name:  "admin-port",
-			Value: 8081,
-			Usage: "Port the admin server will be listening on",
-		},
-		&cli.StringFlag{
-			Name:  "path",
-			Value: "/wh/tunnel",
-			Usage: "Path under which the tunnel server will expose the tunnel entrypoint. All other paths will be 404",
-		},
-		&cli.BoolFlag{
-			Name:  "port-use-range",
-			Value: false,
-			Usage: "Uses fixed port range for allocations",
-		},
-		&cli.IntFlag{
-			Name:  "port-range-min",
-			Value: 30000,
-			Usage: "Port range for allocations of new proxy services",
-		},
-		&cli.IntFlag{
-			Name:  "port-range-max",
-			Value: 30499,
-			Usage: "Port range for allocations of new proxy services",
-		},
-		&cli.BoolFlag{
-			Name:  "kubernetes",
-			Usage: "Enables kubernetes integration",
-		},
-		&cli.StringFlag{
-			Name:  "kubernetes-namespace",
-			Value: "wormhole",
-			Usage: "Namespace to create the proxy services in",
-		},
-		&cli.StringFlag{
-			Name:  "kubernetes-labels",
-			Value: "application=wormhole-server",
-			Usage: "Labels that will be set on proxy service, must match the labels of wormhole server pod",
-		},
-		&cli.StringFlag{
-			Name:  "acceptor",
-			Value: "server",
-			Usage: "How would you like to accept pairing requests? `server` waits for approval, every " +
-				"other value triggers DummyAcceptor, that automatically blindly accepts all pairing requests",
-		},
-		&cli.StringFlag{
-			Name:  "acceptor-storage-file-path",
-			Value: "",
-			Usage: "A file, that holds information about previously accepted fingerprints. If left entry, " +
-				"the information will be stored in memory",
-		},
-		&cli.StringFlag{
-			Name:  "wg-address",
-			Value: "10.188.0.1",
-		},
-		&cli.StringFlag{
-			Name:  "wg-subnet",
-			Value: "24",
-		},
-		&cli.StringFlag{
-			Name:  "wg-privkey",
-			Value: "",
-		},
-		&cli.IntFlag{
-			Name:  "wg-port",
-			Value: 51820,
-		},
+		kubernetesFlag,
+		stateManagerPathFlag,
+		nginxExposerConfdPathFlag,
+		wireguardConfigFilePathFlag,
+		helloServerListenAddress,
+		kubernetesNamespaceFlag,
+		kubernetesLabelsFlag,
+		wgAddressFlag,
+		wgSubnetFlag,
+		wgPortFlag,
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
@@ -97,25 +54,58 @@ var listenCommand *cli.Command = &cli.Command{
 		if err != nil {
 			return err
 		}
-		g := nginx.NewNginxConfigGuard(
-			"/storage/nginx",
-			"local",
-			nginx.NewConfigReloader(),
-		)
 
-		go g.Watch(getStateManager(svcdetector.NewStaticPeerDetector(c.String("wg-address"))).Changes(), make(chan bool))
-		hello.NewServer(
-			"0.0.0.0:8081",
+		localListenerRegistry := listeners.NewRegistry(nginx.NewNginxExposer(
+			c.String(nginxExposerConfdPathFlag.Name),
+			"local",
+			nginx.NewDefaultReloader(),
+			nginx.NewRangePortAllocator(20000, 25000),
+		))
+
+		remoteNginxExposer := nginx.NewNginxExposer(
+			c.String(nginxExposerConfdPathFlag.Name),
+			"remote",
+			nginx.NewDefaultReloader(),
+			nginx.NewRangePortAllocator(25001, 30000),
+		)
+		var effectiveExposer listeners.Exposer = remoteNginxExposer
+
+		if c.Bool(kubernetesFlag.Name) {
+			namespace := c.String(kubernetesNamespaceFlag.Name)
+			rawLabels := c.String(kubernetesLabelsFlag.Name)
+			if namespace == "" || rawLabels == "" {
+				logrus.Fatalf(
+					"Namespace (--%s) and labels (--%s) must be set when using kubernetes integration",
+					kubernetesNamespaceFlag.Name,
+					kubernetesLabelsFlag.Name,
+				)
+			}
+			effectiveExposer = k8s.NewK8sExposer(
+				c.String(kubernetesNamespaceFlag.Name),
+				k8s.CSVToMap(c.String(kubernetesLabelsFlag.Name)),
+				remoteNginxExposer,
+			)
+		}
+		remoteListenerRegistry := listeners.NewRegistry(effectiveExposer)
+
+		go localListenerRegistry.Watch(getStateManager(c).Changes(), make(chan bool))
+
+		remoteNginxAdapter := hello.NewAppStateChangeGenerator()
+		go remoteListenerRegistry.Watch(remoteNginxAdapter.Changes(), make(chan bool))
+
+		return hello.NewServer(
+			c.String(helloServerListenAddress.Name),
 			pkey.PublicKey().String(),
 			"wormhole-server-chart.server.svc.cluster.local:51820",
 			&wg.Config{
-				Address:    c.String("wg-address"),
-				Subnet:     c.String("wg-subnet"),
-				ListenPort: c.Int("wg-port"),
+				Address:    c.String(wgAddressFlag.Name),
+				Subnet:     c.String(wgSubnetFlag.Name),
+				ListenPort: c.Int(wgPortFlag.Name),
 				PrivateKey: pkey.String(),
 			},
-			g,
+			localListenerRegistry,
+			remoteNginxAdapter,
+			wg.NewWriter(c.String(wireguardConfigFilePathFlag.Name)),
 		).Listen()
-		return nil
 	},
 }

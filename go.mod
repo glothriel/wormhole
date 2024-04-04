@@ -12,6 +12,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.11.0
 	github.com/urfave/cli/v2 v2.3.0
+	go.uber.org/multierr v1.11.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3

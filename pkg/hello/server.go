@@ -2,16 +2,23 @@ package hello
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/nginx"
+	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
+
+type appRegistry interface {
+	Apps() []peers.App
+}
 
 // Server is a separate HTTP server, that allows managing wormhole using API
 type Server struct {
@@ -23,7 +30,10 @@ type Server struct {
 	lastIP    net.IP
 	m         sync.Mutex
 
-	nginxConfig *nginx.ConfigGuard
+	apps             appRegistry
+	hostnamesToNames map[string]string
+
+	remoteNginxAdapter *AppStateChangeGenerator
 }
 
 func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +49,13 @@ func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	s.hostnamesToNames[ip.String()] = body.Name
 
 	s.cfg.Upsert(wg.Peer{
 		PublicKey:  body.PublicKey,
-		AllowedIPs: ip.String() + "/32," + s.cfg.Address + "/32",
+		AllowedIPs: fmt.Sprintf("%s/32,%s/32", ip.String(), s.cfg.Address),
 	})
+	logrus.Infof("Registered new peer: %s, %s", body.Name, ip.String())
 
 	theResponse := map[string]any{
 		"peer": map[string]any{
@@ -72,10 +84,6 @@ func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
-	s.m.Lock()
-	ip := nextIP(s.lastIP, 1)
-	s.lastIP = ip
-	s.m.Unlock()
 
 	var body syncRequestAndResponse
 	decoder := json.NewDecoder(r.Body)
@@ -85,14 +93,33 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logrus.Infof("Received sync request: %v, %s", body, r.RemoteAddr)
+	segments := strings.Split(r.RemoteAddr, ":")
+	mappedName, ok := s.hostnamesToNames[segments[0]]
+	if !ok {
+		logrus.Errorf("No hostname found for %s", segments[0])
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	s.remoteNginxAdapter.OnSync(
+		mappedName,
+		toPeerApps(mappedName, segments[0], body.Apps),
+		nil,
+	)
 
 	apps := []syncRequestApp{}
-	for _, server := range s.nginxConfig.Servers {
+	for _, app := range s.apps.Apps() {
+		port, parseErr := strconv.Atoi(strings.Split(app.Address, ":")[1])
+		if parseErr != nil {
+			logrus.Errorf("Failed to parse port: %v", parseErr)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		apps = append(apps, syncRequestApp{
-			Name: server.App.Name,
-			Peer: server.App.Peer,
-			Port: server.ListenPort,
+			Name:         app.Name,
+			Peer:         app.Peer,
+			Port:         port,
+			OriginalPort: app.OriginalPort,
+			TargetLabels: app.TargetLabels,
 		})
 	}
 	reqBodyJSON := syncRequestAndResponse{
@@ -121,7 +148,9 @@ func NewServer(
 	publicKey string,
 	endpoint string,
 	cfg *wg.Config,
-	nginxConfig *nginx.ConfigGuard,
+	apps appRegistry,
+	remoteNginxAdapter *AppStateChangeGenerator,
+	wgWatcher *wg.Watcher,
 ) *Server {
 	mux := mux.NewRouter()
 	s := &Server{
@@ -130,13 +159,15 @@ func NewServer(
 			Handler:           mux,
 			ReadHeaderTimeout: time.Second * 5,
 		},
-		publicKey:   publicKey,
-		endpoint:    endpoint,
-		cfg:         cfg,
-		lastIP:      nextIP(net.ParseIP(cfg.Address), 1),
-		cfgWriter:   wg.NewWriter("/storage/wireguard/wg0.conf"),
-		m:           sync.Mutex{},
-		nginxConfig: nginxConfig,
+		publicKey:          publicKey,
+		endpoint:           endpoint,
+		cfg:                cfg,
+		lastIP:             nextIP(net.ParseIP(cfg.Address), 1),
+		cfgWriter:          wgWatcher,
+		m:                  sync.Mutex{},
+		apps:               apps,
+		remoteNginxAdapter: remoteNginxAdapter,
+		hostnamesToNames:   map[string]string{},
 	}
 	mux.HandleFunc("/v1/hello", s.handleHello).Methods(http.MethodPost)
 	mux.HandleFunc("/v1/sync", s.handleSync).Methods(http.MethodPost)
@@ -152,4 +183,18 @@ func nextIP(ip net.IP, inc uint) net.IP {
 	v1 := byte((v >> 16) & 0xFF)
 	v0 := byte((v >> 24) & 0xFF)
 	return net.IPv4(v0, v1, v2, v3)
+}
+
+func toPeerApps(peerName, hostname string, s []syncRequestApp) []peers.App {
+	apps := make([]peers.App, 0, len(s))
+	for _, app := range s {
+		apps = append(apps, peers.App{
+			Name:         app.Name,
+			Peer:         peerName,
+			Address:      fmt.Sprintf("%s:%d", hostname, app.Port),
+			OriginalPort: app.OriginalPort,
+			TargetLabels: app.TargetLabels,
+		})
+	}
+	return apps
 }

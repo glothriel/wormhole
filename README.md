@@ -2,6 +2,13 @@
 
 L7 reverse TCP tunnels over websocket, similar to ngrok, teleport or skupper, but implemented specifically for Kubernetes. Mostly a learning project. Allows exposing services from one Kubernetes cluster to another just by annotating them.
 
+## Roadmap
+
+* [ ] Integration tests of simple scenarios
+* [ ] Proper abstractions over hello package contents + encryption of messages passed between client and server
+* [ ] Peer registration support
+* [ ] Improve unit test coverage
+
 ![overview](docs/overview.jpg "Overview")
 
 ## What should I use this for?

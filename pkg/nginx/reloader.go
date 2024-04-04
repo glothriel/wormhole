@@ -13,12 +13,12 @@ type Reloader interface {
 	Reload() error
 }
 
-type pidBasedReloader struct {
+type lowestMatchingProcessIDReloader struct {
 }
 
-func (r *pidBasedReloader) Reload() error {
+func (r *lowestMatchingProcessIDReloader) Reload() error {
 	max := 1999999999
-	nginxMasterPid := 1999999999
+	nginxMasterPid := max
 	p, processListErr := ps.Processes()
 	if processListErr != nil {
 		return fmt.Errorf("could not list processes: %v", processListErr)
@@ -62,9 +62,9 @@ func NewRetryingReloader(child Reloader, tries int) Reloader {
 }
 
 func NewPidBasedReloader() Reloader {
-	return &pidBasedReloader{}
+	return &lowestMatchingProcessIDReloader{}
 }
 
-func NewConfigReloader() Reloader {
+func NewDefaultReloader() Reloader {
 	return NewRetryingReloader(NewPidBasedReloader(), 10)
 }

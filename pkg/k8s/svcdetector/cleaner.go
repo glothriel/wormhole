@@ -10,7 +10,7 @@ type cleaner interface {
 	clean(services []serviceWrapper, registry exposedServicesRegistry) ([]itemToDelete, error)
 }
 
-// Cleans up apps originating from services, that prviously had exposing annotations, but no longer have
+// Cleans up apps originating from services, that previously had exposing annotations, but no longer have
 type modifiedAnnotationsCleaner struct{}
 
 func (cleaner modifiedAnnotationsCleaner) clean(

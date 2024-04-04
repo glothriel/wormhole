@@ -21,7 +21,9 @@ type syncRequestAndResponse struct {
 }
 
 type syncRequestApp struct {
-	Name string `json:"name"`
-	Peer string `json:"peer"`
-	Port int    `json:"port"`
+	Name         string `json:"name"`
+	Peer         string `json:"peer"`
+	Port         int    `json:"port"`
+	OriginalPort int32  `json:"original_port"`
+	TargetLabels string `json:"target_labels"`
 }

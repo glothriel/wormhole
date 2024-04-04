@@ -45,7 +45,6 @@ func (event watchEvent) isDeleted() bool {
 
 type defaultServiceRepository struct {
 	client dynamic.Interface
-	pd     PeerDetector
 }
 
 func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
@@ -68,7 +67,7 @@ func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
 				convertError,
 			)
 		}
-		services = append(services, newDefaultServiceWrapper(svc, repository.pd))
+		services = append(services, newDefaultServiceWrapper(svc))
 	}
 	return services, nil
 }
@@ -135,15 +134,14 @@ func (repository defaultServiceRepository) dispatchEvents(eventType int, informe
 	return []watchEvent{
 		{
 			evtType: eventType,
-			service: newDefaultServiceWrapper(&svc, repository.pd),
+			service: newDefaultServiceWrapper(&svc),
 		},
 	}
 }
 
 // NewDefaultServiceRepository creates ServiceRepository instances
-func NewDefaultServiceRepository(client dynamic.Interface, peerDetector PeerDetector) ServiceRepository {
+func NewDefaultServiceRepository(client dynamic.Interface) ServiceRepository {
 	return &defaultServiceRepository{
 		client: client,
-		pd:     peerDetector,
 	}
 }

@@ -18,7 +18,7 @@ func startPrometheusServer(c *cli.Context) {
 	logrus.Infof("Starting prometheus metrics server on %s", metricsAddr)
 	go func() {
 		if listenErr := http.ListenAndServe(metricsAddr, nil); listenErr != nil {
-			logrus.Fatalf("Failed to start prometheus metrics server: %v", listenErr)
+			logrus.Panicf("Failed to start prometheus metrics server: %v", listenErr)
 		}
 	}()
 }

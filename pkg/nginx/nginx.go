@@ -2,8 +2,9 @@ package nginx
 
 import (
 	"fmt"
+	"os"
 	"path"
-	"sync"
+	"strings"
 
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
@@ -19,7 +20,7 @@ type StreamServer struct {
 	App peers.App
 }
 
-type ConfigGuard struct {
+type ConfdGuard struct {
 	prefix string
 	path   string
 	fs     afero.Fs
@@ -28,16 +29,41 @@ type ConfigGuard struct {
 	portAllocator PortAllocator
 
 	Servers []StreamServer
-	lock    sync.Mutex
 }
 
-func (g *ConfigGuard) Watch(c chan svcdetector.AppStateChange, done chan bool) {
+func (g *ConfdGuard) RemoveAll() error {
+	filesToClean := make([]string, 0)
+	if walkErr := afero.Walk(g.fs, g.path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasPrefix(info.Name(), g.prefix) || !strings.HasSuffix(info.Name(), ".conf") {
+			return nil
+		}
+		filesToClean = append(filesToClean, path)
+		return nil
+	}); walkErr != nil {
+		return fmt.Errorf("Could not walk through directory: %v", walkErr)
+	}
+	for _, file := range filesToClean {
+		removeErr := g.fs.Remove(file)
+		if removeErr != nil {
+			logrus.Errorf("Could not remove file %s: %v", file, removeErr)
+		} else {
+			logrus.Infof("Cleaned up NGINX config file upon startup %s", file)
+		}
+	}
+	return nil
+}
+
+func (g *ConfdGuard) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 	for {
-		func() {
-			select {
-			case appStageChange := <-c:
-				g.lock.Lock()
-				defer g.lock.Unlock()
+		select {
+		case appStageChange := <-c:
+			func() {
 				if appStageChange.State == svcdetector.AppStateChangeAdded {
 					port, portErr := g.portAllocator.Allocate()
 					if portErr != nil {
@@ -48,12 +74,12 @@ func (g *ConfigGuard) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 						ListenPort: port,
 						ProxyPass:  appStageChange.App.Address,
 						File: fmt.Sprintf(
-							"%s-%s.conf", g.prefix, appStageChange.App.Name,
+							"%s-%s-%s.conf", g.prefix, appStageChange.App.Peer, appStageChange.App.Name,
 						),
 						App: appStageChange.App,
 					}
 					g.Servers = append(g.Servers, server)
-					afero.WriteFile(g.fs, path.Join(g.path, server.File), []byte(fmt.Sprintf(`
+					if writeErr := afero.WriteFile(g.fs, path.Join(g.path, server.File), []byte(fmt.Sprintf(`
 # [%s] %s
 server {
 	listen %d;
@@ -64,7 +90,12 @@ server {
 						server.App.Name,
 						server.ListenPort,
 						server.ProxyPass,
-					)), 0644)
+					)), 0644); writeErr != nil {
+						logrus.Errorf("Could not write NGINX config file: %v", writeErr)
+
+					} else {
+						logrus.Infof("Created NGINX config file %s", server.File)
+					}
 				} else if appStageChange.State == svcdetector.AppStateChangeWithdrawn {
 					g.fs.Remove(path.Join(g.path, fmt.Sprintf(
 						"%s-%s.conf", g.prefix, appStageChange.App.Name,
@@ -78,22 +109,28 @@ server {
 					}
 				}
 				if reloaderErr := g.reloader.Reload(); reloaderErr != nil {
-					logrus.Errorf("Could not reload nginx: %v", reloaderErr)
+					logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
 				}
-			case <-done:
-				return
-			}
-		}()
+			}()
+		case <-done:
+			return
+		}
+
 	}
 }
 
-func NewNginxConfigGuard(path, confPrefix string, reloader Reloader) *ConfigGuard {
-	return &ConfigGuard{
+func NewConfdGuard(path, confPrefix string, reloader Reloader, allocator PortAllocator) *ConfdGuard {
+	cg := &ConfdGuard{
 		path:   path,
 		prefix: confPrefix,
 		fs:     afero.NewOsFs(),
 
 		reloader:      reloader,
-		portAllocator: NewRangePortAllocator(20000, 25000),
+		portAllocator: allocator,
 	}
+	if cleanErr := cg.RemoveAll(); cleanErr != nil {
+		logrus.Errorf("Could not clean NGINX config directory: %v", cleanErr)
+	}
+
+	return cg
 }

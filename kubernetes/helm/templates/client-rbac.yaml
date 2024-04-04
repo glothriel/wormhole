@@ -21,6 +21,8 @@ rules:
       - services
     verbs:
       - get
+      - create
+      - update
       - list
       - watch
 ---

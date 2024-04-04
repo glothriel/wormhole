@@ -18,7 +18,6 @@ type serviceWrapper interface {
 
 type defaultServiceWrapper struct {
 	k8sSvc *corev1.Service
-	pd     PeerDetector
 }
 
 func (wrapper defaultServiceWrapper) id() string {
@@ -42,6 +41,14 @@ func (wrapper defaultServiceWrapper) name() string {
 		return wrapper.id()
 	}
 	return exposeName
+}
+
+func (wrapper defaultServiceWrapper) targetLabels() string {
+	labels, labelsOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/labels"]
+	if !labelsOk {
+		return ""
+	}
+	return labels
 }
 
 func (wrapper defaultServiceWrapper) ports() []corev1.ServicePort {
@@ -88,11 +95,13 @@ func (wrapper defaultServiceWrapper) apps() []peers.App {
 				wrapper.k8sSvc.ObjectMeta.Namespace,
 				portDefinition.Port,
 			),
+			TargetLabels: wrapper.targetLabels(),
+			OriginalPort: portDefinition.Port,
 		})
 	}
 	return apps
 }
 
-func newDefaultServiceWrapper(svc *corev1.Service, pd PeerDetector) defaultServiceWrapper {
-	return defaultServiceWrapper{k8sSvc: svc, pd: pd}
+func newDefaultServiceWrapper(svc *corev1.Service) defaultServiceWrapper {
+	return defaultServiceWrapper{k8sSvc: svc}
 }

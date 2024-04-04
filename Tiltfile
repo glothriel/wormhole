@@ -9,7 +9,7 @@ default_registry(
 docker_build(
     'wormhole', 
     context='.', 
-    dockerfile='./docker/Dockerfile.go',
+    dockerfile='./docker/goDockerfile',
     target='dev',
     build_args={
         'USER_ID': str(local('id -u')),
@@ -27,7 +27,7 @@ docker_build(
 docker_build(
     'wireguard', 
     context='docker',
-    dockerfile='./docker/Dockerfile.wg',
+    dockerfile='./docker/wgDockerfile',
 )
 
 servers = ["server"]

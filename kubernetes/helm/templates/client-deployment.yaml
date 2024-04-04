@@ -58,7 +58,6 @@ spec:
       - name: {{ template "name-client" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-client" . }}
-      - name: {{ template "name-client" . }}-tmp
       containers:
         - name: nginx
           image: nginx:alpine
