@@ -24,7 +24,7 @@ var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 
 var serverUrlFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "server",
-	Value: "http://localhost:8080",
+	Value: "http://localhost:8081",
 }
 
 var joinCommand *cli.Command = &cli.Command{

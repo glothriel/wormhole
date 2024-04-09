@@ -1,11 +1,9 @@
 module github.com/glothriel/wormhole
 
-go 1.21
-
-toolchain go1.22.1
+go 1.22
 
 require (
-	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/avast/retry-go/v4 v4.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/prometheus/client_golang v1.12.1

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"path/filepath"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
@@ -93,10 +94,15 @@ func (w *Watcher) Update(settings Config) error {
 	return nil
 }
 
-func NewWriter(path string) *Watcher {
+func NewWriter(cfgPath string) *Watcher {
+	fs := &afero.Afero{Fs: afero.NewOsFs()}
+	createErr := fs.MkdirAll(filepath.Dir(cfgPath), 0755)
+	if createErr != nil && createErr != afero.ErrDestinationExists {
+		logrus.Panicf("Could not create Wireguard config directory at %s: %v", cfgPath, createErr)
+	}
 	return &Watcher{
-		path: path,
-		fs:   &afero.Afero{Fs: afero.NewOsFs()},
+		path: cfgPath,
+		fs:   fs,
 	}
 }
 

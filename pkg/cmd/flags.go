@@ -8,7 +8,7 @@ var nginxExposerConfdPathFlag *cli.StringFlag = &cli.StringFlag{
 }
 
 var wireguardConfigFilePathFlag *cli.StringFlag = &cli.StringFlag{
-	Name:  "wireguard-config-path",
+	Name:  "wg-config",
 	Value: "/storage/wireguard/wg0.conf",
 }
 

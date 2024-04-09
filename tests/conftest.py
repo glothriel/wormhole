@@ -38,8 +38,15 @@ def executable():
 
 
 @pytest.fixture()
-def client(executable, server):
-    c = Client(executable, exposes=[f"localhost:{TEST_SERVER_PORT}"])
+def client(executable, server, tmpdir):
+    c_subdir = tmpdir.mkdir("client")
+    c = Client(
+        executable,
+        server,
+        c_subdir.mkdir("state-manager"),
+        c_subdir.mkdir("nginx"),
+        c_subdir.mkdir("wireguard").join("wg0.conf"),
+    )
     try:
         yield c.start()
     finally:
@@ -47,8 +54,14 @@ def client(executable, server):
 
 
 @pytest.fixture()
-def server(executable):
-    server = Server(executable)
+def server(executable, tmpdir):
+    s_subdir = tmpdir.mkdir("server")
+    server = Server(
+        executable,
+        s_subdir.mkdir("state-manager"),
+        s_subdir.mkdir("nginx"),
+        s_subdir.mkdir("wireguard").join("wg0.conf"),
+    )
     try:
         server.start()
         yield server

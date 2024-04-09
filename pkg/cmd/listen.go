@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
 	"github.com/glothriel/wormhole/pkg/listeners"
@@ -13,7 +15,7 @@ import (
 
 var (
 	wgAddressFlag *cli.StringFlag = &cli.StringFlag{
-		Name:  "wg-address",
+		Name:  "wg-host",
 		Value: "10.188.0.1",
 	}
 
@@ -27,9 +29,14 @@ var (
 		Value: 51820,
 	}
 
-	helloServerListenAddress *cli.StringFlag = &cli.StringFlag{
-		Name:  "hello-server-listen-address",
-		Value: "0.0.0.0:8081",
+	extServerListenAddress *cli.StringFlag = &cli.StringFlag{
+		Name:  "ext-server-listen-address",
+		Value: "0.0.0.0:8080",
+	}
+
+	intServerListenPort *cli.IntFlag = &cli.IntFlag{
+		Name:  "int-server-listen-port",
+		Value: 8081,
 	}
 )
 
@@ -40,7 +47,8 @@ var listenCommand *cli.Command = &cli.Command{
 		stateManagerPathFlag,
 		nginxExposerConfdPathFlag,
 		wireguardConfigFilePathFlag,
-		helloServerListenAddress,
+		extServerListenAddress,
+		intServerListenPort,
 		kubernetesNamespaceFlag,
 		kubernetesLabelsFlag,
 		wgAddressFlag,
@@ -94,7 +102,8 @@ var listenCommand *cli.Command = &cli.Command{
 		go remoteListenerRegistry.Watch(remoteNginxAdapter.Changes(), make(chan bool))
 
 		return hello.NewServer(
-			c.String(helloServerListenAddress.Name),
+			fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
+			c.String(extServerListenAddress.Name),
 			pkey.PublicKey().String(),
 			"wormhole-server-chart.server.svc.cluster.local:51820",
 			&wg.Config{

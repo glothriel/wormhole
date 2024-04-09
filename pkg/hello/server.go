@@ -10,11 +10,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
+
+type helloResult struct {
+}
 
 type appRegistry interface {
 	Apps() []peers.App
@@ -22,7 +26,8 @@ type appRegistry interface {
 
 // Server is a separate HTTP server, that allows managing wormhole using API
 type Server struct {
-	server    *http.Server
+	extServer *http.Server
+	intServer *http.Server
 	publicKey string
 	endpoint  string
 	cfg       *wg.Config
@@ -139,12 +144,30 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 // Listen starts the server
 func (apiServer *Server) Listen() error {
 	apiServer.cfgWriter.Update(*apiServer.cfg)
-	return apiServer.server.ListenAndServe()
+	go func() {
+		logrus.Infof("Starting internal server on %s", apiServer.intServer.Addr)
+		retry.Do(func() error {
+			// The address will bind only after wireguard is up, hence the retry
+			listenErr := apiServer.intServer.ListenAndServe()
+			if listenErr != nil {
+				logrus.Errorf("Failed to start internal server: %v, will retry", listenErr)
+			}
+			return listenErr
+		},
+			retry.Attempts(0), // infinite retries
+			retry.DelayType(retry.BackOffDelay),
+			retry.MaxDelay(time.Second*10),
+			retry.Delay(time.Millisecond*100),
+		)
+	}()
+	logrus.Infof("Starting external server on %s", apiServer.extServer.Addr)
+	return apiServer.extServer.ListenAndServe()
 }
 
 // NewServer creates WormholeAdminServer instances
 func NewServer(
-	addr string,
+	intAddr string,
+	extAddr string,
 	publicKey string,
 	endpoint string,
 	cfg *wg.Config,
@@ -152,11 +175,17 @@ func NewServer(
 	remoteNginxAdapter *AppStateChangeGenerator,
 	wgWatcher *wg.Watcher,
 ) *Server {
-	mux := mux.NewRouter()
+	extMux := mux.NewRouter()
+	intMux := mux.NewRouter()
 	s := &Server{
-		server: &http.Server{
-			Addr:              addr,
-			Handler:           mux,
+		extServer: &http.Server{
+			Addr:              extAddr,
+			Handler:           extMux,
+			ReadHeaderTimeout: time.Second * 5,
+		},
+		intServer: &http.Server{
+			Addr:              intAddr,
+			Handler:           intMux,
 			ReadHeaderTimeout: time.Second * 5,
 		},
 		publicKey:          publicKey,
@@ -169,8 +198,8 @@ func NewServer(
 		remoteNginxAdapter: remoteNginxAdapter,
 		hostnamesToNames:   map[string]string{},
 	}
-	mux.HandleFunc("/v1/hello", s.handleHello).Methods(http.MethodPost)
-	mux.HandleFunc("/v1/sync", s.handleSync).Methods(http.MethodPost)
+	extMux.HandleFunc("/v1/hello", s.handleHello).Methods(http.MethodPost)
+	intMux.HandleFunc("/v1/sync", s.handleSync).Methods(http.MethodPost)
 	return s
 }
 

@@ -18,12 +18,24 @@ def run_process(command, *args, **kwargs):
 
 
 class Server:
-    def __init__(self, executable, metrics_port=8090, acceptor="dummy"):
+    def __init__(
+            self,
+            executable,
+            state_manager_path="/tmp/server-state-manager",
+            nginx_confd_path="/tmp/server-nginx-confd",
+            wireguard_config_path="/tmp/server-wireguard/wg0.conf",
+            wireguard_address="192.168.0.1",
+            wireguard_subnet="24",
+            metrics_port=8090,
+    ):
         self.executable = executable
-        self.process = None
-        self.admin_port = 8081
+        self.state_manager_path = state_manager_path
+        self.nginx_confd_path = nginx_confd_path
+        self.wireguard_config_path = wireguard_config_path
         self.metrics_port = metrics_port
-        self.acceptor = acceptor
+        self.wireguard_address = wireguard_address
+        self.wireguard_subnet = wireguard_subnet
+        self.process = None
 
     def start(self):
         self.process = subprocess.Popen(
@@ -34,8 +46,16 @@ class Server:
                 "--metrics-port",
                 str(self.metrics_port),
                 "listen",
-                "--acceptor",
-                self.acceptor,
+                "--directory-state-manager-path",
+                self.state_manager_path,
+                "--nginx-confd-path",
+                self.nginx_confd_path,
+                "--wg-config",
+                self.wireguard_config_path,
+                "--wg-host",
+                self.wireguard_address,
+                "--wg-subnet-mask",
+                self.wireguard_subnet,
             ],
             shell=False,
         )
@@ -43,7 +63,7 @@ class Server:
         @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
             # All three ports are opened
-            assert len(psutil.Process(self.process.pid).connections()) == 3
+            assert len(psutil.Process(self.process.pid).connections()) == 2
 
         _check_if_is_already_opened()
 
@@ -107,9 +127,20 @@ class MySQLServer:
 
 
 class Client:
-    def __init__(self, executable, exposes, metrics_port=8091):
+    def __init__(
+            self,
+            executable,
+            server,
+            state_manager_path="/tmp/client-state-manager",
+            nginx_confd_path="/tmp/client-nginx-confd",
+            wireguard_config_path="/tmp/client-wireguard/wg0.conf",
+            metrics_port=8091
+    ):
         self.executable = executable
-        self.exposes = exposes
+        self.server = server
+        self.state_manager_path = state_manager_path
+        self.nginx_confd_path = nginx_confd_path
+        self.wireguard_config_path = wireguard_config_path
         self.metrics_port = metrics_port
         self.process = None
 
@@ -122,19 +153,15 @@ class Client:
             "join",
             "--name",
             uuid.uuid4().hex,
+            "--nginx-confd-path",
+            self.nginx_confd_path,
+            "--wg-config",
+            self.wireguard_config_path,
+            "--directory-state-manager-path",
+            self.state_manager_path,
+
         ]
-        for expose in self.exposes:
-            if type(expose) == str:
-                command += ["--expose", expose]
-            else:
-                command += ["--expose", f"name={expose[0]},address={expose[1]}"]
-
         self.process = subprocess.Popen(command, shell=False)
-        # TODO: Replace with retry once it supports multiple connections
-        import time
-
-        time.sleep(2)
-
         return self
 
     def stop(self):
