@@ -123,11 +123,13 @@ spec:
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes
+            - --kubernetes-namespace
+            - {{ $.Release.Namespace }}
+            - --kubernetes-labels
+            - 'application={{ template "name-client" . }}'
             - --server
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
-            - --keypair-storage-path
-            - /storage
-
+            
 ---
 apiVersion: v1
 kind: ConfigMap

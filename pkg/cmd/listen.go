@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
@@ -15,13 +16,18 @@ import (
 
 var (
 	wgAddressFlag *cli.StringFlag = &cli.StringFlag{
-		Name:  "wg-host",
-		Value: "10.188.0.1",
+		Name:     "wg-internal-host",
+		Required: true,
 	}
 
 	wgSubnetFlag *cli.StringFlag = &cli.StringFlag{
 		Name:  "wg-subnet-mask",
 		Value: "24",
+	}
+
+	wgPublicHostFlag *cli.StringFlag = &cli.StringFlag{
+		Name:  "wg-public-host",
+		Value: "wormhole-server-chart.server.svc.cluster.local",
 	}
 
 	wgPortFlag *cli.IntFlag = &cli.IntFlag{
@@ -46,6 +52,7 @@ var listenCommand *cli.Command = &cli.Command{
 		kubernetesFlag,
 		stateManagerPathFlag,
 		nginxExposerConfdPathFlag,
+		wgPublicHostFlag,
 		wireguardConfigFilePathFlag,
 		extServerListenAddress,
 		intServerListenPort,
@@ -101,20 +108,42 @@ var listenCommand *cli.Command = &cli.Command{
 		remoteNginxAdapter := hello.NewAppStateChangeGenerator()
 		go remoteListenerRegistry.Watch(remoteNginxAdapter.Changes(), make(chan bool))
 
-		return hello.NewServer(
-			fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
-			c.String(extServerListenAddress.Name),
-			pkey.PublicKey().String(),
-			"wormhole-server-chart.server.svc.cluster.local:51820",
-			&wg.Config{
-				Address:    c.String(wgAddressFlag.Name),
-				Subnet:     c.String(wgSubnetFlag.Name),
-				ListenPort: c.Int(wgPortFlag.Name),
+		wgConfig := &wg.Config{
+			Address:    c.String(wgAddressFlag.Name),
+			Subnet:     c.String(wgSubnetFlag.Name),
+			ListenPort: c.Int(wgPortFlag.Name),
+			PrivateKey: pkey.String(),
+		}
+		peers := hello.NewInMemoryPeerStorage()
+		syncTransport := hello.NewHTTPServerSyncTransport(&http.Server{
+			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
+		})
+		ss := hello.NewSyncingServer(
+			remoteNginxAdapter,
+			hello.NewPeerEnrichingAppSource("server", localListenerRegistry),
+			hello.NewJSONSyncEncoder(),
+			syncTransport,
+			peers,
+		)
+		ps := hello.NewPairingServer(
+			"server",
+			fmt.Sprintf("%s:%d", c.String(wgPublicHostFlag.Name), c.Int(wgPortFlag.Name)),
+			wgConfig,
+			hello.KeyPair{
+				PublicKey:  pkey.PublicKey().String(),
 				PrivateKey: pkey.String(),
 			},
-			localListenerRegistry,
-			remoteNginxAdapter,
-			wg.NewWriter(c.String(wireguardConfigFilePathFlag.Name)),
-		).Listen()
+			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
+			hello.NewJSONPairingEncoder(),
+			hello.NewHTTPServerTransport(&http.Server{
+				Addr: c.String(extServerListenAddress.Name),
+			}),
+			hello.NewIPPool(c.String(wgAddressFlag.Name)),
+			peers,
+			[]hello.MetadataEnricher{syncTransport},
+		)
+		go ss.Start()
+		ps.Start()
+		return nil
 	},
 }

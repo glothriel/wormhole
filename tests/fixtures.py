@@ -19,14 +19,14 @@ def run_process(command, *args, **kwargs):
 
 class Server:
     def __init__(
-            self,
-            executable,
-            state_manager_path="/tmp/server-state-manager",
-            nginx_confd_path="/tmp/server-nginx-confd",
-            wireguard_config_path="/tmp/server-wireguard/wg0.conf",
-            wireguard_address="192.168.0.1",
-            wireguard_subnet="24",
-            metrics_port=8090,
+        self,
+        executable,
+        state_manager_path="/tmp/server-state-manager",
+        nginx_confd_path="/tmp/server-nginx-confd",
+        wireguard_config_path="/tmp/server-wireguard/wg0.conf",
+        wireguard_address="0.0.0.0",
+        wireguard_subnet="24",
+        metrics_port=8090,
     ):
         self.executable = executable
         self.state_manager_path = state_manager_path
@@ -38,32 +38,35 @@ class Server:
         self.process = None
 
     def start(self):
+        cmd = [
+            self.executable,
+            "--debug",
+            "--metrics",
+            "--metrics-port",
+            str(self.metrics_port),
+            "listen",
+            "--directory-state-manager-path",
+            self.state_manager_path,
+            "--nginx-confd-path",
+            self.nginx_confd_path,
+            "--wg-config",
+            self.wireguard_config_path,
+            "--wg-public-host",
+            self.wireguard_address,
+            "--wg-internal-host",
+            self.wireguard_address,
+            "--wg-subnet-mask",
+            self.wireguard_subnet,
+        ]
+        print(' '.join([str(i) for i in cmd]))
         self.process = subprocess.Popen(
-            [
-                self.executable,
-                "--debug",
-                "--metrics",
-                "--metrics-port",
-                str(self.metrics_port),
-                "listen",
-                "--directory-state-manager-path",
-                self.state_manager_path,
-                "--nginx-confd-path",
-                self.nginx_confd_path,
-                "--wg-config",
-                self.wireguard_config_path,
-                "--wg-host",
-                self.wireguard_address,
-                "--wg-subnet-mask",
-                self.wireguard_subnet,
-            ],
+            cmd,
             shell=False,
         )
 
         @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
-            # All three ports are opened
-            assert len(psutil.Process(self.process.pid).connections()) == 2
+            assert len(psutil.Process(self.process.pid).connections()) > 0
 
         _check_if_is_already_opened()
 
@@ -128,13 +131,13 @@ class MySQLServer:
 
 class Client:
     def __init__(
-            self,
-            executable,
-            server,
-            state_manager_path="/tmp/client-state-manager",
-            nginx_confd_path="/tmp/client-nginx-confd",
-            wireguard_config_path="/tmp/client-wireguard/wg0.conf",
-            metrics_port=8091
+        self,
+        executable,
+        server,
+        state_manager_path="/tmp/client-state-manager",
+        nginx_confd_path="/tmp/client-nginx-confd",
+        wireguard_config_path="/tmp/client-wireguard/wg0.conf",
+        metrics_port=8091,
     ):
         self.executable = executable
         self.server = server
@@ -159,7 +162,6 @@ class Client:
             self.wireguard_config_path,
             "--directory-state-manager-path",
             self.state_manager_path,
-
         ]
         self.process = subprocess.Popen(command, shell=False)
         return self

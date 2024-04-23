@@ -10,6 +10,7 @@ import (
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 var helloRetryIntervalFlag *cli.DurationFlag = &cli.DurationFlag{
@@ -24,7 +25,7 @@ var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 
 var serverUrlFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "server",
-	Value: "http://localhost:8081",
+	Value: "http://localhost:8080",
 }
 
 var joinCommand *cli.Command = &cli.Command{
@@ -41,6 +42,10 @@ var joinCommand *cli.Command = &cli.Command{
 		wireguardConfigFilePathFlag,
 	},
 	Action: func(c *cli.Context) error {
+		pkey, keyErr := wgtypes.GeneratePrivateKey()
+		if keyErr != nil {
+			logrus.Fatalf("Failed to generate private key: %v", keyErr)
+		}
 		startPrometheusServer(c)
 
 		localListenerRegistry := listeners.NewRegistry(nginx.NewNginxExposer(
@@ -77,27 +82,53 @@ var joinCommand *cli.Command = &cli.Command{
 		remoteListenerRegistry := listeners.NewRegistry(effectiveExposer)
 
 		appStateChangeGenerator := hello.NewAppStateChangeGenerator()
-		helloClient := hello.NewClient(
-			c.String(serverUrlFlag.Name),
-			c.String(peerNameFlag.Name),
-			localListenerRegistry,
-			appStateChangeGenerator,
-			wg.NewWriter(c.String(wireguardConfigFilePathFlag.Name)),
-		)
 
+		client := hello.NewPairingClient(
+			c.String(peerNameFlag.Name),
+			c.String(serverUrlFlag.Name),
+			&wg.Config{
+				PrivateKey: pkey.String(),
+				Subnet:     "32",
+			},
+
+			hello.KeyPair{
+				PublicKey:  pkey.PublicKey().String(),
+				PrivateKey: pkey.String(),
+			},
+			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
+			hello.NewJSONPairingEncoder(),
+			hello.NewHTTPClientTransport(c.String(serverUrlFlag.Name)),
+		)
+		var pairingResponse hello.PairingResponse
 		for {
 			var err error
-			if _, err = helloClient.Hello(); err != nil {
+			if pairingResponse, err = client.Pair(); err != nil {
 				logrus.Error(err)
 				time.Sleep(c.Duration(helloRetryIntervalFlag.Name))
 				continue
 			}
 			break
 		}
-		go localListenerRegistry.Watch(getStateManager(c).Changes(), make(chan bool))
 
+		logrus.Infof("Paired with server, assigned IP: %s", pairingResponse.AssignedIP)
+		go localListenerRegistry.Watch(getStateManager(c).Changes(), make(chan bool))
 		go remoteListenerRegistry.Watch(appStateChangeGenerator.Changes(), make(chan bool))
-		helloClient.SyncForever()
+
+		sc, scErr := hello.NewHTTPSyncingClient(
+			appStateChangeGenerator,
+			hello.NewJSONSyncEncoder(),
+			time.Second*5,
+			hello.NewPeerEnrichingAppSource(
+				c.String(peerNameFlag.Name),
+				localListenerRegistry,
+			),
+			pairingResponse,
+		)
+		if scErr != nil {
+			logrus.Fatalf("Failed to create syncing client: %v", scErr)
+		}
+		sc.Start()
+
 		return nil
 	},
 }

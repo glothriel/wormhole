@@ -20,7 +20,7 @@ def test_wireguard_configs_created(
     _ensure_wireguard_configs_were_created()
 
     parts = server.wireguard_address.split(".")
-    parts[-1] = int(parts[-1]) + 2
+    parts[-1] = int(parts[-1]) + 1
     first_client_ip = ".".join(map(str, parts))
     assert_wireguard_config_params(
         server.wireguard_config_path,

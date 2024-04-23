@@ -52,13 +52,22 @@ server {
 	} else {
 		logrus.Infof("Created NGINX config file %s", server.File)
 	}
+
+	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
+		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
+	}
 	return peers.WithAddress(app, fmt.Sprintf("localhost:%d", port)), nil
 }
 
 func (n *NginxExposer) Withdraw(app peers.App) error {
-	return n.fs.Remove(path.Join(n.path, fmt.Sprintf(
+	removeErr := n.fs.Remove(path.Join(n.path, fmt.Sprintf(
 		"%s-%s.conf", n.prefix, app.Name,
 	)))
+
+	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
+		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
+	}
+	return removeErr
 }
 
 func (n *NginxExposer) WithdrawAll() error {
@@ -78,14 +87,22 @@ func (n *NginxExposer) WithdrawAll() error {
 	}); walkErr != nil {
 		return fmt.Errorf("Could not walk through directory: %v", walkErr)
 	}
+	deleted := 0
 	for _, file := range filesToClean {
 		removeErr := n.fs.Remove(file)
 		if removeErr != nil {
 			logrus.Errorf("Could not remove file %s: %v", file, removeErr)
 		} else {
+			deleted++
 			logrus.Infof("Cleaned up NGINX config file upon startup %s", file)
 		}
 	}
+	if deleted > 0 {
+		if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
+			logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
+		}
+	}
+
 	return nil
 }
 
@@ -103,6 +120,7 @@ func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortA
 	if createErr != nil && createErr != afero.ErrDestinationExists {
 		logrus.Fatalf("Could not create NGINX config directory at %s: %v", path, createErr)
 	}
+
 	if cleanErr := cg.WithdrawAll(); cleanErr != nil {
 		logrus.Errorf("Could not clean NGINX config directory: %v", cleanErr)
 	}

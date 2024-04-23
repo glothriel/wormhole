@@ -61,7 +61,7 @@ for client in clients:
     k8s_yaml(helm("./kubernetes/helm", namespace=client, name=client, set=[
         "client.enabled=true",
         "client.name=" + client,
-        "client.serverDsn=http://wormhole-server-chart-admin.server.svc.cluster.local:8081",
+        "client.serverDsn=http://wormhole-server-chart-peering.server.svc.cluster.local:8080",
         "client.resources.limits.memory=2Gi",
         "client.securityContext.runAsUser=0",
         "client.securityContext.runAsGroup=0",

@@ -121,10 +121,6 @@ spec:
           args:
             - --metrics
             - listen
-            - --acceptor
-            - {{ $.Values.server.acceptor }}
-            - --acceptor-storage-file-path
-            - /storage
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}

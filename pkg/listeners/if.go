@@ -67,8 +67,8 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 	}
 }
 
-func (g *Registry) Apps() []peers.App {
-	return g.apps
+func (g *Registry) List() ([]peers.App, error) {
+	return g.apps, nil
 }
 
 func NewRegistry(r Exposer) *Registry {

@@ -94,7 +94,7 @@ func (w *Watcher) Update(settings Config) error {
 	return nil
 }
 
-func NewWriter(cfgPath string) *Watcher {
+func NewWatcher(cfgPath string) *Watcher {
 	fs := &afero.Afero{Fs: afero.NewOsFs()}
 	createErr := fs.MkdirAll(filepath.Dir(cfgPath), 0755)
 	if createErr != nil && createErr != afero.ErrDestinationExists {

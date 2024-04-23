@@ -1,8 +1,6 @@
 package hello
 
 import (
-	"fmt"
-
 	"github.com/glothriel/wormhole/pkg/wg"
 )
 
@@ -37,14 +35,6 @@ type PairingResponseWireguardConfig struct {
 type IPPool interface {
 	// TODO: This interface is not complete, it should have at least a method to release IP
 	Next() (string, error)
-}
-
-type PairingEncoder interface {
-	EncodeRequest(PairingRequest) ([]byte, error)
-	DecodeRequest([]byte) (PairingRequest, error)
-
-	EncodeResponse(PairingResponse) ([]byte, error)
-	DecodeResponse([]byte) (PairingResponse, error)
 }
 
 type PairingRequestClientError struct {
@@ -99,101 +89,4 @@ type PeerInfo struct {
 	IP          string `json:"ip"`
 	PublicKey   string `json:"public_key"`
 	LastContact int64  `json:"last_contact"`
-}
-
-type PeerStorage interface {
-	Store(PeerInfo) error
-	GetByName(string) (PeerInfo, error)
-	GetByIP(string) (PeerInfo, error)
-	List() ([]PeerInfo, error)
-}
-
-type PairingServer struct {
-	serverName       string     // Name of the server peer
-	publicWgHostPort string     // Public Wireguard host:port, used in Endpoint field of the Wireguard config of other peers
-	wgConfig         *wg.Config // Local Wireguard config
-	keyPair          KeyPair    // Local Wireguard key pair
-
-	wgReloader WireguardConfigReloader
-	encoder    PairingEncoder
-	transport  PairingServerTransport
-	ips        IPPool
-	storage    PeerStorage
-}
-
-func (s *PairingServer) Start() {
-	for incomingRequest := range s.transport.Requests() {
-		request, requestErr := s.encoder.DecodeRequest(incomingRequest.Request)
-		if requestErr != nil {
-			incomingRequest.Err <- NewPairingRequestClientError(requestErr)
-			continue
-		}
-
-		// Assign IP
-		ip, ipErr := s.ips.Next()
-		if ipErr != nil {
-			incomingRequest.Err <- NewPairingRequestServerError(ipErr)
-			continue
-		}
-
-		// Update local wireguard config
-		s.wgConfig.Upsert(wg.Peer{
-			PublicKey:  request.Wireguard.PublicKey,
-			AllowedIPs: fmt.Sprintf("%s/32,%s/32", ip, s.wgConfig.Address),
-		})
-		s.wgReloader.Update(*s.wgConfig)
-
-		// Store peer info
-		storeErr := s.storage.Store(PeerInfo{
-			Name:      request.Name,
-			IP:        ip,
-			PublicKey: request.Wireguard.PublicKey,
-		})
-		if storeErr != nil {
-			incomingRequest.Err <- NewPairingRequestServerError(storeErr)
-			continue
-		}
-
-		// Respond to the client
-		response := PairingResponse{
-			Name:             s.serverName,
-			AssignedIP:       ip,
-			InternalServerIP: s.wgConfig.Address,
-			Wireguard: PairingResponseWireguardConfig{
-				PublicKey: s.keyPair.PublicKey,
-				Endpoint:  s.publicWgHostPort,
-			},
-			Metadata: map[string]string{},
-		}
-		encoded, encodeErr := s.encoder.EncodeResponse(response)
-		if encodeErr != nil {
-			incomingRequest.Err <- NewPairingRequestServerError(encodeErr)
-			continue
-		}
-		incomingRequest.Response <- encoded
-	}
-}
-
-func NewPairingServer(
-	serverName string,
-	publicWgHostPort string,
-	wgConfig *wg.Config,
-	keyPair KeyPair,
-	wgReloader WireguardConfigReloader,
-	encoder PairingEncoder,
-	transport PairingServerTransport,
-	ips IPPool,
-	storage PeerStorage,
-) *PairingServer {
-	return &PairingServer{
-		serverName:       serverName,
-		publicWgHostPort: publicWgHostPort,
-		wgConfig:         wgConfig,
-		keyPair:          keyPair,
-		wgReloader:       wgReloader,
-		encoder:          encoder,
-		transport:        transport,
-		ips:              ips,
-		storage:          storage,
-	}
 }

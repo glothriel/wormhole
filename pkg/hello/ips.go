@@ -34,3 +34,4 @@ func NewIPPool(starting string) IPPool {
 	}
 	return &ipPool{previous: ip}
 }
+
