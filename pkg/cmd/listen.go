@@ -50,7 +50,7 @@ var listenCommand *cli.Command = &cli.Command{
 	Name: "listen",
 	Flags: []cli.Flag{
 		kubernetesFlag,
-		//?
+		inviteTokenFlag,
 		stateManagerPathFlag,
 		nginxExposerConfdPathFlag,
 		wgPublicHostFlag,
@@ -131,6 +131,15 @@ var listenCommand *cli.Command = &cli.Command{
 		)
 		watcher := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
 		watcher.Update(*wgConfig)
+		peerTransport := hello.NewHTTPServerPairingTransport(&http.Server{
+			Addr: c.String(extServerListenAddress.Name),
+		})
+		if c.String(inviteTokenFlag.Name) != "" {
+			peerTransport = hello.NewPSKPairingServerTransport(
+				c.String(inviteTokenFlag.Name),
+				peerTransport,
+			)
+		}
 		ps := hello.NewPairingServer(
 			"server",
 			fmt.Sprintf("%s:%d", c.String(wgPublicHostFlag.Name), c.Int(wgPortFlag.Name)),
@@ -141,9 +150,7 @@ var listenCommand *cli.Command = &cli.Command{
 			},
 			watcher,
 			hello.NewJSONPairingEncoder(),
-			hello.NewHTTPServerPairingTransport(&http.Server{
-				Addr: c.String(extServerListenAddress.Name),
-			}),
+			peerTransport,
 			hello.NewIPPool(c.String(wgAddressFlag.Name)),
 			peers,
 			[]hello.MetadataEnricher{syncTransport},

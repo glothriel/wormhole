@@ -63,7 +63,12 @@ func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Server returned status code %d when called %s", resp.StatusCode, postURL)
+		respBody := make([]byte, resp.ContentLength)
+		_, readErr := resp.Body.Read(respBody)
+		if readErr != nil {
+			logrus.Errorf("Failed to read response body: %v", readErr)
+		}
+		return nil, fmt.Errorf("Server returned status code %d when called %s: %s", resp.StatusCode, postURL, string(respBody))
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

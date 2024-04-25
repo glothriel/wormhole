@@ -120,6 +120,7 @@ spec:
           args:
             - --metrics
             - join
+            - --invite-token hello123
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes

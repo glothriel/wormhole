@@ -23,7 +23,7 @@ var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 	Required: true,
 }
 
-var serverUrlFlag *cli.StringFlag = &cli.StringFlag{
+var pairingServerURL *cli.StringFlag = &cli.StringFlag{
 	Name:  "server",
 	Value: "http://localhost:8080",
 }
@@ -31,7 +31,8 @@ var serverUrlFlag *cli.StringFlag = &cli.StringFlag{
 var joinCommand *cli.Command = &cli.Command{
 	Name: "join",
 	Flags: []cli.Flag{
-		serverUrlFlag,
+		pairingServerURL,
+		inviteTokenFlag,
 		kubernetesFlag,
 		stateManagerPathFlag,
 		kubernetesNamespaceFlag,
@@ -83,9 +84,17 @@ var joinCommand *cli.Command = &cli.Command{
 
 		appStateChangeGenerator := hello.NewAppStateChangeGenerator()
 
+		transport := hello.NewHTTPClientPairingTransport(c.String(pairingServerURL.Name))
+		if c.String(inviteTokenFlag.Name) != "" {
+			transport = hello.NewPSKClientPairingTransport(
+				c.String(inviteTokenFlag.Name),
+				transport,
+			)
+		}
+
 		client := hello.NewPairingClient(
 			c.String(peerNameFlag.Name),
-			c.String(serverUrlFlag.Name),
+			c.String(pairingServerURL.Name),
 			&wg.Config{
 				PrivateKey: pkey.String(),
 				Subnet:     "32",
@@ -97,7 +106,7 @@ var joinCommand *cli.Command = &cli.Command{
 			},
 			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
 			hello.NewJSONPairingEncoder(),
-			hello.NewHTTPClientPairingTransport(c.String(serverUrlFlag.Name)),
+			transport,
 		)
 		var pairingResponse hello.PairingResponse
 		for {

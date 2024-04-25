@@ -121,6 +121,7 @@ spec:
           args:
             - --metrics
             - listen
+            - --invite-token hello123
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}

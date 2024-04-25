@@ -34,3 +34,8 @@ var stateManagerPathFlag *cli.StringFlag = &cli.StringFlag{
 	Hidden: true,
 	Value:  "",
 }
+
+var inviteTokenFlag *cli.StringFlag = &cli.StringFlag{
+	Name:  "invite-token",
+	Value: "",
+}
