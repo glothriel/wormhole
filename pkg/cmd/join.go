@@ -97,7 +97,7 @@ var joinCommand *cli.Command = &cli.Command{
 			},
 			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
 			hello.NewJSONPairingEncoder(),
-			hello.NewHTTPClientTransport(c.String(serverUrlFlag.Name)),
+			hello.NewHTTPClientPairingTransport(c.String(serverUrlFlag.Name)),
 		)
 		var pairingResponse hello.PairingResponse
 		for {

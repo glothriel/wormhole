@@ -34,6 +34,7 @@ client:
   nodeSelector: null
   tolerations: null
 
+
   pvc:
     storageClassName: ""
     storage: 1Gi
@@ -77,6 +78,11 @@ server:
   pvc:
     storageClassName: ""
     storage: 1Gi
+
+  wg:
+    publicHost: ""
+    internalHost: 10.188.0.1
+    subnetMask: 24
 
   acceptor: "server"
   path: ""

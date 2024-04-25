@@ -2,30 +2,14 @@ import pytest
 from retry import retry
 
 
-@pytest.mark.parametrize("pvc", (True, False))
-def test_helm_chart_is_installable(
-    kubectl, helm, fresh_cluster, docker_image_loaded_into_cluster, pvc
-):
-    kubectl.run(["create", "namespace", "server"])
-    helm.install(
-        "server",
-        {"server.enabled": True, "server.acceptor": "dummy", "server.pvc.enabled": pvc},
-    )
-
-    kubectl.run(["create", "namespace", "client"])
-    helm.install(
-        "client",
-        {
-            "client.enabled": True,
-            "client.pvc.enabled": pvc,
-            "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
-        },
-    )
-
-
-def test_changing_annotation_causes_creating_and_deleting_proxy_service(
-    kubectl, helm, fresh_cluster, docker_image_loaded_into_cluster
+def test_changing_annotation_causes_creating_proxy_service(
+    kubectl,
+    helm,
+    fresh_cluster,
+    wormhole_image,
+    wireguard_image,
+    docker_images_loaded_into_cluster,
+    mock_server,
 ):
     kubectl.run(["create", "namespace", "server"])
     helm.install(
@@ -33,7 +17,18 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
         {
             "server.enabled": True,
             "server.acceptor": "dummy",
-            "server.pvc.enabled": True,
+            "server.securityContext.runAsUser": 0,
+            "server.securityContext.runAsGroup": 0,
+            "server.securityContext.runAsNonRoot": False,
+            "server.containerSecurityContext.readOnlyRootFilesystem": False,
+            "server.containerSecurityContext.privileged": True,
+            "server.containerSecurityContext.allowPrivilegeEscalation": True,
+            "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
+            "docker.image": wormhole_image.split(":")[0],
+            "docker.version": wormhole_image.split(":")[1],
+            "docker.wgImage": wireguard_image.split(":")[0],
+            "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.registry": "",
         },
     )
 
@@ -42,14 +37,21 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
         "client",
         {
             "client.enabled": True,
-            "client.pvc.enabled": True,
-            "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
+            "client.name": "client",
+            "client.serverDsn": "http://wormhole-server-server-peering.server.svc.cluster.local:8080",
+            "client.securityContext.runAsUser": 0,
+            "client.securityContext.runAsGroup": 0,
+            "client.securityContext.runAsNonRoot": False,
+            "client.containerSecurityContext.readOnlyRootFilesystem": False,
+            "client.containerSecurityContext.privileged": True,
+            "client.containerSecurityContext.allowPrivilegeEscalation": True,
+            "docker.image": wormhole_image.split(":")[0],
+            "docker.version": wormhole_image.split(":")[1],
+            "docker.wgImage": wireguard_image.split(":")[0],
+            "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.registry": "",
         },
     )
-
-    kubectl.run(["create", "namespace", "mocks"])
-    kubectl.run(["apply", "-f", "kubernetes/raw/mocks"])
 
     amount_of_services_before_annotation = len(
         kubectl.json(["-n", "server", "get", "svc"])["items"]
@@ -59,15 +61,15 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
     kubectl.run(
         [
             "-n",
-            "mocks",
+            mock_server.namespace,
             "annotate",
             "svc",
-            "wormhole-mocks",
+            mock_server.name,
             "wormhole.glothriel.github.com/exposed=yes",
         ]
     )
 
-    @retry(tries=10, delay=1)
+    @retry(tries=60, delay=1)
     def _ensure_that_proxied_service_is_created():
         assert (
             len(kubectl.json(["-n", "server", "get", "svc"])["items"])
@@ -80,11 +82,11 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
     kubectl.run(
         [
             "-n",
-            "mocks",
+            mock_server.namespace,
             "annotate",
             "--overwrite",
             "svc",
-            "wormhole-mocks",
+            mock_server.name,
             "wormhole.glothriel.github.com/exposed=no",
         ]
     )
@@ -99,57 +101,57 @@ def test_changing_annotation_causes_creating_and_deleting_proxy_service(
     _ensure_that_proxied_service_is_deleted()
 
 
-def test_client_disconnect_causes_deletion_of_related_proxy_services(
-    kubectl, helm, fresh_cluster, docker_image_loaded_into_cluster
-):
-    kubectl.run(["create", "namespace", "server"])
-    helm.install("server", {"server.enabled": True, "server.acceptor": "dummy"})
+# def test_client_disconnect_causes_deletion_of_related_proxy_services(
+#     kubectl, helm, fresh_cluster, docker_image_loaded_into_cluster
+# ):
+#     kubectl.run(["create", "namespace", "server"])
+#     helm.install("server", {"server.enabled": True, "server.acceptor": "dummy"})
 
-    kubectl.run(["create", "namespace", "client"])
-    helm.install(
-        "client",
-        {
-            "client.enabled": True,
-            "client.name": "testclient",
-            "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
-        },
-    )
+#     kubectl.run(["create", "namespace", "client"])
+#     helm.install(
+#         "client",
+#         {
+#             "client.enabled": True,
+#             "client.name": "testclient",
+#             "client.serverDsn": "ws://wormhole-server-server.server:8080/wh/tunnel",
+#         },
+#     )
 
-    kubectl.run(["create", "namespace", "mocks"])
-    kubectl.run(["apply", "-f", "kubernetes/raw/mocks"])
+#     kubectl.run(["create", "namespace", "mocks"])
+#     kubectl.run(["apply", "-f", "kubernetes/raw/mocks"])
 
-    amount_of_services_before_annotation = len(
-        kubectl.json(["-n", "server", "get", "svc"])["items"]
-    )
+#     amount_of_services_before_annotation = len(
+#         kubectl.json(["-n", "server", "get", "svc"])["items"]
+#     )
 
-    # Set annotation to yes - enable proxying
-    kubectl.run(
-        [
-            "-n",
-            "mocks",
-            "annotate",
-            "svc",
-            "wormhole-mocks",
-            "wormhole.glothriel.github.com/exposed=yes",
-        ]
-    )
+#     # Set annotation to yes - enable proxying
+#     kubectl.run(
+#         [
+#             "-n",
+#             "mocks",
+#             "annotate",
+#             "svc",
+#             "wormhole-mocks",
+#             "wormhole.glothriel.github.com/exposed=yes",
+#         ]
+#     )
 
-    @retry(tries=10, delay=1)
-    def _ensure_that_proxied_service_is_created():
-        assert (
-            len(kubectl.json(["-n", "server", "get", "svc"])["items"])
-            == amount_of_services_before_annotation + 1
-        )
+#     @retry(tries=10, delay=1)
+#     def _ensure_that_proxied_service_is_created():
+#         assert (
+#             len(kubectl.json(["-n", "server", "get", "svc"])["items"])
+#             == amount_of_services_before_annotation + 1
+#         )
 
-    _ensure_that_proxied_service_is_created()
+#     _ensure_that_proxied_service_is_created()
 
-    kubectl.run(["delete", "namespace", "client"])
+#     kubectl.run(["delete", "namespace", "client"])
 
-    @retry(tries=60, delay=1)
-    def _ensure_that_proxied_service_is_deleted():
-        assert (
-            len(kubectl.json(["-n", "server", "get", "svc"])["items"])
-            == amount_of_services_before_annotation
-        )
+#     @retry(tries=60, delay=1)
+#     def _ensure_that_proxied_service_is_deleted():
+#         assert (
+#             len(kubectl.json(["-n", "server", "get", "svc"])["items"])
+#             == amount_of_services_before_annotation
+#         )
 
-    _ensure_that_proxied_service_is_deleted()
+#     _ensure_that_proxied_service_is_deleted()

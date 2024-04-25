@@ -5,6 +5,7 @@ import signal
 import subprocess
 import uuid
 from contextlib import contextmanager
+import tempfile
 
 import psutil
 import pymysql
@@ -58,7 +59,7 @@ class Server:
             "--wg-subnet-mask",
             self.wireguard_subnet,
         ]
-        print(' '.join([str(i) for i in cmd]))
+        print(" ".join([str(i) for i in cmd]))
         self.process = subprocess.Popen(
             cmd,
             shell=False,
@@ -173,38 +174,32 @@ class Client:
 
 
 class MockServer:
-    def __init__(self, executable, port=1234, response=None):
-        self.executable = executable
-        self.process = None
-        self.port = port
-        self.response = response
+    def __init__(self, kubectl, wormhole_image):
+        self.namespace = "mock"
+        self.name = "mock"
+        self.kubectl = kubectl
+        self.image = wormhole_image.split(":")[0]
+        self.version = wormhole_image.split(":")[1]
 
     def start(self):
-        self.process = subprocess.Popen(
-            [self.executable, "testserver", "--port", str(self.port)]
-            + (["--response", self.response] if self.response else []),
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", suffix=".yaml", delete=False)
+        with open(tmp.name, 'w') as f:
+            with open("kubernetes/raw/mocks/all.yaml", 'r') as fr:
+                f.write(fr.read().format(
+                    name=self.name,
+                    namespace=self.namespace,
+                ))
+        self.kubectl.run(["create", "ns", self.namespace])
 
-        @retry(delay=0.1, tries=50)
-        def _check_if_is_already_opened():
-            assert requests.get("http://localhost:1234").status_code == 200
-
-        _check_if_is_already_opened()
+        @retry(tries=20, delay=.5)
+        def _wait_for_mocks():
+            self.kubectl.run(["apply", "-f", tmp.name])
+        _wait_for_mocks()
+        os.unlink(tmp.name)
         return self
 
     def stop(self):
-        return_code = self.process.poll()
-        if return_code is None:
-            return os.kill(self.process.pid, signal.SIGINT)
-        stdout, stderr = self.process.communicate()
-        print(stdout.decode())
-        print(stderr.decode())
-
-    def endpoint(self):
-        return f"localhost:{self.port}"
+        self.kubectl.run(["delete", "ns", self.namespace])
 
 
 @contextmanager
@@ -340,13 +335,10 @@ class Helm:
                 namespace or name,
                 name,
                 "kubernetes/helm",
-                "--wait",
                 "--set",
                 "client.pullPolicy=Never",
                 "--set",
                 "server.pullPolicy=Never",
-                "--set",
-                "docker.version=pytest",
             ]
             + [
                 item
@@ -386,3 +378,61 @@ def download(url, path):
     assert response.status_code < 299, f"Could not download file from {url}"
     with open(path, "wb") as f:
         f.write(response.content)
+
+
+class Nginx:
+
+    YAML = """---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: nginx
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.17.3
+          ports:
+            - containerPort: 80
+"""
+
+    def __init__(self):
+        self.name = "nginx"
+        self.service = "nginx"
+        self.namespace = "nginx"
+
+    def create(self, kubectl):
+        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", suffix=".yaml", delete=False)
+        with open(tmp.name, 'w') as f:
+            f.write(self.YAML)
+        kubectl.run(["create", "ns", self.namespace])
+
+        @retry(tries=20, delay=.5)
+        def _wait_for_nginx():
+            kubectl.run(["apply", "-f", tmp.name])
+        _wait_for_nginx()
+        os.unlink(tmp.name)
+
+    def delete(self, kubectl):
+        kubectl.run(["delete", "ns", self.namespace])

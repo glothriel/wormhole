@@ -130,6 +130,9 @@ spec:
             - {{ $.Release.Namespace }}
             - --kubernetes-labels
             - 'application={{ template "name-server" . }}'
+            - '--wg-internal-host={{ $.Values.server.wg.internalHost }}'
+            - '--wg-public-host={{ $.Values.server.wg.publicHost }}'
+            - '--wg-subnet-mask={{ $.Values.server.wg.subnetMask }}'
 
 ---
 apiVersion: v1

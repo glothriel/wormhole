@@ -2,10 +2,11 @@ import logging
 import os
 import subprocess
 import tempfile
+import sys
 
 import pytest
 
-from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server
+from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server, Nginx
 
 logger = logging.getLogger(__name__)
 
@@ -13,16 +14,23 @@ TEST_SERVER_PORT = 1234
 
 
 def run_process(process, **kwargs):
-    logger.info(" ".join(process))
-    rt = subprocess.run(process, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    print("\n>>> " + " ".join(process))
+    rt = subprocess.run(
+        process,
+        # stdout=kwargs.pop("stdout", subprocess.PIPE),
+        # stderr=kwargs.pop("stderr", subprocess.PIPE),
+        **kwargs,
+    )
     try:
         rt.check_returncode()
     finally:
-        logger.info(rt.stdout.decode())
-        logger.info(f"Return code: {rt.returncode}")
-        stderr = rt.stderr.decode()
-        if stderr:
-            logger.error(stderr)
+        if rt.stdout:
+            logger.info(rt.stdout.decode())
+            logger.info(f"Return code: {rt.returncode}")
+        if rt.stderr:
+            stderr = rt.stderr.decode()
+            if stderr:
+                logger.error(stderr)
     return rt
 
 
@@ -80,8 +88,8 @@ def mysql():
 
 
 @pytest.fixture()
-def mock_server(executable):
-    server = MockServer(executable)
+def mock_server(fresh_cluster, wormhole_image, kubectl):
+    server = MockServer(kubectl, wormhole_image)
     try:
         yield server.start()
     finally:
@@ -134,19 +142,52 @@ def server_installed_with_helm(kubectl, helm, fresh_cluster):
 
 
 @pytest.fixture(scope="session")
-def docker_image():
-    image_name = "ghcr.io/glothriel/wormhole:pytest"
-    subprocess.run(
-        ["docker", "build", "-t", image_name, "."],
-        shell=False,
-        stdout=subprocess.PIPE,
-        check=True,
-        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    )
+def wormhole_image():
+    # Define the Docker image and build parameters
+    image_name = "wormhole:ci"
+    context_path = os.path.abspath(".")
+    dockerfile_path = "./docker/goDockerfile"
+    build_args = {
+        "USER_ID": subprocess.check_output(["id", "-u"]).decode().strip(),
+        "GROUP_ID": subprocess.check_output(["id", "-g"]).decode().strip(),
+        "VERSION": "dev",
+        "PROJECT": "..",
+    }
+
+    # Build the Docker image
+    build_command = ["docker", "build", "-t", image_name, "-f", dockerfile_path, context_path] + [
+        j
+        for sub in [("--build-arg", f"{key}={value}") for key, value in build_args.items()]
+        for j in sub
+    ]
+
+    run_process(build_command, shell=False, stdout=sys.stdout, check=True)
+
+    # Yield the image name for use in tests
     yield image_name
 
 
 @pytest.fixture(scope="session")
-def docker_image_loaded_into_cluster(kind_cluster, docker_image):
-    kind_cluster.load_image(docker_image)
-    yield docker_image
+def wireguard_image():
+    # Define the Docker image and build parameters
+    image_name = "wireguard:ci"
+    context_path = os.path.abspath("docker")
+    dockerfile_path = "./docker/wgDockerfile"
+
+    # Build the Docker image
+    build_command = ["docker", "build", "-t", image_name, "-f", dockerfile_path, context_path]
+
+    run_process(build_command, shell=False, stdout=sys.stdout, check=True)
+
+    # Yield the image name for use in tests
+    yield image_name
+
+
+@pytest.fixture(scope="session")
+def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_image):
+    kind_cluster.load_image(wormhole_image)
+    kind_cluster.load_image(wireguard_image)
+    yield {
+        'wormhole': wormhole_image,
+        'wireguard': wireguard_image
+    }

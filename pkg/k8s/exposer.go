@@ -43,7 +43,6 @@ func (factory *k8sServiceExposer) Add(app peers.App) (peers.App, error) {
 		return peers.App{}, multierr.Combine(portErr, factory.Withdraw(addedApp))
 	}
 
-	logrus.Errorf("Original port: %d, new port: %d", app.OriginalPort, port)
 	serviceName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

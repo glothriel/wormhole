@@ -1,37 +1,11 @@
 package hello
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 )
-
-type SyncEncoder interface {
-	Encode([]peers.App) ([]byte, error)
-	Decode([]byte) ([]peers.App, error)
-}
-
-type jsonSyncEncoder struct{}
-
-func (e *jsonSyncEncoder) Encode(apps []peers.App) ([]byte, error) {
-	return json.Marshal(apps)
-}
-
-func (e *jsonSyncEncoder) Decode(data []byte) ([]peers.App, error) {
-	var apps []peers.App
-	err := json.Unmarshal(data, &apps)
-	return apps, err
-}
-
-func NewJSONSyncEncoder() SyncEncoder {
-	return &jsonSyncEncoder{}
-}
 
 type IncomingSyncRequest struct {
 	Request  []byte
@@ -53,7 +27,7 @@ type SyncingServer struct {
 
 	apps AppSource
 
-	encoder   SyncEncoder
+	encoder   SyncingEncoder
 	transport SyncServerTransport
 	peers     PeerStorage
 }
@@ -94,7 +68,7 @@ func (s *SyncingServer) Start() {
 func NewSyncingServer(
 	nginxAdapter *AppStateChangeGenerator,
 	apps AppSource,
-	encoder SyncEncoder,
+	encoder SyncingEncoder,
 	transport SyncServerTransport,
 	peers PeerStorage,
 ) *SyncingServer {
@@ -109,7 +83,7 @@ func NewSyncingServer(
 
 type SyncingClient struct {
 	nginxAdapter *AppStateChangeGenerator
-	encoder      SyncEncoder
+	encoder      SyncingEncoder
 	interval     time.Duration
 	apps         AppSource
 	transport    SyncClientTransport
@@ -149,7 +123,7 @@ func (c *SyncingClient) Start() error {
 
 func NewSyncingClient(
 	nginxAdapter *AppStateChangeGenerator,
-	encoder SyncEncoder,
+	encoder SyncingEncoder,
 	interval time.Duration,
 	apps AppSource,
 	transport SyncClientTransport,
@@ -163,13 +137,9 @@ func NewSyncingClient(
 	}
 }
 
-type SyncingClientFactory interface {
-	New(PairingResponse) (*SyncingClient, error)
-}
-
 func NewHTTPSyncingClient(
 	nginxAdapter *AppStateChangeGenerator,
-	encoder SyncEncoder,
+	encoder SyncingEncoder,
 	interval time.Duration,
 	apps AppSource,
 	pr PairingResponse,
@@ -179,7 +149,7 @@ func NewHTTPSyncingClient(
 	if !ok {
 		return nil, errors.New("sync_server_address not found in pairing response metadata")
 	}
-	transport := NewHTTPClientSyncTransport(syncServerAddress)
+	transport := NewHTTPClientSyncingTransport(syncServerAddress)
 	return NewSyncingClient(
 		nginxAdapter,
 		encoder,
@@ -188,71 +158,4 @@ func NewHTTPSyncingClient(
 		transport,
 	), nil
 
-}
-
-type httpServerSyncTransport struct {
-	syncs  chan IncomingSyncRequest
-	server *http.Server
-}
-
-func (t *httpServerSyncTransport) Syncs() <-chan IncomingSyncRequest {
-	return t.syncs
-}
-
-func (t *httpServerSyncTransport) Metadata() map[string]string {
-	return map[string]string{
-		"sync_server_address": fmt.Sprintf("http://%s", t.server.Addr),
-	}
-}
-
-func NewHTTPServerSyncTransport(server *http.Server) SyncServerTransport {
-	syncs := make(chan IncomingSyncRequest)
-	router := http.NewServeMux()
-	router.HandleFunc("/sync", func(w http.ResponseWriter, r *http.Request) {
-		var req IncomingSyncRequest
-		req.Request = make([]byte, r.ContentLength)
-		r.Body.Read(req.Request)
-		req.Response = make(chan []byte)
-		req.Err = make(chan error)
-		syncs <- req
-		select {
-		case resp := <-req.Response:
-			w.Write(resp)
-		case err := <-req.Err:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-	server.Handler = router
-	go func() {
-		logrus.Infof("Starting HTTP sync transport server on %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil {
-			logrus.Fatalf("Failed to start HTTP transport server: %v", err)
-		}
-	}()
-	return &httpServerSyncTransport{
-		syncs:  syncs,
-		server: server,
-	}
-}
-
-type httpClientSyncTransport struct {
-	serverURL string
-	client    *http.Client
-}
-
-func (t *httpClientSyncTransport) Sync(req []byte) ([]byte, error) {
-	resp, err := t.client.Post(t.serverURL+"/sync", "application/octet-stream", bytes.NewReader(req))
-	if err != nil {
-		return nil, err
-	}
-	respBody := make([]byte, resp.ContentLength)
-	resp.Body.Read(respBody)
-	return respBody, nil
-}
-
-func NewHTTPClientSyncTransport(serverURL string) SyncClientTransport {
-	return &httpClientSyncTransport{
-		serverURL: serverURL,
-		client:    &http.Client{},
-	}
 }

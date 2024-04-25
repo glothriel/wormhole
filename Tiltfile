@@ -51,6 +51,7 @@ for server in servers:
         "server.containerSecurityContext.readOnlyRootFilesystem=false",
         "server.containerSecurityContext.privileged=true",
         "server.containerSecurityContext.allowPrivilegeEscalation=true",
+        "server.wg.publicHost=wormhole-server-chart.server.svc.cluster.local",
         "docker.image=wormhole",
         "docker.wgImage=wireguard",
         "docker.registry=",

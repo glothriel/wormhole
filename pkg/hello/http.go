@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
-type httpServerTransport struct {
+type httpServerPairingTransport struct {
 	requests chan IncomingPairingRequest
 	server   *http.Server
 }
 
-func (t *httpServerTransport) Requests() <-chan IncomingPairingRequest {
+func (t *httpServerPairingTransport) Requests() <-chan IncomingPairingRequest {
 	return t.requests
 }
 
-func NewHTTPServerTransport(server *http.Server) PairingServerTransport {
+func NewHTTPServerPairingTransport(server *http.Server) PairingServerTransport {
 	incoming := make(chan IncomingPairingRequest)
 	router := mux.NewRouter()
 	router.HandleFunc("/pairing", func(w http.ResponseWriter, r *http.Request) {
@@ -40,21 +41,21 @@ func NewHTTPServerTransport(server *http.Server) PairingServerTransport {
 	go func() {
 		logrus.Infof("Starting HTTP pairing transport server on %s", server.Addr)
 		if err := server.ListenAndServe(); err != nil {
-			logrus.Fatalf("Failed to start HTTP transport server: %v", err)
+			logrus.Fatalf("Failed to start HTTP pairing transport server: %v", err)
 		}
 	}()
-	return &httpServerTransport{
+	return &httpServerPairingTransport{
 		requests: incoming,
 		server:   server,
 	}
 }
 
-type httpClientTransport struct {
+type httpClientPairingTransport struct {
 	serverURL string
 	client    *http.Client
 }
 
-func (t *httpClientTransport) Send(req []byte) ([]byte, error) {
+func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 	postURL := t.serverURL + "/pairing"
 	resp, err := t.client.Post(postURL, "application/octet-stream", bytes.NewReader(req))
 	if err != nil {
@@ -71,8 +72,79 @@ func (t *httpClientTransport) Send(req []byte) ([]byte, error) {
 	return respBody, nil
 }
 
-func NewHTTPClientTransport(serverURL string) PairingClientTransport {
-	return &httpClientTransport{
+func NewHTTPClientPairingTransport(serverURL string) PairingClientTransport {
+	return &httpClientPairingTransport{
+		serverURL: serverURL,
+		client:    &http.Client{},
+	}
+}
+
+type httpServerSyncingTransport struct {
+	syncs  chan IncomingSyncRequest
+	server *http.Server
+}
+
+func (t *httpServerSyncingTransport) Syncs() <-chan IncomingSyncRequest {
+	return t.syncs
+}
+
+func (t *httpServerSyncingTransport) Metadata() map[string]string {
+	return map[string]string{
+		"sync_server_address": fmt.Sprintf("http://%s", t.server.Addr),
+	}
+}
+
+func NewHTTPServerSyncingTransport(server *http.Server) SyncServerTransport {
+	syncs := make(chan IncomingSyncRequest)
+	router := http.NewServeMux()
+	router.HandleFunc("/sync", func(w http.ResponseWriter, r *http.Request) {
+		var req IncomingSyncRequest
+		req.Request = make([]byte, r.ContentLength)
+		r.Body.Read(req.Request)
+		req.Response = make(chan []byte)
+		req.Err = make(chan error)
+		syncs <- req
+		select {
+		case resp := <-req.Response:
+			w.Write(resp)
+		case err := <-req.Err:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	server.Handler = router
+
+	go func() {
+		for {
+			logrus.Infof("Starting HTTP syncing transport server on %s", server.Addr)
+			if err := server.ListenAndServe(); err != nil {
+				logrus.Errorf("Failed to start HTTP syncing transport server: %v", err)
+				time.Sleep(time.Second * 5)
+			}
+		}
+	}()
+	return &httpServerSyncingTransport{
+		syncs:  syncs,
+		server: server,
+	}
+}
+
+type httpClientSyncingTransport struct {
+	serverURL string
+	client    *http.Client
+}
+
+func (t *httpClientSyncingTransport) Sync(req []byte) ([]byte, error) {
+	resp, err := t.client.Post(t.serverURL+"/sync", "application/octet-stream", bytes.NewReader(req))
+	if err != nil {
+		return nil, err
+	}
+	respBody := make([]byte, resp.ContentLength)
+	resp.Body.Read(respBody)
+	return respBody, nil
+}
+
+func NewHTTPClientSyncingTransport(serverURL string) SyncClientTransport {
+	return &httpClientSyncingTransport{
 		serverURL: serverURL,
 		client:    &http.Client{},
 	}

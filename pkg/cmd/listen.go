@@ -26,8 +26,8 @@ var (
 	}
 
 	wgPublicHostFlag *cli.StringFlag = &cli.StringFlag{
-		Name:  "wg-public-host",
-		Value: "wormhole-server-chart.server.svc.cluster.local",
+		Name:     "wg-public-host",
+		Required: true,
 	}
 
 	wgPortFlag *cli.IntFlag = &cli.IntFlag{
@@ -50,6 +50,7 @@ var listenCommand *cli.Command = &cli.Command{
 	Name: "listen",
 	Flags: []cli.Flag{
 		kubernetesFlag,
+		//?
 		stateManagerPathFlag,
 		nginxExposerConfdPathFlag,
 		wgPublicHostFlag,
@@ -114,8 +115,11 @@ var listenCommand *cli.Command = &cli.Command{
 			ListenPort: c.Int(wgPortFlag.Name),
 			PrivateKey: pkey.String(),
 		}
+		/*
+			NIE SEEDUJE SIĘ PIERWSZA WERSJA CONFIGA WIREGUARDA - DOPIERO PO PIERWSZYM PAIRINGU
+		*/
 		peers := hello.NewInMemoryPeerStorage()
-		syncTransport := hello.NewHTTPServerSyncTransport(&http.Server{
+		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
 		ss := hello.NewSyncingServer(
@@ -125,6 +129,8 @@ var listenCommand *cli.Command = &cli.Command{
 			syncTransport,
 			peers,
 		)
+		watcher := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
+		watcher.Update(*wgConfig)
 		ps := hello.NewPairingServer(
 			"server",
 			fmt.Sprintf("%s:%d", c.String(wgPublicHostFlag.Name), c.Int(wgPortFlag.Name)),
@@ -133,9 +139,9 @@ var listenCommand *cli.Command = &cli.Command{
 				PublicKey:  pkey.PublicKey().String(),
 				PrivateKey: pkey.String(),
 			},
-			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
+			watcher,
 			hello.NewJSONPairingEncoder(),
-			hello.NewHTTPServerTransport(&http.Server{
+			hello.NewHTTPServerPairingTransport(&http.Server{
 				Addr: c.String(extServerListenAddress.Name),
 			}),
 			hello.NewIPPool(c.String(wgAddressFlag.Name)),

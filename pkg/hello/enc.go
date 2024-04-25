@@ -1,6 +1,10 @@
 package hello
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/glothriel/wormhole/pkg/peers"
+)
 
 type Marshaler interface {
 	EncodeRequest(PairingRequest) ([]byte, error)
@@ -34,4 +38,25 @@ func (e *jsonPairingEncoder) DecodeResponse(data []byte) (PairingResponse, error
 
 func NewJSONPairingEncoder() Marshaler {
 	return &jsonPairingEncoder{}
+}
+
+type SyncingEncoder interface {
+	Encode([]peers.App) ([]byte, error)
+	Decode([]byte) ([]peers.App, error)
+}
+
+type jsonSyncingEncoder struct{}
+
+func (e *jsonSyncingEncoder) Encode(apps []peers.App) ([]byte, error) {
+	return json.Marshal(apps)
+}
+
+func (e *jsonSyncingEncoder) Decode(data []byte) ([]peers.App, error) {
+	var apps []peers.App
+	err := json.Unmarshal(data, &apps)
+	return apps, err
+}
+
+func NewJSONSyncEncoder() SyncingEncoder {
+	return &jsonSyncingEncoder{}
 }
