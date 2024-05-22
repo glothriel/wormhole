@@ -33,7 +33,7 @@ jobs:
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: docker
           file: docker/goDockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -68,7 +68,7 @@ jobs:
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: docker
           file: docker/wgDockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -103,7 +103,7 @@ jobs:
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: docker
           file: docker/nginxDockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
