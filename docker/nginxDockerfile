@@ -1,5 +1,9 @@
 FROM nginx:alpine
 
+RUN deluser nginx
+RUN addgroup -g 1000 nginx && \
+  adduser -u 1000 -G nginx -h /home/nginx -D nginx
+
 RUN mkdir -p /home/nginx/log/nginx
 RUN chown -R nginx:nginx /home/nginx
 USER nginx

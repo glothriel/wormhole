@@ -89,4 +89,4 @@ docker:
 
 # Dev mode expects dev image with watchexec + go run instead of binary
 devMode:
-  enabled: true
+  enabled: false

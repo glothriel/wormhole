@@ -3,4 +3,4 @@ server:
   service:
     type: LoadBalancer
   wg:
-    publicHost: "4.182.82.39"
+    publicHost: "4.182.93.30"
