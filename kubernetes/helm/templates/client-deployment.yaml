@@ -119,6 +119,7 @@ spec:
             name: {{ template "name-client" . }}-persistent
           args:
             - --metrics
+            - --debug
             - join
             - --invite-token
             - hello123
@@ -139,11 +140,10 @@ metadata:
   name: {{ template "name-client" . }}-nginx
 data:
   nginx.conf: |
-    user  nginx;
     worker_processes  auto;
 
     error_log  /home/nginx/log/nginx/error.log notice;
-    pid        /home/nginx/run/nginx.pid;
+    pid        /home/nginx/nginx.pid;
 
     events {
         worker_connections  1024;

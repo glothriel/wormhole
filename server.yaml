@@ -1,4 +1,6 @@
 server:
   enabled: true
+  service:
+    type: LoadBalancer
   wg:
-    publicHost: wormhole-server-chart.server.svc.cluster.local
+    publicHost: "4.182.82.39"

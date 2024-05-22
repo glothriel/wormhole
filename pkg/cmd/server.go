@@ -127,7 +127,10 @@ var listenCommand *cli.Command = &cli.Command{
 			peers,
 		)
 		watcher := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
-		watcher.Update(*wgConfig)
+		updateErr := watcher.Update(*wgConfig)
+		if updateErr != nil {
+			return fmt.Errorf("failed to bootstrap wireguard config: %w", updateErr)
+		}
 		peerTransport := hello.NewHTTPServerPairingTransport(&http.Server{
 			Addr: c.String(extServerListenAddress.Name),
 		})

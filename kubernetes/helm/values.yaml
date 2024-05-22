@@ -8,11 +8,7 @@ client:
   priorityClassName: ""
   pullPolicy: Always
 
-  securityContext:
-    runAsUser: 1337
-    runAsGroup: 1337
-    runAsNonRoot: true
-    fsGroup: 1337
+  securityContext: {}
 
   containerSecurityContext:
     readOnlyRootFilesystem: true
@@ -49,12 +45,7 @@ server:
   priorityClassName: ""
   pullPolicy: Always
 
-  securityContext:
-    runAsUser: 1337
-    runAsGroup: 1337
-    runAsNonRoot: true
-    fsGroup: 1337
-
+  securityContext: {}
   containerSecurityContext:
     readOnlyRootFilesystem: true
     privileged: false
