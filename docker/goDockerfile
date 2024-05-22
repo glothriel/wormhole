@@ -61,7 +61,7 @@ ARG VERSION=dev
 ENV VERSION=${VERSION}
 ENV GIN_MODE=release
 USER 1000:1000
-COPY --from=build --chown=1000:1000 /home/go/app /home/nonroot/app
+COPY --from=build --chown=1000:1000 /home/go/app /bin/app
 LABEL maintainer="https://github.com/glothriel"
-ENTRYPOINT ["/home/nonroot/app"]
+ENTRYPOINT ["/bin/app"]
 CMD ["start"]
