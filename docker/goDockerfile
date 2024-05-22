@@ -20,7 +20,7 @@ RUN if ! getent group ${GROUP_ID} > /dev/null 2>&1; then \
     
 # Add the 'go' user with the specified USER_ID and add to the determined group
 RUN groupadd -g ${GROUP_ID} go
-RUN useradd -u ${USER_ID} -gid ${GROUP_ID} -m go
+RUN useradd -u ${USER_ID} -g ${GROUP_ID} -m go
 USER go:go
 
 WORKDIR /src

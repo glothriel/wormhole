@@ -28,7 +28,7 @@ jobs:
         id: meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ghcr.io/glothriel/wormhole-app
+          images: ghcr.io/glothriel/wormhole-controller
 
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
