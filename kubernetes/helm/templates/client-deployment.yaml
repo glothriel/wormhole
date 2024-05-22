@@ -61,6 +61,7 @@ spec:
       containers:
         - name: nginx
           image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
           volumeMounts:
           - mountPath: "/etc/nginx/nginx.conf"
             name: nginx-conf
@@ -79,11 +80,16 @@ spec:
           - containerPort: 9000
         - name: wireguard
           image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
           volumeMounts:
           - mountPath: "/etc/wireguard"
             name: {{ template "name-client" . }}-persistent
             subPath: wireguard
           securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            fsGroup: 1000
             capabilities:
               add:
               - NET_ADMIN

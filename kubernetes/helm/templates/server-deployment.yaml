@@ -84,6 +84,10 @@ spec:
             name: {{ template "name-server" . }}-persistent
             subPath: wireguard
           securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            fsGroup: 1000
             capabilities:
               add:
               - NET_ADMIN

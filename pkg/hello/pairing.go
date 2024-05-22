@@ -90,6 +90,7 @@ type PairingServer struct {
 
 func (s *PairingServer) Start() {
 	for incomingRequest := range s.transport.Requests() {
+		logrus.Debugf("Received pairing request %v", incomingRequest)
 		request, requestErr := s.marshaler.DecodeRequest(incomingRequest.Request)
 		if requestErr != nil {
 			incomingRequest.Err <- NewPairingRequestClientError(requestErr)

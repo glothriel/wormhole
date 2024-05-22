@@ -34,7 +34,9 @@ type SyncingServer struct {
 
 func (s *SyncingServer) Start() {
 	for incomingSync := range s.transport.Syncs() {
+		logrus.Debugf("Received sync request %v", incomingSync)
 		apps, decodeErr := s.encoder.Decode(incomingSync.Request)
+		logrus.Debugf("Decoded apps: %v", apps)
 		if decodeErr != nil {
 			incomingSync.Err <- decodeErr
 			continue
