@@ -5,7 +5,6 @@ default_registry(
     host_from_cluster='wormhole:5000'
 )
 
-# Define the Docker image build
 docker_build(
     'wormhole', 
     context='.', 
@@ -23,11 +22,16 @@ docker_build(
     ]
 )
 
-# Define the Docker image build
 docker_build(
-    'wireguard', 
+    'wormhole-wireguard', 
     context='docker',
     dockerfile='./docker/wgDockerfile',
+)
+
+docker_build(
+    'wormhole-nginx', 
+    context='docker',
+    dockerfile='./docker/nginxDockerfile',
 )
 
 servers = ["server"]
@@ -53,7 +57,8 @@ for server in servers:
         "server.containerSecurityContext.allowPrivilegeEscalation=true",
         "server.wg.publicHost=wormhole-server-chart.server.svc.cluster.local",
         "docker.image=wormhole",
-        "docker.wgImage=wireguard",
+        "docker.wgImage=wormhole-wireguard",
+        "docker.nginxImage=wormhole-nginx",
         "docker.registry=",
         "devMode.enabled=true",
     ]))
@@ -71,7 +76,8 @@ for client in clients:
         "client.containerSecurityContext.privileged=true",
         "client.containerSecurityContext.allowPrivilegeEscalation=true",
         "docker.image=wormhole",
-        "docker.wgImage=wireguard",
+        "docker.wgImage=wormhole-wireguard",
+        "docker.nginxImage=wormhole-nginx",
         "docker.registry=",
         "devMode.enabled=true",
     ]))

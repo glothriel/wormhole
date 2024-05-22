@@ -71,7 +71,7 @@ var listenCommand *cli.Command = &cli.Command{
 			return err
 		}
 
-		localListenerRegistry := listeners.NewRegistry(nginx.NewNginxExposer(
+		appsExposedHere := listeners.NewApps(nginx.NewNginxExposer(
 			c.String(nginxExposerConfdPathFlag.Name),
 			"local",
 			nginx.NewDefaultReloader(),
@@ -102,12 +102,12 @@ var listenCommand *cli.Command = &cli.Command{
 				remoteNginxExposer,
 			)
 		}
-		remoteListenerRegistry := listeners.NewRegistry(effectiveExposer)
+		appsExposedFromRemote := listeners.NewApps(effectiveExposer)
 
-		go localListenerRegistry.Watch(getStateManager(c).Changes(), make(chan bool))
+		go appsExposedHere.Watch(getAppStateChangeGenerator(c).Changes(), make(chan bool))
 
 		remoteNginxAdapter := hello.NewAppStateChangeGenerator()
-		go remoteListenerRegistry.Watch(remoteNginxAdapter.Changes(), make(chan bool))
+		go appsExposedFromRemote.Watch(remoteNginxAdapter.Changes(), make(chan bool))
 
 		wgConfig := &wg.Config{
 			Address:    c.String(wgAddressFlag.Name),
@@ -115,16 +115,13 @@ var listenCommand *cli.Command = &cli.Command{
 			ListenPort: c.Int(wgPortFlag.Name),
 			PrivateKey: pkey.String(),
 		}
-		/*
-			NIE SEEDUJE SIĘ PIERWSZA WERSJA CONFIGA WIREGUARDA - DOPIERO PO PIERWSZYM PAIRINGU
-		*/
 		peers := hello.NewInMemoryPeerStorage()
 		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
 		ss := hello.NewSyncingServer(
 			remoteNginxAdapter,
-			hello.NewPeerEnrichingAppSource("server", localListenerRegistry),
+			hello.NewPeerEnrichingAppSource("server", appsExposedHere),
 			hello.NewJSONSyncEncoder(),
 			syncTransport,
 			peers,

@@ -33,7 +33,7 @@ spec:
   selector:
     application: {{ template "name-server" . }}
   sessionAffinity: None
-  type: ClusterIP
+  type: {{ $.Values.server.service.type }}
 ---
 apiVersion: v1
 kind: Service

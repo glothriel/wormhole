@@ -60,7 +60,7 @@ spec:
           claimName: {{ template "name-client" . }}
       containers:
         - name: nginx
-          image: nginx:alpine
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
           volumeMounts:
           - mountPath: "/etc/nginx/nginx.conf"
             name: nginx-conf
@@ -120,7 +120,8 @@ spec:
           args:
             - --metrics
             - join
-            - --invite-token hello123
+            - --invite-token
+            - hello123
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes

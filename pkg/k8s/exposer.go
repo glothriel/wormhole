@@ -81,7 +81,22 @@ func (factory *k8sServiceExposer) Add(app peers.App) (peers.App, error) {
 }
 
 func (factory *k8sServiceExposer) Withdraw(app peers.App) error {
-	return nil
+	config, inClusterConfigErr := rest.InClusterConfig()
+	if inClusterConfigErr != nil {
+		return inClusterConfigErr
+	}
+	clientset, clientSetErr := kubernetes.NewForConfig(config)
+	if clientSetErr != nil {
+		return clientSetErr
+	}
+	servicesClient := clientset.CoreV1().Services(factory.namespace)
+	serviceName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
+	logrus.Debugf("Deleting service %s", serviceName)
+	deleteErr := servicesClient.Delete(context.Background(), serviceName, metav1.DeleteOptions{})
+	if deleteErr != nil {
+		return fmt.Errorf("Could not delete service %s: %v", serviceName, deleteErr)
+	}
+	return factory.child.Withdraw(app)
 }
 
 func (factory *k8sServiceExposer) WithdrawAll() error {

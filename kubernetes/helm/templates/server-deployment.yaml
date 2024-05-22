@@ -61,7 +61,7 @@ spec:
           claimName: {{ template "name-server" . }}
       containers:
         - name: nginx
-          image: nginx:alpine
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
           volumeMounts:
           - mountPath: "/etc/nginx/nginx.conf"
             name: nginx-conf
@@ -121,7 +121,8 @@ spec:
           args:
             - --metrics
             - listen
-            - --invite-token hello123
+            - --invite-token
+            - hello123
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}

@@ -10,7 +10,7 @@ def assert_wireguard_config_params(config_path, address, allowed_ips):
 
 
 def test_wireguard_configs_created(
-        executable, mock_server, server, client
+        executable, server, client
 ):
     @retry(tries=30, delay=1)
     def _ensure_wireguard_configs_were_created():

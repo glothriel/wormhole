@@ -58,6 +58,8 @@ class Server:
             self.wireguard_address,
             "--wg-subnet-mask",
             self.wireguard_subnet,
+            "--invite-token",
+            "123123",
         ]
         print(" ".join([str(i) for i in cmd]))
         self.process = subprocess.Popen(
@@ -163,6 +165,8 @@ class Client:
             self.wireguard_config_path,
             "--directory-state-manager-path",
             self.state_manager_path,
+            "--invite-token",
+            "123123",
         ]
         self.process = subprocess.Popen(command, shell=False)
         return self

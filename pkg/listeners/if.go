@@ -71,7 +71,7 @@ func (g *Registry) List() ([]peers.App, error) {
 	return g.apps, nil
 }
 
-func NewRegistry(r Exposer) *Registry {
+func NewApps(r Exposer) *Registry {
 	return &Registry{
 		Exposer: r,
 	}

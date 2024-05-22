@@ -61,7 +61,7 @@ server {
 
 func (n *NginxExposer) Withdraw(app peers.App) error {
 	removeErr := n.fs.Remove(path.Join(n.path, fmt.Sprintf(
-		"%s-%s.conf", n.prefix, app.Name,
+		"%s-%s-%s.conf", n.prefix, app.Peer, app.Name,
 	)))
 
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {

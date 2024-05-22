@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func getStateManager(c *cli.Context) svcdetector.AppStateManager {
+func getAppStateChangeGenerator(c *cli.Context) svcdetector.AppStateManager {
 	if c.Bool(kubernetesFlag.Name) {
 		config, inClusterConfigErr := rest.InClusterConfig()
 		if inClusterConfigErr != nil {
