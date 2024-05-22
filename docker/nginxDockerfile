@@ -1,5 +1,5 @@
 FROM nginx:alpine
 
-RUN mdkir -p /home/nginx/logs
+RUN mkdir -p /home/nginx/logs
 RUN chown -R nginx:nginx /home/nginx
 USER nginx
