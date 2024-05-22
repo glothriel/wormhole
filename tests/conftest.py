@@ -184,10 +184,28 @@ def wireguard_image():
 
 
 @pytest.fixture(scope="session")
-def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_image):
+def nginx_image():
+    # Define the Docker image and build parameters
+    image_name = "nginx:ci"
+    context_path = os.path.abspath("docker")
+    dockerfile_path = "./docker/nginxDockerfile"
+
+    # Build the Docker image
+    build_command = ["docker", "build", "-t", image_name, "-f", dockerfile_path, context_path]
+
+    run_process(build_command, shell=False, stdout=sys.stdout, check=True)
+
+    # Yield the image name for use in tests
+    yield image_name
+
+
+@pytest.fixture(scope="session")
+def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_image, nginx_image):
     kind_cluster.load_image(wormhole_image)
     kind_cluster.load_image(wireguard_image)
+    kind_cluster.load_image(nginx_image)
     yield {
         'wormhole': wormhole_image,
-        'wireguard': wireguard_image
+        'wireguard': wireguard_image,
+        'nginx': nginx_image,
     }

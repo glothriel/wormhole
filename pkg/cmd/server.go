@@ -121,7 +121,10 @@ var listenCommand *cli.Command = &cli.Command{
 		})
 		ss := hello.NewSyncingServer(
 			remoteNginxAdapter,
-			hello.NewPeerEnrichingAppSource("server", appsExposedHere),
+			hello.NewAddressEnrichingAppSource(
+				wgConfig.Address,
+				hello.NewPeerEnrichingAppSource("server", appsExposedHere),
+			),
 			hello.NewJSONSyncEncoder(),
 			syncTransport,
 			peers,

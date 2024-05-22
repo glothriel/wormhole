@@ -127,9 +127,12 @@ var joinCommand *cli.Command = &cli.Command{
 			appStateChangeGenerator,
 			hello.NewJSONSyncEncoder(),
 			time.Second*5,
-			hello.NewPeerEnrichingAppSource(
-				c.String(peerNameFlag.Name),
-				localListenerRegistry,
+			hello.NewAddressEnrichingAppSource(
+				pairingResponse.AssignedIP,
+				hello.NewPeerEnrichingAppSource(
+					c.String(peerNameFlag.Name),
+					localListenerRegistry,
+				),
 			),
 			pairingResponse,
 		)

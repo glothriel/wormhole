@@ -8,6 +8,7 @@ def test_changing_annotation_causes_creating_proxy_service(
     fresh_cluster,
     wormhole_image,
     wireguard_image,
+    nginx_image,
     docker_images_loaded_into_cluster,
     mock_server,
 ):
@@ -16,18 +17,13 @@ def test_changing_annotation_causes_creating_proxy_service(
         "server",
         {
             "server.enabled": True,
-            "server.acceptor": "dummy",
-            "server.securityContext.runAsUser": 0,
-            "server.securityContext.runAsGroup": 0,
-            "server.securityContext.runAsNonRoot": False,
-            "server.containerSecurityContext.readOnlyRootFilesystem": False,
-            "server.containerSecurityContext.privileged": True,
-            "server.containerSecurityContext.allowPrivilegeEscalation": True,
             "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
             "docker.wgImage": wireguard_image.split(":")[0],
             "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.nginxImage": nginx_image.split(":")[0],
+            "docker.nginxVersion": nginx_image.split(":")[1],
             "docker.registry": "",
         },
     )
@@ -39,16 +35,12 @@ def test_changing_annotation_causes_creating_proxy_service(
             "client.enabled": True,
             "client.name": "client",
             "client.serverDsn": "http://wormhole-server-server-peering.server.svc.cluster.local:8080",
-            "client.securityContext.runAsUser": 0,
-            "client.securityContext.runAsGroup": 0,
-            "client.securityContext.runAsNonRoot": False,
-            "client.containerSecurityContext.readOnlyRootFilesystem": False,
-            "client.containerSecurityContext.privileged": True,
-            "client.containerSecurityContext.allowPrivilegeEscalation": True,
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
             "docker.wgImage": wireguard_image.split(":")[0],
             "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.nginxImage": nginx_image.split(":")[0],
+            "docker.nginxVersion": nginx_image.split(":")[1],
             "docker.registry": "",
         },
     )
@@ -68,6 +60,8 @@ def test_changing_annotation_causes_creating_proxy_service(
             "wormhole.glothriel.github.com/exposed=yes",
         ]
     )
+    import time
+    time.sleep(1500)
 
     @retry(tries=60, delay=1)
     def _ensure_that_proxied_service_is_created():
