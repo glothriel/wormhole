@@ -62,6 +62,7 @@ spec:
       containers:
         - name: nginx
           image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
           volumeMounts:
           - mountPath: "/etc/nginx/nginx.conf"
             name: nginx-conf
@@ -74,6 +75,7 @@ spec:
           - containerPort: 9000
         - name: wireguard
           image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
           ports:
             - containerPort: 51820
               protocol: UDP

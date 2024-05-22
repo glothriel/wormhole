@@ -1,5 +1,5 @@
 FROM nginx:alpine
 
-RUN mkdir -p /home/nginx/logs
+RUN mkdir -p /home/nginx/log/nginx
 RUN chown -R nginx:nginx /home/nginx
 USER nginx
