@@ -1,0 +1,4 @@
+server:
+  enabled: true
+  wg:
+    publicHost: wormhole-server-chart.server.svc.cluster.local

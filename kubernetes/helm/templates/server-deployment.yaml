@@ -146,8 +146,8 @@ data:
     user  nginx;
     worker_processes  auto;
 
-    error_log  /var/log/nginx/error.log notice;
-    pid        /var/run/nginx.pid;
+    error_log  /home/nginx/log/nginx/error.log notice;
+    pid        /home/nginx/run/nginx.pid;
 
     events {
         worker_connections  1024;

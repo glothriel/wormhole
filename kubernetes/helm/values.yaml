@@ -89,12 +89,12 @@ server:
 
 docker:
   registry: ghcr.io
-  image: glothriel/wormhole
-  version: latest
+  image: glothriel/wormhole-controller
+  version: 0.9.0-alpha.2
   wgImage: glothriel/wormhole-wireguard
-  wgVersion: latest
+  wgVersion: 0.9.0-alpha.2
   nginxImage: glothriel/wormhole-nginx
-  nginxVersion: latest
+  nginxVersion: 0.9.0-alpha.2
 
 # Dev mode expects dev image with watchexec + go run instead of binary
 devMode:
