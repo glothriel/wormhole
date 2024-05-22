@@ -33,7 +33,12 @@ jobs:
       - name: Build image and push to GCR
         uses: docker/build-push-action@v2
         with:
-          context: docker
+          context: .
+          build-args:
+            - USER_ID=1000
+            - GROUP_ID=1000
+            - VERSION=${{ steps.meta.outputs.tags }}
+            - PROJECT=..
           file: docker/goDockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
