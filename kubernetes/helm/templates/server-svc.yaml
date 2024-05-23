@@ -13,20 +13,6 @@ spec:
     port: 51820
     protocol: UDP
     targetPort: 51820
-  selector:
-    application: {{ template "name-server" . }}
-  sessionAffinity: None
-  type: {{ $.Values.server.service.type }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ template "name-server" . }}-peering
-  namespace: {{ $.Release.Namespace }}
-  labels:
-    application: {{ template "name-server" . }}
-spec:
-  ports:
   - name: peering
     port: 8080
     targetPort: 8080

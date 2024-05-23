@@ -34,7 +34,7 @@ def test_changing_annotation_causes_creating_proxy_service(
         {
             "client.enabled": True,
             "client.name": "client",
-            "client.serverDsn": "http://wormhole-server-server-peering.server.svc.cluster.local:8080",
+            "client.serverDsn": "http://wormhole-server-server.server.svc.cluster.local:8080",
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
             "docker.wgImage": wireguard_image.split(":")[0],
@@ -60,8 +60,6 @@ def test_changing_annotation_causes_creating_proxy_service(
             "wormhole.glothriel.github.com/exposed=yes",
         ]
     )
-    import time
-    time.sleep(1500)
 
     @retry(tries=60, delay=1)
     def _ensure_that_proxied_service_is_created():
