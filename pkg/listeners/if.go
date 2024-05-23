@@ -52,10 +52,9 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 				} else if appStageChange.State == svcdetector.AppStateChangeWithdrawn {
 					logrus.Infof("App local.%s withdrawn", appStageChange.App.Name)
 					if withdrawErr := g.Exposer.Withdraw(appStageChange.App); withdrawErr != nil {
-						logrus.Errorf("Could not withdraw listener: %v", withdrawErr)
+						logrus.Errorf("Could not withdraw app: %v", withdrawErr)
 					}
 					for i, app := range g.apps {
-						logrus.Infof("Checking app %s.%s == %s.%s", app.Peer, app.Name, appStageChange.App.Peer, appStageChange.App.Name)
 						if app.Name == appStageChange.App.Name && appStageChange.App.Peer == app.Peer {
 							g.apps = append(g.apps[:i], g.apps[i+1:]...)
 							break

@@ -34,7 +34,7 @@ You should do this on another cluster. If not, change the namespace to say `worm
 ```
 kubectl create namespace wormhole
 
-helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --client.name clientOne
+helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --set client.name=clientOne
 ```
 
 ### Expose a service
