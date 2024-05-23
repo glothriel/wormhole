@@ -3,6 +3,7 @@
 # /src should contain files bundled from dockerfile
 # /src-tmp should have mounted volume, that will allow syncing file from Tilt
 
+
 # if /src-tmp is empty, copy all files from /src to /src-tmp
 if [ ! "$(ls -A /src-tmp)" ]; then
   cp -r /src/* /src-tmp
