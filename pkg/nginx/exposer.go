@@ -60,9 +60,18 @@ server {
 }
 
 func (n *NginxExposer) Withdraw(app peers.App) error {
-	removeErr := n.fs.Remove(path.Join(n.path, fmt.Sprintf(
+	path := path.Join(n.path, fmt.Sprintf(
 		"%s-%s-%s.conf", n.prefix, app.Peer, app.Name,
-	)))
+	))
+	removeErr := n.fs.Remove(path)
+
+	if removeErr != nil {
+		if os.IsNotExist(removeErr) {
+			logrus.Infof("Expected NGINX config file `%s` cannot be deleted: %v", path, removeErr)
+		} else {
+			return fmt.Errorf("Could not remove NGINX config file: %v", removeErr)
+		}
+	}
 
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
 		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)

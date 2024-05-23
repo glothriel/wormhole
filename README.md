@@ -42,8 +42,8 @@ helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set clie
 No you can expose a service from one infrastructure to another. Services exposed from the server will be available on all the clients. Services exposed from the client will be available only on the server.
 
 ```
-kubectl annotate --overwrite svc <namespace> <service> wormhole.glothriel.github.com/exposed=yes
+kubectl annotate --overwrite svc --namespace <namespace> <service> wormhole.glothriel.github.com/exposed=yes
 ```
 
-After up to 30 seconds the service will be available on the other side. You can check the status of the tunnel by running:
+After up to 30 seconds the service will be available on the other side. 
 
