@@ -17,6 +17,7 @@ type PeerStorage interface {
 	Store(PeerInfo) error
 	GetByName(string) (PeerInfo, error)
 	List() ([]PeerInfo, error)
+	DeleteByName(string) error
 }
 
 type inMemoryPeerStorage struct {
@@ -42,6 +43,11 @@ func (s *inMemoryPeerStorage) List() ([]PeerInfo, error) {
 		return true
 	})
 	return peers, nil
+}
+
+func (s *inMemoryPeerStorage) DeleteByName(name string) error {
+	s.peers.Delete(name)
+	return nil
 }
 
 func NewInMemoryPeerStorage() PeerStorage {
@@ -96,6 +102,13 @@ func (s *boltPeerStorage) List() ([]PeerInfo, error) {
 		return nil
 	})
 	return peers, err
+}
+
+func (s *boltPeerStorage) DeleteByName(name string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("peers"))
+		return b.Delete([]byte(name))
+	})
 }
 
 func NewBoltPeerStorage(path string) PeerStorage {
