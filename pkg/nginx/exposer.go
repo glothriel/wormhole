@@ -29,10 +29,8 @@ func (n *NginxExposer) Add(app peers.App) (peers.App, error) {
 	server := StreamServer{
 		ListenPort: port,
 		ProxyPass:  app.Address,
-		File: fmt.Sprintf(
-			"%s-%s-%s.conf", n.prefix, app.Peer, app.Name,
-		),
-		App: app,
+		File:       nginxConfigPath(n.prefix, app),
+		App:        app,
 	}
 
 	if writeErr := afero.WriteFile(n.fs, path.Join(n.path, server.File), []byte(fmt.Sprintf(`
@@ -60,9 +58,7 @@ server {
 }
 
 func (n *NginxExposer) Withdraw(app peers.App) error {
-	path := path.Join(n.path, fmt.Sprintf(
-		"%s-%s-%s.conf", n.prefix, app.Peer, app.Name,
-	))
+	path := path.Join(n.path, nginxConfigPath(n.prefix, app))
 	removeErr := n.fs.Remove(path)
 
 	if removeErr != nil {
@@ -76,7 +72,7 @@ func (n *NginxExposer) Withdraw(app peers.App) error {
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
 		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
 	}
-	return removeErr
+	return nil
 }
 
 func (n *NginxExposer) WithdrawAll() error {
@@ -135,4 +131,8 @@ func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortA
 	}
 
 	return cg
+}
+
+func nginxConfigPath(prefix string, peer peers.App) string {
+	return fmt.Sprintf("%s-%s-%s.conf", prefix, peer.Peer, peer.Name)
 }
