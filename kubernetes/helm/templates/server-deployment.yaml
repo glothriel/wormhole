@@ -55,6 +55,9 @@ spec:
       - name: {{ template "name-server" . }}-build-cache
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}-build-cache
+      - name: {{ template "name-server" . }}-code
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-code
       {{- end }}
       - name: {{ template "name-server" . }}-persistent
         persistentVolumeClaim:
@@ -118,6 +121,8 @@ spec:
           {{- if .Values.devMode.enabled }}
           - mountPath: "/home/go/.cache"
             name: {{ template "name-server" . }}-build-cache
+          - mountPath: "/src-tmp"
+            name: {{ template "name-server" . }}-code
           {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-server" . }}-tmp

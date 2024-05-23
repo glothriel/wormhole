@@ -63,12 +63,14 @@ func (n *NginxExposer) Withdraw(app peers.App) error {
 
 	if removeErr != nil {
 		if os.IsNotExist(removeErr) {
-			logrus.Infof("Expected NGINX config file `%s` cannot be deleted: %v", path, removeErr)
+			logrus.Debugf("Expected NGINX config file `%s` does not exist: %v.", path, removeErr)
 		} else {
 			return fmt.Errorf("Could not remove NGINX config file: %v", removeErr)
 		}
-	}
+	} else {
 
+		logrus.Infof("Removed NGINX config file %s", path)
+	}
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
 		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
 	}
@@ -133,6 +135,9 @@ func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortA
 	return cg
 }
 
-func nginxConfigPath(prefix string, peer peers.App) string {
-	return fmt.Sprintf("%s-%s-%s.conf", prefix, peer.Peer, peer.Name)
+func nginxConfigPath(prefix string, app peers.App) string {
+	if app.Peer == "" {
+		return fmt.Sprintf("%s-%s.conf", prefix, app.Name)
+	}
+	return fmt.Sprintf("%s-%s-%s.conf", prefix, app.Peer, app.Name)
 }

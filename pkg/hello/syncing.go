@@ -23,7 +23,7 @@ type SyncServerTransport interface {
 }
 
 type SyncingServer struct {
-	nginxAdapter *AppStateChangeGenerator
+	stateGenerator *AppStateChangeGenerator
 
 	apps AppSource
 
@@ -45,7 +45,7 @@ func (s *SyncingServer) Start() {
 				incomingSync.Err <- peerErr
 				continue
 			}
-			s.nginxAdapter.OnSync(
+			s.stateGenerator.OnSync(
 				peer.Name,
 				apps,
 				nil,
@@ -66,18 +66,18 @@ func (s *SyncingServer) Start() {
 }
 
 func NewSyncingServer(
-	nginxAdapter *AppStateChangeGenerator,
+	stateGenerator *AppStateChangeGenerator,
 	apps AppSource,
 	encoder SyncingEncoder,
 	transport SyncServerTransport,
 	peers PeerStorage,
 ) *SyncingServer {
 	return &SyncingServer{
-		nginxAdapter: nginxAdapter,
-		apps:         apps,
-		encoder:      encoder,
-		transport:    transport,
-		peers:        peers,
+		stateGenerator: stateGenerator,
+		apps:           apps,
+		encoder:        encoder,
+		transport:      transport,
+		peers:          peers,
 	}
 }
 

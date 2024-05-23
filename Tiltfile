@@ -6,7 +6,7 @@ default_registry(
 )
 
 docker_build(
-    'wormhole', 
+    'wormhole-controller', 
     context='.', 
     dockerfile='./docker/goDockerfile',
     target='dev',
@@ -17,8 +17,10 @@ docker_build(
         'PROJECT': '..'
     },
     live_update=[
-        sync('./main.go', '/src/main.go'),
-        sync('./pkg', '/src/pkg')
+        sync('./main.go', '/src-tmp/main.go'),
+        sync('./pkg', '/src-tmp/pkg'),
+        sync('./go.sum', '/src-tmp/go.sum'),
+        sync('./go.mod', '/src-tmp/go.mod')
     ]
 )
 
@@ -44,13 +46,15 @@ metadata:
   name: {ns}
 """.replace("{ns}", ns))) for ns in (servers + clients)]
 
+k8s_yaml('./kubernetes/raw/mocks/all.yaml')
+
 for server in servers:
     k8s_yaml(helm("./kubernetes/helm", namespace=server, set=[
         "server.enabled=true",
         "server.acceptor=dummy",
         "server.resources.limits.memory=2Gi",
         "server.wg.publicHost=wormhole-server-chart.server.svc.cluster.local",
-        "docker.image=wormhole",
+        "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",
         "docker.registry=",
@@ -63,7 +67,7 @@ for client in clients:
         "client.name=" + client,
         "client.serverDsn=http://wormhole-server-chart.server.svc.cluster.local:8080",
         "client.resources.limits.memory=2Gi",
-        "docker.image=wormhole",
+        "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",
         "docker.registry=",

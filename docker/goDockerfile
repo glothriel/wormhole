@@ -29,6 +29,7 @@ RUN go mod download
 COPY ${PROJECT}/pkg ./pkg
 COPY ${PROJECT}/main.go ./main.go
 
+
 # Dev stage, can be used for development using docker-compose "build.target" config
 FROM golang:${GO_VERSION}-bookworm as we
 RUN apt update  && apt install -y xz-utils

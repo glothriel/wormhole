@@ -50,6 +50,7 @@ spec:
           name: {{ template "name-client" . }}-nginx
       {{- if .Values.devMode.enabled }}
       - name: {{ template "name-client" . }}-dev
+      - name: {{ template "name-client" . }}-code
       - name: {{ template "name-client" . }}-build-cache
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}-build-cache
@@ -117,6 +118,8 @@ spec:
           {{- if .Values.devMode.enabled }}
           - mountPath: "/home/go/.cache"
             name: {{ template "name-client" . }}-build-cache
+          - mountPath: "/src-tmp"
+            name: {{ template "name-client" . }}-code
           {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-client" . }}-tmp

@@ -42,6 +42,7 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 		case appStageChange := <-c:
 			func() {
 				if appStageChange.State == svcdetector.AppStateChangeAdded {
+					logrus.Infof("App local.%s added", appStageChange.App.Name)
 					newApp, createErr := g.Exposer.Add(appStageChange.App)
 					if createErr != nil {
 						logrus.Errorf("Could not create listener: %v", createErr)
@@ -49,11 +50,13 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 					}
 					g.apps = append(g.apps, newApp)
 				} else if appStageChange.State == svcdetector.AppStateChangeWithdrawn {
+					logrus.Infof("App local.%s withdrawn", appStageChange.App.Name)
 					if withdrawErr := g.Exposer.Withdraw(appStageChange.App); withdrawErr != nil {
 						logrus.Errorf("Could not withdraw listener: %v", withdrawErr)
 					}
 					for i, app := range g.apps {
-						if app.Name == appStageChange.App.Name && app.Address == appStageChange.App.Address {
+						logrus.Infof("Checking app %s.%s == %s.%s", app.Peer, app.Name, appStageChange.App.Peer, appStageChange.App.Name)
+						if app.Name == appStageChange.App.Name && appStageChange.App.Peer == app.Peer {
 							g.apps = append(g.apps[:i], g.apps[i+1:]...)
 							break
 						}

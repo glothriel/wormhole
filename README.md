@@ -47,3 +47,28 @@ kubectl annotate --overwrite svc --namespace <namespace> <service> wormhole.glot
 
 After up to 30 seconds the service will be available on the other side. 
 
+## Local development
+
+### Development environment
+
+Requirements:
+
+* Helm
+* Tilt
+* K3d
+
+```
+k3d cluster create wormhole --registry-create wormhole
+
+tilt up
+```
+
+First start of wormhole will be really slow - it compiles the go code inside the container. Subsequent starts will be faster, as the go build cache is preserved in PVC.
+
+### Integration tests
+
+```
+cd tests && python setup.py develop && cd -
+
+pytest tests
+```

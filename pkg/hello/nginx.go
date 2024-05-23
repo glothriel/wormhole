@@ -5,6 +5,7 @@ import (
 
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/sirupsen/logrus"
 )
 
 type AppStateChangeGenerator struct {
@@ -15,6 +16,7 @@ type AppStateChangeGenerator struct {
 }
 
 func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr error) {
+	logrus.Debugf("Received sync from %s with %d apps", peer, len(apps))
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	apps = patchPeer(apps, peer)
@@ -46,6 +48,7 @@ func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr 
 	}
 
 	for _, app := range addedApps {
+		logrus.Infof("App %s.%s added", app.Peer, app.Name)
 		s.changes <- svcdetector.AppStateChange{
 			App:   app,
 			State: svcdetector.AppStateChangeAdded,
@@ -53,6 +56,7 @@ func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr 
 	}
 
 	for _, app := range removedApps {
+		logrus.Infof("App %s.%s removed", app.Peer, app.Name)
 		s.changes <- svcdetector.AppStateChange{
 			App:   app,
 			State: svcdetector.AppStateChangeWithdrawn,
@@ -60,6 +64,7 @@ func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr 
 	}
 
 	for _, app := range changedApps {
+		logrus.Infof("App %s.%s changed", app.Peer, app.Name)
 		s.changes <- svcdetector.AppStateChange{
 			App:   app,
 			State: svcdetector.AppStateChangeWithdrawn,
