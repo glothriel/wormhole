@@ -10,7 +10,6 @@ import (
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 var helloRetryIntervalFlag *cli.DurationFlag = &cli.DurationFlag{
@@ -36,11 +35,12 @@ var joinCommand *cli.Command = &cli.Command{
 		helloRetryIntervalFlag,
 		nginxExposerConfdPathFlag,
 		wireguardConfigFilePathFlag,
+		keyStorageDBFlag,
 	},
 	Action: func(c *cli.Context) error {
-		pkey, keyErr := wgtypes.GeneratePrivateKey()
+		privateKey, publicKey, keyErr := wg.GetOrGenerateKeyPair(getKeyStorage(c))
 		if keyErr != nil {
-			logrus.Fatalf("Failed to generate private key: %v", keyErr)
+			logrus.Fatalf("Failed to get or generate key pair: %v", keyErr)
 		}
 		startPrometheusServer(c)
 
@@ -91,13 +91,13 @@ var joinCommand *cli.Command = &cli.Command{
 			c.String(peerNameFlag.Name),
 			c.String(pairingServerURL.Name),
 			&wg.Config{
-				PrivateKey: pkey.String(),
+				PrivateKey: privateKey,
 				Subnet:     "32",
 			},
 
 			hello.KeyPair{
-				PublicKey:  pkey.PublicKey().String(),
-				PrivateKey: pkey.String(),
+				PublicKey:  publicKey,
+				PrivateKey: privateKey,
 			},
 			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
 			hello.NewJSONPairingEncoder(),

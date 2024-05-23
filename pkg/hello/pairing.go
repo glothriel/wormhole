@@ -96,30 +96,47 @@ func (s *PairingServer) Start() {
 			continue
 		}
 
-		// Assign IP
-		ip, ipErr := s.ips.Next()
-		if ipErr != nil {
-			incomingRequest.Err <- NewPairingRequestServerError(ipErr)
-			continue
+		var ip string
+		var publicKey string
+		existingPeer, peerErr := s.storage.GetByName(request.Name)
+		if peerErr != nil {
+			if peerErr != ErrPeerDoesNotExist {
+				incomingRequest.Err <- NewPairingRequestServerError(peerErr)
+				continue
+			}
+			// Peer is not in the Database
+			var ipErr error
+			ip, ipErr = s.ips.Next()
+			if ipErr != nil {
+				incomingRequest.Err <- NewPairingRequestServerError(ipErr)
+				continue
+			}
+			publicKey = request.Wireguard.PublicKey
+
+			// Store peer info
+			storeErr := s.storage.Store(PeerInfo{
+				Name:      request.Name,
+				IP:        ip,
+				PublicKey: publicKey,
+			})
+
+			if storeErr != nil {
+				incomingRequest.Err <- NewPairingRequestServerError(storeErr)
+				continue
+			}
+		} else {
+			// Peer is in the Database
+			ip = existingPeer.IP
+			publicKey = existingPeer.PublicKey
 		}
 
 		// Update local wireguard config
 		s.wgConfig.Upsert(wg.Peer{
-			PublicKey:  request.Wireguard.PublicKey,
+			PublicKey:  publicKey,
 			AllowedIPs: fmt.Sprintf("%s/32,%s/32", ip, s.wgConfig.Address),
 		})
 		s.wgReloader.Update(*s.wgConfig)
 
-		// Store peer info
-		storeErr := s.storage.Store(PeerInfo{
-			Name:      request.Name,
-			IP:        ip,
-			PublicKey: request.Wireguard.PublicKey,
-		})
-		if storeErr != nil {
-			incomingRequest.Err <- NewPairingRequestServerError(storeErr)
-			continue
-		}
 		// Enrich metadata
 		metadata := map[string]string{}
 		for _, enricher := range s.enrichers {

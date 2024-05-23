@@ -148,6 +148,8 @@ spec:
             - '--wg-internal-host={{ $.Values.server.wg.internalHost }}'
             - '--wg-public-host={{ $.Values.server.wg.publicHost }}'
             - '--wg-subnet-mask={{ $.Values.server.wg.subnetMask }}'
+            - '--peer-storage-db=/storage/peers.db'
+            - '--key-storage-db=/storage/keys.db'
 
 ---
 apiVersion: v1

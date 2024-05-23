@@ -140,6 +140,8 @@ spec:
             - 'application={{ template "name-client" . }}'
             - --server
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
+            - '--key-storage-db=/storage/keys.db'
+
             
 ---
 apiVersion: v1

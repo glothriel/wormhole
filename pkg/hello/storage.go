@@ -1,11 +1,16 @@
 package hello
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/sirupsen/logrus"
+	bolt "go.etcd.io/bbolt"
 )
+
+var ErrPeerDoesNotExist = errors.New("peer does not exist")
 
 type PeerStorage interface {
 	Store(PeerInfo) error
@@ -57,6 +62,72 @@ func (s *inMemoryPeerStorage) List() ([]PeerInfo, error) {
 
 func NewInMemoryPeerStorage() PeerStorage {
 	return &inMemoryPeerStorage{}
+}
+
+type boltPeerStorage struct {
+	db *bolt.DB
+}
+
+func (s *boltPeerStorage) Store(peer PeerInfo) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("peers"))
+		return b.Put([]byte(peer.Name), []byte(peer.IP))
+	})
+}
+
+func (s *boltPeerStorage) GetByName(name string) (PeerInfo, error) {
+	var peer PeerInfo
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("peers"))
+		ip := b.Get([]byte(name))
+		if ip == nil {
+			return ErrPeerDoesNotExist
+		}
+		peer = PeerInfo{Name: name, IP: string(ip)}
+		return nil
+	})
+	return peer, err
+}
+
+func (s *boltPeerStorage) GetByIP(ip string) (PeerInfo, error) {
+	var peer PeerInfo
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("peers"))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if string(v) == ip {
+				peer = PeerInfo{Name: string(k), IP: ip}
+				return nil
+			}
+		}
+		return ErrPeerDoesNotExist
+	})
+	return peer, err
+}
+
+func (s *boltPeerStorage) List() ([]PeerInfo, error) {
+	var peers []PeerInfo
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("peers"))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			peers = append(peers, PeerInfo{Name: string(k), IP: string(v)})
+		}
+		return nil
+	})
+	return peers, err
+}
+
+func NewBoltPeerStorage(path string) PeerStorage {
+	db, err := bolt.Open(path, 0600, nil)
+	if err != nil {
+		logrus.Panicf("failed to open bolt db: %v", err)
+	}
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("peers"))
+		return err
+	})
+	return &boltPeerStorage{db: db}
 }
 
 type AppSource interface {

@@ -12,6 +12,16 @@ var wireguardConfigFilePathFlag *cli.StringFlag = &cli.StringFlag{
 	Value: "/storage/wireguard/wg0.conf",
 }
 
+var peerStorageDBFlag *cli.StringFlag = &cli.StringFlag{
+	Name:  "peer-storage-db",
+	Value: "",
+}
+
+var keyStorageDBFlag *cli.StringFlag = &cli.StringFlag{
+	Name:  "key-storage-db",
+	Value: "",
+}
+
 var kubernetesFlag *cli.BoolFlag = &cli.BoolFlag{
 	Name:  "kubernetes",
 	Usage: "Use kubernetes to create proxy services",

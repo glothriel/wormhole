@@ -11,7 +11,6 @@ import (
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 var (
@@ -59,18 +58,23 @@ var listenCommand *cli.Command = &cli.Command{
 		intServerListenPort,
 		kubernetesNamespaceFlag,
 		kubernetesLabelsFlag,
+		peerStorageDBFlag,
 		peerNameFlag,
 		wgAddressFlag,
 		wgSubnetFlag,
 		wgPortFlag,
+		keyStorageDBFlag,
 	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
 
-		pkey, err := wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return err
+		privateKey, publicKey, keyErr := wg.GetOrGenerateKeyPair(getKeyStorage(c))
+		if keyErr != nil {
+			logrus.Fatalf("Failed to get or generate key pair: %v", keyErr)
 		}
+
+		logrus.Info(privateKey)
+		logrus.Info(publicKey)
 
 		appsExposedHere := listeners.NewApps(nginx.NewNginxExposer(
 			c.String(nginxExposerConfdPathFlag.Name),
@@ -114,9 +118,9 @@ var listenCommand *cli.Command = &cli.Command{
 			Address:    c.String(wgAddressFlag.Name),
 			Subnet:     c.String(wgSubnetFlag.Name),
 			ListenPort: c.Int(wgPortFlag.Name),
-			PrivateKey: pkey.String(),
+			PrivateKey: privateKey,
 		}
-		peers := hello.NewInMemoryPeerStorage()
+		peers := getPeerStorage(c)
 		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
@@ -150,13 +154,15 @@ var listenCommand *cli.Command = &cli.Command{
 			fmt.Sprintf("%s:%d", c.String(wgPublicHostFlag.Name), c.Int(wgPortFlag.Name)),
 			wgConfig,
 			hello.KeyPair{
-				PublicKey:  pkey.PublicKey().String(),
-				PrivateKey: pkey.String(),
+				PublicKey:  publicKey,
+				PrivateKey: privateKey,
 			},
 			watcher,
 			hello.NewJSONPairingEncoder(),
 			peerTransport,
-			hello.NewIPPool(c.String(wgAddressFlag.Name)),
+			hello.NewIPPool(c.String(wgAddressFlag.Name), hello.NewReservedAddressLister(
+				peers,
+			)),
 			peers,
 			[]hello.MetadataEnricher{syncTransport},
 		)
