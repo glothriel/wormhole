@@ -1,6 +1,7 @@
 package hello
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -15,7 +16,6 @@ var ErrPeerDoesNotExist = errors.New("peer does not exist")
 type PeerStorage interface {
 	Store(PeerInfo) error
 	GetByName(string) (PeerInfo, error)
-	GetByIP(string) (PeerInfo, error)
 	List() ([]PeerInfo, error)
 }
 
@@ -33,22 +33,6 @@ func (s *inMemoryPeerStorage) GetByName(name string) (PeerInfo, error) {
 		return peer.(PeerInfo), nil
 	}
 	return PeerInfo{}, fmt.Errorf("peer with name %s not found", name)
-}
-
-func (s *inMemoryPeerStorage) GetByIP(ip string) (PeerInfo, error) {
-	var found PeerInfo
-	s.peers.Range(func(_, value interface{}) bool {
-		peer := value.(PeerInfo)
-		if peer.IP == ip {
-			found = peer
-			return false
-		}
-		return true
-	})
-	if found.Name == "" {
-		return PeerInfo{}, fmt.Errorf("peer with IP %s not found", ip)
-	}
-	return found, nil
 }
 
 func (s *inMemoryPeerStorage) List() ([]PeerInfo, error) {
@@ -71,7 +55,11 @@ type boltPeerStorage struct {
 func (s *boltPeerStorage) Store(peer PeerInfo) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("peers"))
-		return b.Put([]byte(peer.Name), []byte(peer.IP))
+		encoded, encodeErr := json.Marshal(peer)
+		if encodeErr != nil {
+			return encodeErr
+		}
+		return b.Put([]byte(peer.Name), encoded)
 	})
 }
 
@@ -79,28 +67,16 @@ func (s *boltPeerStorage) GetByName(name string) (PeerInfo, error) {
 	var peer PeerInfo
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("peers"))
-		ip := b.Get([]byte(name))
-		if ip == nil {
+		payload := b.Get([]byte(name))
+		if payload == nil {
 			return ErrPeerDoesNotExist
 		}
-		peer = PeerInfo{Name: name, IP: string(ip)}
-		return nil
-	})
-	return peer, err
-}
-
-func (s *boltPeerStorage) GetByIP(ip string) (PeerInfo, error) {
-	var peer PeerInfo
-	err := s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("peers"))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if string(v) == ip {
-				peer = PeerInfo{Name: string(k), IP: ip}
-				return nil
-			}
+		var p PeerInfo
+		if err := json.Unmarshal(payload, &p); err != nil {
+			return err
 		}
-		return ErrPeerDoesNotExist
+		peer = p
+		return nil
 	})
 	return peer, err
 }
@@ -111,7 +87,11 @@ func (s *boltPeerStorage) List() ([]PeerInfo, error) {
 		b := tx.Bucket([]byte("peers"))
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			peers = append(peers, PeerInfo{Name: string(k), IP: string(v)})
+			var p PeerInfo
+			if err := json.Unmarshal(v, &p); err != nil {
+				return err
+			}
+			peers = append(peers, p)
 		}
 		return nil
 	})

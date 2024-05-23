@@ -73,9 +73,6 @@ var listenCommand *cli.Command = &cli.Command{
 			logrus.Fatalf("Failed to get or generate key pair: %v", keyErr)
 		}
 
-		logrus.Info(privateKey)
-		logrus.Info(publicKey)
-
 		appsExposedHere := listeners.NewApps(nginx.NewNginxExposer(
 			c.String(nginxExposerConfdPathFlag.Name),
 			"local",
@@ -120,7 +117,17 @@ var listenCommand *cli.Command = &cli.Command{
 			ListenPort: c.Int(wgPortFlag.Name),
 			PrivateKey: privateKey,
 		}
-		peers := getPeerStorage(c)
+		peerStorage := getPeerStorage(c)
+		savedPeers, peersErr := peerStorage.List()
+		if peersErr != nil {
+			logrus.Panicf("failed to list peers: %v", peersErr)
+		}
+		for _, savedPeer := range savedPeers {
+			wgConfig.Upsert(wg.Peer{
+				PublicKey:  savedPeer.PublicKey,
+				AllowedIPs: fmt.Sprintf("%s/32,%s/32", savedPeer.IP, wgConfig.Address),
+			})
+		}
 		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
@@ -133,7 +140,7 @@ var listenCommand *cli.Command = &cli.Command{
 			),
 			hello.NewJSONSyncEncoder(),
 			syncTransport,
-			peers,
+			peerStorage,
 		)
 		watcher := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
 		updateErr := watcher.Update(*wgConfig)
@@ -161,9 +168,9 @@ var listenCommand *cli.Command = &cli.Command{
 			hello.NewJSONPairingEncoder(),
 			peerTransport,
 			hello.NewIPPool(c.String(wgAddressFlag.Name), hello.NewReservedAddressLister(
-				peers,
+				peerStorage,
 			)),
-			peers,
+			peerStorage,
 			[]hello.MetadataEnricher{syncTransport},
 		)
 		go ss.Start()
