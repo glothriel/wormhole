@@ -29,12 +29,12 @@ helm upgrade -n wormhole wh kubernetes/helm --set server.enabled=true --set serv
 
 ### Install client
 
-You should do this on another cluster. If not, change the namespace to say `wormhole-client` to avoid conflicts.
+You should do this on another cluster. If not, change the namespace to say `wormhole-client` to avoid conflicts. Please note the `client.name` parameter - it should be unique for each client. At this point you may add as many clients as you want.
 
 ```
 kubectl create namespace wormhole
 
-helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://server.wg.publicHost:8080"
+helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --client.name clientOne
 ```
 
 ### Expose a service
