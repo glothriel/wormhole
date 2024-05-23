@@ -40,21 +40,26 @@ func NewJSONPairingEncoder() Marshaler {
 	return &jsonPairingEncoder{}
 }
 
+type SyncingMessage struct {
+	Peer string
+	Apps []peers.App
+}
+
 type SyncingEncoder interface {
-	Encode([]peers.App) ([]byte, error)
-	Decode([]byte) ([]peers.App, error)
+	Encode(SyncingMessage) ([]byte, error)
+	Decode([]byte) (SyncingMessage, error)
 }
 
 type jsonSyncingEncoder struct{}
 
-func (e *jsonSyncingEncoder) Encode(apps []peers.App) ([]byte, error) {
+func (e *jsonSyncingEncoder) Encode(apps SyncingMessage) ([]byte, error) {
 	return json.Marshal(apps)
 }
 
-func (e *jsonSyncingEncoder) Decode(data []byte) ([]peers.App, error) {
-	var apps []peers.App
-	err := json.Unmarshal(data, &apps)
-	return apps, err
+func (e *jsonSyncingEncoder) Decode(data []byte) (SyncingMessage, error) {
+	var msg SyncingMessage
+	err := json.Unmarshal(data, &msg)
+	return msg, err
 }
 
 func NewJSONSyncEncoder() SyncingEncoder {

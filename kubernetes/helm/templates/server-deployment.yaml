@@ -134,6 +134,8 @@ spec:
             - listen
             - --invite-token
             - hello123
+            - --name
+            - {{ .Values.server.name }}
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}

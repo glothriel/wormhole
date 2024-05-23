@@ -40,3 +40,8 @@ var inviteTokenFlag *cli.StringFlag = &cli.StringFlag{
 	Usage: "Invite token to use to connect to the wormhole server",
 	Value: "",
 }
+
+var peerNameFlag *cli.StringFlag = &cli.StringFlag{
+	Name:     "name",
+	Required: true,
+}

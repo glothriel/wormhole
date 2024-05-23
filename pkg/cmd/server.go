@@ -59,6 +59,7 @@ var listenCommand *cli.Command = &cli.Command{
 		intServerListenPort,
 		kubernetesNamespaceFlag,
 		kubernetesLabelsFlag,
+		peerNameFlag,
 		wgAddressFlag,
 		wgSubnetFlag,
 		wgPortFlag,
@@ -120,6 +121,7 @@ var listenCommand *cli.Command = &cli.Command{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
 		ss := hello.NewSyncingServer(
+			c.String(peerNameFlag.Name),
 			remoteNginxAdapter,
 			hello.NewAddressEnrichingAppSource(
 				wgConfig.Address,

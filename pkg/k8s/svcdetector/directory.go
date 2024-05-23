@@ -42,6 +42,7 @@ func parseAppFromPath(fs afero.Fs, path string) (peers.App, error) {
 
 }
 
+// This is used for integration tests
 func NewDirectoryMonitoringAppStateManager(location string, fs afero.Fs) AppStateManager {
 
 	changesChan := make(chan AppStateChange)

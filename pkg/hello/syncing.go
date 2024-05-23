@@ -23,6 +23,7 @@ type SyncServerTransport interface {
 }
 
 type SyncingServer struct {
+	peerName       string
 	stateGenerator *AppStateChangeGenerator
 
 	apps AppSource
@@ -34,29 +35,33 @@ type SyncingServer struct {
 
 func (s *SyncingServer) Start() {
 	for incomingSync := range s.transport.Syncs() {
-		apps, decodeErr := s.encoder.Decode(incomingSync.Request)
+		msg, decodeErr := s.encoder.Decode(incomingSync.Request)
 		if decodeErr != nil {
 			incomingSync.Err <- decodeErr
 			continue
 		}
-		if len(apps) > 0 {
-			peer, peerErr := s.peers.GetByName(apps[0].Peer)
-			if peerErr != nil {
-				incomingSync.Err <- peerErr
-				continue
-			}
-			s.stateGenerator.OnSync(
-				peer.Name,
-				apps,
-				nil,
-			)
+		peer, peerErr := s.peers.GetByName(msg.Peer)
+		if peerErr != nil {
+			incomingSync.Err <- peerErr
+			continue
 		}
+		s.stateGenerator.OnSync(
+			peer.Name,
+			msg.Apps,
+			nil,
+		)
 		apps, listErr := s.apps.List()
 		if listErr != nil {
 			incomingSync.Err <- listErr
 			continue
 		}
-		encoded, encodeErr := s.encoder.Encode(apps)
+
+		encoded, encodeErr := s.encoder.Encode(
+			SyncingMessage{
+				Peer: s.peerName,
+				Apps: apps,
+			},
+		)
 		if encodeErr != nil {
 			incomingSync.Err <- encodeErr
 			continue
@@ -66,6 +71,7 @@ func (s *SyncingServer) Start() {
 }
 
 func NewSyncingServer(
+	myName string,
 	stateGenerator *AppStateChangeGenerator,
 	apps AppSource,
 	encoder SyncingEncoder,
@@ -73,6 +79,7 @@ func NewSyncingServer(
 	peers PeerStorage,
 ) *SyncingServer {
 	return &SyncingServer{
+		peerName:       myName,
 		stateGenerator: stateGenerator,
 		apps:           apps,
 		encoder:        encoder,
@@ -82,6 +89,7 @@ func NewSyncingServer(
 }
 
 type SyncingClient struct {
+	myName       string
 	nginxAdapter *AppStateChangeGenerator
 	encoder      SyncingEncoder
 	interval     time.Duration
@@ -98,7 +106,10 @@ func (c *SyncingClient) Start() error {
 			logrus.Errorf("failed to list apps: %v", listErr)
 			continue
 		}
-		encodedApps, encodeErr := c.encoder.Encode(apps)
+		encodedApps, encodeErr := c.encoder.Encode(SyncingMessage{
+			Peer: c.myName,
+			Apps: apps,
+		})
 		if encodeErr != nil {
 			logrus.Errorf("failed to encode apps: %v", encodeErr)
 			continue
@@ -108,20 +119,21 @@ func (c *SyncingClient) Start() error {
 			logrus.Errorf("failed to sync apps: %v", err)
 			continue
 		}
-		decodedIncomingApps, decodeErr := c.encoder.Decode(incomingApps)
+		decodedMsg, decodeErr := c.encoder.Decode(incomingApps)
 		if decodeErr != nil {
 			logrus.Errorf("failed to decode incoming apps: %v", decodeErr)
 			continue
 		}
 		c.nginxAdapter.OnSync(
-			"server",
-			decodedIncomingApps,
+			decodedMsg.Peer,
+			decodedMsg.Apps,
 			nil,
 		)
 	}
 }
 
 func NewSyncingClient(
+	myName string,
 	nginxAdapter *AppStateChangeGenerator,
 	encoder SyncingEncoder,
 	interval time.Duration,
@@ -129,6 +141,7 @@ func NewSyncingClient(
 	transport SyncClientTransport,
 ) *SyncingClient {
 	return &SyncingClient{
+		myName:       myName,
 		nginxAdapter: nginxAdapter,
 		encoder:      encoder,
 		interval:     interval,
@@ -138,6 +151,7 @@ func NewSyncingClient(
 }
 
 func NewHTTPSyncingClient(
+	myName string,
 	nginxAdapter *AppStateChangeGenerator,
 	encoder SyncingEncoder,
 	interval time.Duration,
@@ -151,6 +165,7 @@ func NewHTTPSyncingClient(
 	}
 	transport := NewHTTPClientSyncingTransport(syncServerAddress)
 	return NewSyncingClient(
+		myName,
 		nginxAdapter,
 		encoder,
 		interval,

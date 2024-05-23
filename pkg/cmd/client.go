@@ -18,11 +18,6 @@ var helloRetryIntervalFlag *cli.DurationFlag = &cli.DurationFlag{
 	Value: time.Second * 1,
 }
 
-var peerNameFlag *cli.StringFlag = &cli.StringFlag{
-	Name:     "name",
-	Required: true,
-}
-
 var pairingServerURL *cli.StringFlag = &cli.StringFlag{
 	Name:  "server",
 	Value: "http://localhost:8080",
@@ -124,6 +119,7 @@ var joinCommand *cli.Command = &cli.Command{
 		go remoteListenerRegistry.Watch(appStateChangeGenerator.Changes(), make(chan bool))
 
 		sc, scErr := hello.NewHTTPSyncingClient(
+			c.String(peerNameFlag.Name),
 			appStateChangeGenerator,
 			hello.NewJSONSyncEncoder(),
 			time.Second*5,
