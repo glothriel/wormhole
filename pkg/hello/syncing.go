@@ -23,7 +23,7 @@ type SyncServerTransport interface {
 }
 
 type SyncingServer struct {
-	peerName       string
+	myName         string
 	stateGenerator *AppStateChangeGenerator
 
 	apps AppSource
@@ -58,7 +58,7 @@ func (s *SyncingServer) Start() {
 
 		encoded, encodeErr := s.encoder.Encode(
 			SyncingMessage{
-				Peer: s.peerName,
+				Peer: s.myName,
 				Apps: apps,
 			},
 		)
@@ -79,7 +79,7 @@ func NewSyncingServer(
 	peers PeerStorage,
 ) *SyncingServer {
 	return &SyncingServer{
-		peerName:       myName,
+		myName:         myName,
 		stateGenerator: stateGenerator,
 		apps:           apps,
 		encoder:        encoder,
