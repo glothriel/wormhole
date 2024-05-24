@@ -1,6 +1,11 @@
 package cmd
 
-import "github.com/urfave/cli/v2"
+import (
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
+	"regexp"
+	"strings"
+)
 
 var nginxExposerConfdPathFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "nginx-confd-path",
@@ -54,4 +59,12 @@ var inviteTokenFlag *cli.StringFlag = &cli.StringFlag{
 var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 	Name:     "name",
 	Required: true,
+}
+
+func sanitizePeerNameFlag(context *cli.Context) error {
+	reg := regexp.MustCompile("[^a-zA-Z0-9]{1}")
+	sanitized := reg.ReplaceAllString(context.String(peerNameFlag.Name), "-")
+	sanitized = strings.ToLower(sanitized)
+	logrus.Infof("Using client name: '%s'", context.String(peerNameFlag.Name))
+	return context.Set(peerNameFlag.Name, sanitized)
 }
