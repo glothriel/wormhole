@@ -115,7 +115,13 @@ def kubectl(kind_cluster):
 def fresh_cluster(kind_cluster):
     kubectl = Kubectl(kind_cluster)
     starting_namespaces = set(
-        [item["metadata"]["name"] for item in kubectl.json(["get", "namespaces"])["items"]]
+        [
+            'kube-system',
+            'default',
+            'local-path-storage',
+            'kube-node-lease',
+            'kube-public'
+        ]
     )
     try:
         yield kind_cluster
@@ -129,7 +135,7 @@ def fresh_cluster(kind_cluster):
             print(f"Deleted namespace {namespace_to_be_deleted}")
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def helm(kind_cluster):
     yield Helm(kind_cluster)
 
@@ -144,7 +150,7 @@ def server_installed_with_helm(kubectl, helm, fresh_cluster):
 @pytest.fixture(scope="session")
 def wormhole_image():
     # Define the Docker image and build parameters
-    image_name = "wormhole:ci"
+    image_name = "wormhole-controller:latest"
     context_path = os.path.abspath(".")
     dockerfile_path = "./docker/goDockerfile"
     build_args = {
@@ -170,7 +176,7 @@ def wormhole_image():
 @pytest.fixture(scope="session")
 def wireguard_image():
     # Define the Docker image and build parameters
-    image_name = "wireguard:ci"
+    image_name = "wormhole-wireguard:latest"
     context_path = os.path.abspath("docker")
     dockerfile_path = "./docker/wgDockerfile"
 
@@ -186,7 +192,7 @@ def wireguard_image():
 @pytest.fixture(scope="session")
 def nginx_image():
     # Define the Docker image and build parameters
-    image_name = "nginx:ci"
+    image_name = "wormhole-nginx:latest"
     context_path = os.path.abspath("docker")
     dockerfile_path = "./docker/nginxDockerfile"
 
@@ -209,3 +215,57 @@ def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_im
         'wireguard': wireguard_image,
         'nginx': nginx_image,
     }
+
+
+@pytest.fixture()
+def k8s_server(
+    kubectl,
+    helm,
+    wormhole_image,
+    wireguard_image,
+    nginx_image,
+    fresh_cluster,
+):
+    kubectl.run(["create", "namespace", "server"])
+    helm.install(
+        "server",
+        {
+            "server.enabled": True,
+            "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
+            "docker.image": wormhole_image.split(":")[0],
+            "docker.version": wormhole_image.split(":")[1],
+            "docker.wgImage": wireguard_image.split(":")[0],
+            "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.nginxImage": nginx_image.split(":")[0],
+            "docker.nginxVersion": nginx_image.split(":")[1],
+            "docker.registry": "",
+        },
+    )
+
+
+@pytest.fixture()
+def k8s_client(
+    kubectl,
+    helm,
+    wormhole_image,
+    wireguard_image,
+    nginx_image,
+    fresh_cluster,
+):
+
+    kubectl.run(["create", "namespace", "client"])
+    helm.install(
+        "client",
+        {
+            "client.enabled": True,
+            "client.name": "client",
+            "client.serverDsn": "http://wormhole-server-server.server.svc.cluster.local:8080",
+            "docker.image": wormhole_image.split(":")[0],
+            "docker.version": wormhole_image.split(":")[1],
+            "docker.wgImage": wireguard_image.split(":")[0],
+            "docker.wgVersion": wireguard_image.split(":")[1],
+            "docker.nginxImage": nginx_image.split(":")[0],
+            "docker.nginxVersion": nginx_image.split(":")[1],
+            "docker.registry": "",
+        },
+    )

@@ -179,27 +179,17 @@ class Client:
 
 class MockServer:
     def __init__(self, kubectl, wormhole_image):
-        self.namespace = "mock"
-        self.name = "mock"
+        self.namespace = "nginx"
+        self.name = "nginx"
         self.kubectl = kubectl
-        self.image = wormhole_image.split(":")[0]
-        self.version = wormhole_image.split(":")[1]
 
     def start(self):
-        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", suffix=".yaml", delete=False)
-        with open(tmp.name, 'w') as f:
-            with open("kubernetes/raw/mocks/all.yaml", 'r') as fr:
-                f.write(fr.read().format(
-                    name=self.name,
-                    namespace=self.namespace,
-                ))
         self.kubectl.run(["create", "ns", self.namespace])
 
         @retry(tries=20, delay=.5)
         def _wait_for_mocks():
-            self.kubectl.run(["apply", "-f", tmp.name])
+            self.kubectl.run(["apply", "-f", "kubernetes/raw/mocks/all.yaml"])
         _wait_for_mocks()
-        os.unlink(tmp.name)
         return self
 
     def stop(self):
@@ -270,6 +260,7 @@ class KindCluster:
 
     def __init__(self, name):
         self.name = name
+        self.existed_before = False
         self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
 
     @property
@@ -280,7 +271,9 @@ class KindCluster:
         return exists
 
     def create(self):
-        assert not self.exists, f"Cannot create cluster {self.name} - it already exists"
+        if self.exists:
+            self.existed_before = True
+            return
         assert not run_process(
             [
                 self.executable(),
@@ -301,6 +294,9 @@ class KindCluster:
 
     def delete(self):
         assert self.exists, f"Cannot delete cluster {self.name} - it does not exist"
+        if self.existed_before:
+            print("Skipping removal of KIND cluster - it existed before the tests were run")
+            return
         assert not run_process(
             [self.executable(), "delete", "cluster", "--name", self.name],
         ).returncode, "Could not delete cluster"
@@ -440,3 +436,24 @@ spec:
 
     def delete(self, kubectl):
         kubectl.run(["delete", "ns", self.namespace])
+
+
+class Annotator:
+
+    def __init__(self, mock_server, kubectl, override_name=None):
+        self.mock_server = mock_server
+        self.kubectl = kubectl
+        self.override_name = override_name
+
+    def do(self, key, value):
+        self.kubectl.run(
+            [
+                "-n",
+                self.mock_server.namespace,
+                "annotate",
+                "svc",
+                self.override_name if self.override_name else self.mock_server.name,
+                f"{key}={value}",
+                "--overwrite"
+            ]
+        )

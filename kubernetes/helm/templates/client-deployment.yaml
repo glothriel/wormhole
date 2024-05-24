@@ -40,9 +40,7 @@ spec:
         {{- toYaml .Values.client.tolerations | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ template "name-client" . }}
-      {{- if .Values.devMode.enabled }}
       terminationGracePeriodSeconds: 1
-      {{- end }}
       volumes:
       - name: nginx-conf
         configMap:
