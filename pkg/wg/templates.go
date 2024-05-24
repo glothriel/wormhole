@@ -25,6 +25,8 @@ type Config struct {
 	ListenPort int
 	PrivateKey string
 
+	EnableKeepAlive bool
+
 	Peers []Peer
 }
 
@@ -58,7 +60,6 @@ PrivateKey = {{.PrivateKey}}
 {{range .Peers}}
 [Peer]
 PublicKey = {{ .PublicKey }}
-PersistentKeepalive = 10
 AllowedIPs = {{ .AllowedIPs }}
 {{if .Endpoint}}Endpoint = {{ .Endpoint }}{{end}}
 {{if .PersistentKeepalive}}PersistentKeepalive = {{ .PersistentKeepalive }}{{end}}
@@ -95,7 +96,7 @@ func (w *Watcher) Update(settings Config) error {
 		return nil
 	}
 
-	writeErr := afero.WriteFile(w.fs, w.path, []byte(content), 0644)
+	writeErr := afero.WriteFile(w.fs, w.path, []byte(content), 0600)
 	if writeErr != nil {
 		return writeErr
 	}
@@ -105,7 +106,7 @@ func (w *Watcher) Update(settings Config) error {
 
 func NewWatcher(cfgPath string) *Watcher {
 	fs := &afero.Afero{Fs: afero.NewOsFs()}
-	createErr := fs.MkdirAll(filepath.Dir(cfgPath), 0755)
+	createErr := fs.MkdirAll(filepath.Dir(cfgPath), 0700)
 	if createErr != nil && createErr != afero.ErrDestinationExists {
 		logrus.Panicf("Could not create Wireguard config directory at %s: %v", cfgPath, createErr)
 	}

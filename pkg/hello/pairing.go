@@ -41,9 +41,10 @@ func (c *PairingClient) Pair() (PairingResponse, error) {
 	}
 	c.wgConfig.Address = decoded.AssignedIP
 	c.wgConfig.Upsert(wg.Peer{
-		Endpoint:   decoded.Wireguard.Endpoint,
-		PublicKey:  decoded.Wireguard.PublicKey,
-		AllowedIPs: fmt.Sprintf("%s/32,%s/32", decoded.InternalServerIP, decoded.AssignedIP),
+		Endpoint:            decoded.Wireguard.Endpoint,
+		PublicKey:           decoded.Wireguard.PublicKey,
+		AllowedIPs:          fmt.Sprintf("%s/32,%s/32", decoded.InternalServerIP, decoded.AssignedIP),
+		PersistentKeepalive: 10,
 	})
 	c.wgReloader.Update(*c.wgConfig)
 

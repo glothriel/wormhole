@@ -18,6 +18,9 @@ done
 # Initial setup
 wg-quick up /etc/wireguard/wg0.conf
 
+# Reload the configuration every 30 seconds
+while true; do wg syncconf wg0 <(wg-quick strip wg0); sleep 30; done &
+
 # Monitor /etc/wireguard for changes and reload wg0 if changes are detected
 inotifywait -m -e create -e delete -e modify -e moved_to -e moved_from --format '%w%f' /etc/wireguard | while read FILE
 do
