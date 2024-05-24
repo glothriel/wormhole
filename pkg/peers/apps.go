@@ -9,14 +9,6 @@ type App struct {
 	TargetLabels string `json:"targetLabels"`
 }
 
-type AppSource interface {
-	Changed() chan []App
-}
-
-type AppExposer interface {
-	Expose([]App)
-}
-
 func WithAddress(app App, newAddress string) App {
 	a := app
 	a.Address = newAddress

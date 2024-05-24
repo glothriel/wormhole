@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/glothriel/wormhole/pkg/api"
 	"net/http"
 
 	"github.com/glothriel/wormhole/pkg/hello"
@@ -131,13 +132,16 @@ var listenCommand *cli.Command = &cli.Command{
 		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
 			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 		})
+
+		appSource := hello.NewAddressEnrichingAppSource(
+			wgConfig.Address,
+			hello.NewPeerEnrichingAppSource("server", appsExposedHere),
+		)
+
 		ss := hello.NewSyncingServer(
 			c.String(peerNameFlag.Name),
 			remoteNginxAdapter,
-			hello.NewAddressEnrichingAppSource(
-				wgConfig.Address,
-				hello.NewPeerEnrichingAppSource("server", appsExposedHere),
-			),
+			appSource,
 			hello.NewJSONSyncEncoder(),
 			syncTransport,
 			peerStorage,
@@ -174,6 +178,16 @@ var listenCommand *cli.Command = &cli.Command{
 			[]hello.MetadataEnricher{syncTransport},
 		)
 		go ss.Start()
+		go func() {
+			err := api.NewAdminAPI([]api.Controller{
+				api.NewAppsController(appSource),
+				api.NewWgController(peerStorage, wgConfig, watcher),
+			}).Run(":8082")
+			if err != nil {
+				logrus.Fatalf("Failed to start admin API: %v", err)
+			}
+		}()
+
 		ps.Start()
 		return nil
 	},

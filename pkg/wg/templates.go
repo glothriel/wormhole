@@ -41,6 +41,15 @@ func (c *Config) Upsert(p Peer) {
 	c.Peers = append(c.Peers, p)
 }
 
+func (c *Config) DeleteByPublicKey(publicKey string) {
+	for i, peer := range c.Peers {
+		if peer.PublicKey == publicKey {
+			c.Peers = append(c.Peers[:i], c.Peers[i+1:]...)
+			return
+		}
+	}
+}
+
 var theTemplate string = `[Interface]
 Address = {{.Address}}/{{.Subnet}}
 {{if .ListenPort}}ListenPort = {{.ListenPort}}{{end}}
