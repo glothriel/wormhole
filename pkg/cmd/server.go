@@ -66,7 +66,9 @@ var listenCommand *cli.Command = &cli.Command{
 		wgPortFlag,
 		keyStorageDBFlag,
 	},
-	Before: sanitizePeerNameFlag,
+	Before: func(context *cli.Context) error {
+		return context.Set(peerNameFlag.Name, sanitizeStringFlag(context.String(peerNameFlag.Name)))
+	},
 	Action: func(c *cli.Context) error {
 		startPrometheusServer(c)
 

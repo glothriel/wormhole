@@ -37,7 +37,9 @@ var joinCommand *cli.Command = &cli.Command{
 		wireguardConfigFilePathFlag,
 		keyStorageDBFlag,
 	},
-	Before: sanitizePeerNameFlag,
+	Before: func(context *cli.Context) error {
+		return context.Set(peerNameFlag.Name, sanitizeStringFlag(context.String(peerNameFlag.Name)))
+	},
 	Action: func(c *cli.Context) error {
 		privateKey, publicKey, keyErr := wg.GetOrGenerateKeyPair(getKeyStorage(c))
 		if keyErr != nil {
