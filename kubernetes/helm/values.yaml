@@ -38,6 +38,8 @@ client:
     storageClassName: ""
     storage: 1Gi
 
+peering:
+  psk: defaultPeeringKeyPleaseChangeMe
 
 server:
   name: server

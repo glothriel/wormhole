@@ -134,7 +134,7 @@ spec:
             - --debug
             - listen
             - --invite-token
-            - hello123
+            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.server.name }}
       {{- if .Values.server.path }}

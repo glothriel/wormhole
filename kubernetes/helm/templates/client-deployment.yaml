@@ -130,7 +130,7 @@ spec:
             - --debug
             - join
             - --invite-token
-            - hello123
+            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes
