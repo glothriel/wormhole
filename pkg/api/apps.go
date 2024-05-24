@@ -22,6 +22,7 @@ func (ac *appsController) registerRoutes(r *gin.Engine) {
 	})
 }
 
-func NewAppsController(appSource hello.AppSource) *appsController {
+// NewAppsController bootstraps creation of the API that allows displaying currently exposed apps
+func NewAppsController(appSource hello.AppSource) Controller {
 	return &appsController{appSource: appSource}
 }

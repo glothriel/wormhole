@@ -1,13 +1,16 @@
+// Package api contains administrative APIs used for querying and manipulation of peers and apps
 package api
 
 import (
 	"github.com/gin-gonic/gin"
 )
 
+// Controller contains a set of functionalities for the API
 type Controller interface {
 	registerRoutes(r *gin.Engine)
 }
 
+// NewAdminAPI bootstraps the creation of the gin engine
 func NewAdminAPI(controllers []Controller) *gin.Engine {
 	r := gin.Default()
 	for _, controller := range controllers {

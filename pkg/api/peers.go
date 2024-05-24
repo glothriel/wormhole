@@ -53,13 +53,13 @@ func (p *peerController) registerRoutes(r *gin.Engine) {
 				"error": err.Error(),
 			})
 			return
-
 		}
 		c.JSON(204, nil)
 	})
 }
 
-func NewWgController(peers hello.PeerStorage, wgConfig *wg.Config, watcher *wg.Watcher) *peerController {
+// NewPeersController allows querying and manipulation of the connected peers
+func NewPeersController(peers hello.PeerStorage, wgConfig *wg.Config, watcher *wg.Watcher) Controller {
 	return &peerController{
 		peers:    peers,
 		wgConfig: wgConfig,

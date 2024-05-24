@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/glothriel/wormhole/pkg/api"
 	"net/http"
+
+	"github.com/glothriel/wormhole/pkg/api"
 
 	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
@@ -181,7 +182,7 @@ var listenCommand *cli.Command = &cli.Command{
 		go func() {
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appSource),
-				api.NewWgController(peerStorage, wgConfig, watcher),
+				api.NewPeersController(peerStorage, wgConfig, watcher),
 			}).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)

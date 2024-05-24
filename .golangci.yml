@@ -11,6 +11,16 @@ linters-settings:
   lll:
     line-length: 120
 
+  depguard:
+    rules:
+      Main:
+        list-mode: lax
+        files:
+        - $all
+        - "!$test"
+        deny:
+          - pkg: reflect
+            desc: Please don't use reflect package
 
 linters:
   disable-all: true
@@ -18,7 +28,6 @@ linters:
     - revive
     - ifshort
     - staticcheck
-    - depguard
     - gosec
     - dogsled
     - godox
@@ -30,6 +39,7 @@ linters:
     - gofmt
     - gocognit
     - dupl
+    - depguard
     - whitespace
     - goconst
     - unconvert

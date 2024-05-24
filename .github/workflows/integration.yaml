@@ -29,7 +29,7 @@ jobs:
 
       - name: Install packages required for tests
         shell: bash
-        run: cd ${{ inputs.test-directory }} && python setup.py develop
+        run: cd tests && python setup.py develop
 
       - name: Run integration tests
         run: py.test -v --tb=short
