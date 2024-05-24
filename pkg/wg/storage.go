@@ -70,6 +70,20 @@ func (s *inMemoryKeyStorage) Load() (private, public string, err error) {
 	return s.private, s.public, nil
 }
 
+type noStorage struct{}
+
+func (s *noStorage) Store(private, public string) error {
+	return nil
+}
+
+func (s *noStorage) Load() (private, public string, err error) {
+	return "", "", errors.New("no storage")
+}
+
+func NewNoStorage() KeyStorage {
+	return &noStorage{}
+}
+
 func NewInMemoryKeyStorage() KeyStorage {
 	return &inMemoryKeyStorage{}
 }
