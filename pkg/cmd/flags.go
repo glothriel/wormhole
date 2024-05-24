@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"regexp"
 	"strings"
@@ -60,9 +61,10 @@ var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 	Required: true,
 }
 
-func sanitizeStringFlag(flagName string) string {
+func sanitizeStringFlag(context *cli.Context, flagName string) error {
 	reg := regexp.MustCompile("[^a-zA-Z0-9]{1}")
-	sanitized := reg.ReplaceAllString(flagName, "-")
+	sanitized := reg.ReplaceAllString(context.String(flagName), "-")
 	sanitized = strings.ToLower(sanitized)
-	return sanitized
+	logrus.Infof("%s flag set to: %s", flagName, sanitized)
+	return context.Set(flagName, sanitized)
 }

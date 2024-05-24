@@ -38,7 +38,7 @@ var joinCommand *cli.Command = &cli.Command{
 		keyStorageDBFlag,
 	},
 	Before: func(context *cli.Context) error {
-		return context.Set(peerNameFlag.Name, sanitizeStringFlag(context.String(peerNameFlag.Name)))
+		return sanitizeStringFlag(context, peerNameFlag.Name)
 	},
 	Action: func(c *cli.Context) error {
 		privateKey, publicKey, keyErr := wg.GetOrGenerateKeyPair(getKeyStorage(c))
