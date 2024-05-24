@@ -125,6 +125,12 @@ func (s *PairingServer) Start() {
 				continue
 			}
 		} else {
+			if existingPeer.PublicKey != request.Wireguard.PublicKey {
+				logrus.Errorf(
+					"attempted peering from peer %s: error, public key mismatch", request.Name,
+				)
+				continue
+			}
 			// Peer is in the Database
 			ip = existingPeer.IP
 			publicKey = existingPeer.PublicKey
