@@ -3,6 +3,7 @@ import os
 import shutil
 import signal
 import subprocess
+import socket
 import uuid
 from contextlib import contextmanager
 import tempfile
@@ -46,6 +47,8 @@ class Server:
             "--metrics-port",
             str(self.metrics_port),
             "listen",
+            "--name",
+            uuid.uuid4().hex,
             "--directory-state-manager-path",
             self.state_manager_path,
             "--nginx-confd-path",
@@ -69,7 +72,12 @@ class Server:
 
         @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
-            assert len(psutil.Process(self.process.pid).connections()) > 0
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.connect(('localhost', self.metrics_port))
+                    return True
+                except (ConnectionRefusedError, OSError):
+                    raise Exception("Port is not open yet")
 
         _check_if_is_already_opened()
 
@@ -256,7 +264,7 @@ class Kubectl:
 
 class KindCluster:
 
-    KIND_VERSION = "v0.11.1"
+    KIND_VERSION = "v0.23.0"
 
     def __init__(self, name):
         self.name = name
