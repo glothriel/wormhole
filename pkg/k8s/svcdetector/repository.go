@@ -94,7 +94,7 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 						theChannel <- event
 					}
 				},
-				UpdateFunc: func(oldObj, obj interface{}) {
+				UpdateFunc: func(_, obj interface{}) {
 					for _, event := range repository.onAddedOrModified(obj) {
 						theChannel <- event
 					}
@@ -105,7 +105,10 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 					}
 				},
 			}
-			s.AddEventHandler(handlers)
+			_, addEventHandlerErr := s.AddEventHandler(handlers)
+			if addEventHandlerErr != nil {
+				return
+			}
 			s.Run(stopCh)
 		}(stopCh, informer.Informer())
 		sigCh := make(chan os.Signal, 1)

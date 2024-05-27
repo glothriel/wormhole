@@ -7,17 +7,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AppStateManager is an interface for managing the state of apps
 type AppStateManager interface {
 	Changes() chan AppStateChange
 }
 
+// AppStateChange is a struct that represents a change in the app state
 type AppStateChange struct {
 	App   peers.App
 	State string
 }
 
 const (
-	AppStateChangeAdded     string = "added"
+	// AppStateChangeAdded represents an app being added
+	AppStateChangeAdded string = "added"
+	// AppStateChangeWithdrawn represents an app being withdrawn
 	AppStateChangeWithdrawn string = "withdrawn"
 )
 

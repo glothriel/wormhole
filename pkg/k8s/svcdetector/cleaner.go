@@ -1,3 +1,4 @@
+// Package svcdetector orchestrates kubernetes integration
 package svcdetector
 
 import (

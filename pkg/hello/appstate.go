@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AppStateChangeGenerator is a generator that listens for changes in the app state and generates events
 type AppStateChangeGenerator struct {
 	peerApps map[string][]peers.App
 
@@ -15,7 +16,8 @@ type AppStateChangeGenerator struct {
 	lock    sync.Mutex
 }
 
-func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr error) {
+// OnSync is called when a sync message is received
+func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App) {
 	logrus.Debugf("Received sync from %s with %d apps", peer, len(apps))
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -76,13 +78,14 @@ func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App, syncErr 
 	}
 
 	s.peerApps[peer] = apps
-
 }
 
+// Changes returns the channel where changes are sent
 func (s *AppStateChangeGenerator) Changes() chan svcdetector.AppStateChange {
 	return s.changes
 }
 
+// NewAppStateChangeGenerator creates a new AppStateChangeGenerator
 func NewAppStateChangeGenerator() *AppStateChangeGenerator {
 	return &AppStateChangeGenerator{
 		peerApps: make(map[string][]peers.App),

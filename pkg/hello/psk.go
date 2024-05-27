@@ -49,6 +49,8 @@ func (t *pskPairingServerTransport) Requests() <-chan IncomingPairingRequest {
 	return theChan
 }
 
+// NewPSKPairingServerTransport creates a new PairingServerTransport, that encrypts and
+// decrypts requests using the provided pre-shared key (psk).
 func NewPSKPairingServerTransport(psk string, child PairingServerTransport) PairingServerTransport {
 	return &pskPairingServerTransport{
 		child: child,
@@ -75,9 +77,10 @@ func (t *pskPairingClientTransport) Send(req []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to decrypt response: %v", aesError)
 	}
 	return decrypted, nil
-
 }
 
+// NewPSKClientPairingTransport creates a new PairingClientTransport, that encrypts and
+// decrypts requests using the provided pre-shared key (psk).
 func NewPSKClientPairingTransport(psk string, child PairingClientTransport) PairingClientTransport {
 	return &pskPairingClientTransport{
 		child: child,

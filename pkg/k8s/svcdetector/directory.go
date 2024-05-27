@@ -39,12 +39,10 @@ func parseAppFromPath(fs afero.Fs, path string) (peers.App, error) {
 		OriginalPort: app.OriginalPort,
 		TargetLabels: app.TargetLabels,
 	}, nil
-
 }
 
-// This is used for integration tests
-func NewDirectoryMonitoringAppStateManager(location string, fs afero.Fs) AppStateManager {
-
+// NewDirectoryMonitoringAppStateManager is used for integration testing
+func NewDirectoryMonitoringAppStateManager(location string, fs afero.Fs) AppStateManager { // nolint: gocognit
 	changesChan := make(chan AppStateChange)
 	lastReadFiles := make(map[string]peers.App)
 	ticker := time.NewTicker(5 * time.Second)
@@ -54,7 +52,7 @@ func NewDirectoryMonitoringAppStateManager(location string, fs afero.Fs) AppStat
 			select {
 			case <-ticker.C:
 				files := make(map[string]peers.App)
-				afero.Walk(fs, location, func(path string, info os.FileInfo, err error) error {
+				if walkErr := afero.Walk(fs, location, func(path string, _ os.FileInfo, err error) error {
 					if err == nil {
 						app, err := parseAppFromPath(fs, path)
 						if err != nil {
@@ -64,7 +62,10 @@ func NewDirectoryMonitoringAppStateManager(location string, fs afero.Fs) AppStat
 						files[path] = app
 					}
 					return nil
-				})
+				}); walkErr != nil {
+					logrus.Errorf("Failed to walk directory: %v", walkErr)
+					continue
+				}
 
 				for file := range files {
 					if _, ok := lastReadFiles[file]; !ok {

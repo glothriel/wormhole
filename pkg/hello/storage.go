@@ -11,8 +11,10 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// ErrPeerDoesNotExist is returned when a peer does not exist yet
 var ErrPeerDoesNotExist = errors.New("peer does not exist")
 
+// PeerStorage is an interface for storing and retrieving peers
 type PeerStorage interface {
 	Store(PeerInfo) error
 	GetByName(string) (PeerInfo, error)
@@ -50,6 +52,7 @@ func (s *inMemoryPeerStorage) DeleteByName(name string) error {
 	return nil
 }
 
+// NewInMemoryPeerStorage creates a new in-memory PeerStorage instance
 func NewInMemoryPeerStorage() PeerStorage {
 	return &inMemoryPeerStorage{}
 }
@@ -111,18 +114,22 @@ func (s *boltPeerStorage) DeleteByName(name string) error {
 	})
 }
 
+// NewBoltPeerStorage creates a new BoltDB (persistent, on-disk storage) PeerStorage instance
 func NewBoltPeerStorage(path string) PeerStorage {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		logrus.Panicf("failed to open bolt db: %v", err)
 	}
-	db.Update(func(tx *bolt.Tx) error {
+	if updateErr := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("peers"))
 		return err
-	})
+	}); updateErr != nil {
+		logrus.Panicf("failed to create BoltDB bucket: %v", updateErr)
+	}
 	return &boltPeerStorage{db: db}
 }
 
+// AppSource is an interface for listing apps
 type AppSource interface {
 	List() ([]peers.App, error)
 }
@@ -157,6 +164,7 @@ func (s *inMemoryAppStorage) List() ([]peers.App, error) {
 	return apps, nil
 }
 
+// NewInMemoryAppStorage creates a new in-memory AppSource instance
 func NewInMemoryAppStorage() AppSource {
 	return &inMemoryAppStorage{}
 }

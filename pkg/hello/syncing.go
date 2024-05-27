@@ -7,21 +7,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// IncomingSyncRequest is a struct that represents raw incoming sync requests
 type IncomingSyncRequest struct {
 	Request  []byte
 	Response chan []byte
 	Err      chan error
 }
 
+// SyncClientTransport is an interface for syncing clients transport. Example implementations
+// can be http, grpc, etc.
 type SyncClientTransport interface {
 	Sync([]byte) ([]byte, error)
 }
 
+// SyncServerTransport is an interface for syncing servers transport, similar to SyncClientTransport
 type SyncServerTransport interface {
 	Syncs() <-chan IncomingSyncRequest
 	Metadata() map[string]string
 }
 
+// SyncingServer orchestrates all the operations that are performed server-side
+// when executing app list synchronizations
 type SyncingServer struct {
 	myName         string
 	stateGenerator *AppStateChangeGenerator
@@ -33,6 +39,7 @@ type SyncingServer struct {
 	peers     PeerStorage
 }
 
+// Start starts the syncing server
 func (s *SyncingServer) Start() {
 	for incomingSync := range s.transport.Syncs() {
 		msg, decodeErr := s.encoder.Decode(incomingSync.Request)
@@ -48,7 +55,6 @@ func (s *SyncingServer) Start() {
 		s.stateGenerator.OnSync(
 			peer.Name,
 			msg.Apps,
-			nil,
 		)
 		apps, listErr := s.apps.List()
 		if listErr != nil {
@@ -70,6 +76,7 @@ func (s *SyncingServer) Start() {
 	}
 }
 
+// NewSyncingServer creates a new SyncingServer instance
 func NewSyncingServer(
 	myName string,
 	stateGenerator *AppStateChangeGenerator,
@@ -88,6 +95,8 @@ func NewSyncingServer(
 	}
 }
 
+// SyncingClient is a struct that orchestrates all the operations that are performed client-side
+// when executing app list synchronizations
 type SyncingClient struct {
 	myName       string
 	nginxAdapter *AppStateChangeGenerator
@@ -97,9 +106,9 @@ type SyncingClient struct {
 	transport    SyncClientTransport
 }
 
+// Start starts the syncing client
 func (c *SyncingClient) Start() error {
 	for {
-
 		time.Sleep(c.interval)
 		apps, listErr := c.apps.List()
 		if listErr != nil {
@@ -127,11 +136,11 @@ func (c *SyncingClient) Start() error {
 		c.nginxAdapter.OnSync(
 			decodedMsg.Peer,
 			decodedMsg.Apps,
-			nil,
 		)
 	}
 }
 
+// NewSyncingClient creates a new SyncingClient instance
 func NewSyncingClient(
 	myName string,
 	nginxAdapter *AppStateChangeGenerator,
@@ -150,6 +159,7 @@ func NewSyncingClient(
 	}
 }
 
+// NewHTTPSyncingClient creates a new SyncingClient instance with HTTP transport
 func NewHTTPSyncingClient(
 	myName string,
 	nginxAdapter *AppStateChangeGenerator,
@@ -172,5 +182,4 @@ func NewHTTPSyncingClient(
 		apps,
 		transport,
 	), nil
-
 }

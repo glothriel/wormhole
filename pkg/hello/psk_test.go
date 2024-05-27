@@ -19,5 +19,4 @@ func TestEncryptDecrypt(t *testing.T) {
 	assert.NoError(t, encryptErr)
 	assert.NoError(t, decryptErr)
 	assert.Equal(t, plaintext, string(decryptedPlaintext))
-
 }
