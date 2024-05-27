@@ -343,7 +343,7 @@ class Helm:
                 namespace or name,
                 name,
                 "kubernetes/helm",
-                "-wait ",
+                "--wait",
                 "--timeout", timeout,
                 "--set",
                 "client.pullPolicy=Never",
