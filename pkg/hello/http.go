@@ -28,8 +28,9 @@ func NewHTTPServerPairingTransport(server *http.Server) PairingServerTransport {
 		var req IncomingPairingRequest
 		req.Request = make([]byte, r.ContentLength)
 		_, readErr := r.Body.Read(req.Request)
-		if readErr != nil {
-			http.Error(w, readErr.Error(), http.StatusInternalServerError)
+		if readErr != nil && readErr != io.EOF {
+			logrus.Errorf("Failed to read request body: %v", readErr)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		req.Response = make(chan []byte)
@@ -39,10 +40,14 @@ func NewHTTPServerPairingTransport(server *http.Server) PairingServerTransport {
 		case resp := <-req.Response:
 			_, writeErr := w.Write(resp)
 			if writeErr != nil {
-				http.Error(w, writeErr.Error(), http.StatusInternalServerError)
+				logrus.Errorf("Failed to write response body: %v", writeErr)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
 			}
 		case err := <-req.Err:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logrus.Errorf(
+				"Failed to process request: %v", err,
+			)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
 	})
 	server.Handler = router
@@ -65,15 +70,15 @@ type httpClientPairingTransport struct {
 
 func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 	postURL := t.serverURL + "/pairing"
-	resp, err := t.client.Post(postURL, "application/octet-stream", bytes.NewReader(req))
-	if err != nil {
-		return nil, err
+	resp, postErr := t.client.Post(postURL, "application/octet-stream", bytes.NewReader(req))
+	if postErr != nil {
+		return nil, postErr
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody := make([]byte, resp.ContentLength)
 		_, readErr := resp.Body.Read(respBody)
-		if readErr != nil {
+		if readErr != nil && readErr != io.EOF {
 			logrus.Errorf("Failed to read response body: %v", readErr)
 		}
 		return nil, fmt.Errorf(
@@ -83,9 +88,9 @@ func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 			string(respBody),
 		)
 	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	respBody, readAllErr := io.ReadAll(resp.Body)
+	if readAllErr != nil {
+		return nil, readAllErr
 	}
 	return respBody, nil
 }
@@ -121,7 +126,7 @@ func NewHTTPServerSyncingTransport(server *http.Server) SyncServerTransport {
 		var req IncomingSyncRequest
 		req.Request = make([]byte, r.ContentLength)
 		_, readErr := r.Body.Read(req.Request)
-		if readErr != nil {
+		if readErr != nil && readErr != io.EOF {
 			http.Error(w, readErr.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -167,7 +172,7 @@ func (t *httpClientSyncingTransport) Sync(req []byte) ([]byte, error) {
 	}
 	respBody := make([]byte, resp.ContentLength)
 	_, readErr := resp.Body.Read(respBody)
-	if readErr != nil {
+	if readErr != nil && readErr != io.EOF {
 		return nil, readErr
 	}
 	return respBody, nil
