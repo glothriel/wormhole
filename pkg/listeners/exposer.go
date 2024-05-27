@@ -1,3 +1,4 @@
+// Package listeners exposes
 package listeners
 
 import (
@@ -6,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Exposer reacts to changes in the app state and perform necessary actions like opening sockets,
+// creating kube services, etc.
 type Exposer interface {
 	Add(app peers.App) (peers.App, error)
 	Withdraw(app peers.App) error
@@ -19,7 +22,7 @@ func (e *noOpExposer) Add(app peers.App) (peers.App, error) {
 	return app, nil
 }
 
-func (e *noOpExposer) Withdraw(app peers.App) error {
+func (e *noOpExposer) Withdraw(_ peers.App) error {
 	return nil
 }
 
@@ -27,16 +30,19 @@ func (e *noOpExposer) WithdrawAll() error {
 	return nil
 }
 
+// NewNoOpExposer creates a new no-op exposer
 func NewNoOpExposer() Exposer {
 	return &noOpExposer{}
 }
 
+// Registry is a registry of apps, that also listens for changes in the app state and triggers the exposer
 type Registry struct {
 	Exposer Exposer
 	apps    []peers.App
 }
 
-func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
+// Watch listens for changes in the app state and triggers the exposer
+func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) { // nolint: gocognit
 	for {
 		select {
 		case appStageChange := <-c:
@@ -65,14 +71,15 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) {
 		case <-done:
 			return
 		}
-
 	}
 }
 
+// List returns the list of apps
 func (g *Registry) List() ([]peers.App, error) {
 	return g.apps, nil
 }
 
+// NewApps creates a new registry of apps
 func NewApps(r Exposer) *Registry {
 	return &Registry{
 		Exposer: r,

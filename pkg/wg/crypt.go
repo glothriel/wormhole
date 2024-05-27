@@ -1,3 +1,4 @@
+// Package wg implements wormhole integration with WireGuard
 package wg
 
 import (
@@ -16,17 +17,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// generateKeyPair generates a new private/public key pair.
-func generateKeyPair() ([32]byte, [32]byte, error) {
-	// Those are base64 - encoded keys
-	private, public, generateErr := GetOrGenerateKeyPair(NewNoStorage())
-	if generateErr != nil {
-		return [32]byte{}, [32]byte{}, generateErr
-	}
-
-	return ConvertFromString(private, public)
-}
-
+// ConvertFromString decodes base64 encoded private and public keys.
 func ConvertFromString(private, public string) ([32]byte, [32]byte, error) {
 	// decode base64 keys
 	var privateKey, publicKey [32]byte
@@ -136,6 +127,7 @@ func decrypt(ciphertext []byte, encryptionKey, authenticationKey [32]byte) ([]by
 	return payload, nil
 }
 
+// Encrypt encrypts the payload using the provided private and public keys.
 func Encrypt(payload []byte, private, public string) ([]byte, error) {
 	privateKey, publicKey, err := ConvertFromString(private, public)
 	if err != nil {
@@ -152,6 +144,7 @@ func Encrypt(payload []byte, private, public string) ([]byte, error) {
 	return encrypt(payload, encryptionKey, authenticationKey)
 }
 
+// Decrypt decrypts the ciphertext using the provided private and public keys.
 func Decrypt(ciphertext []byte, private, public string) ([]byte, error) {
 	privateKey, publicKey, err := ConvertFromString(private, public)
 	if err != nil {

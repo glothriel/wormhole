@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
+// PortAllocator is responsible for allocating and returning ports.
 type PortAllocator interface {
 	Allocate() (int, error)
 	Return(int)
@@ -19,6 +22,7 @@ type rangePortAllocator struct {
 	lock  sync.Mutex
 }
 
+// Allocate returns the next available port in the range.
 func (r *rangePortAllocator) Allocate() (int, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -32,6 +36,7 @@ func (r *rangePortAllocator) Allocate() (int, error) {
 	return 0, errors.New("no ports available")
 }
 
+// Return returns the port to the pool of available ports.
 func (r *rangePortAllocator) Return(port int) {
 	delete(r.used, port)
 }
@@ -41,6 +46,7 @@ type validatingRangePortAllocator struct {
 	child PortAllocator
 }
 
+// Allocate returns the next available port in the range that is physically open for listening.
 func (v *validatingRangePortAllocator) Allocate() (int, error) {
 	for {
 		port, err := v.child.Allocate()
@@ -51,13 +57,13 @@ func (v *validatingRangePortAllocator) Allocate() (int, error) {
 		// Check if the port is physically open for listening
 		if isPortOpen(port) {
 			return port, nil
-		} else {
-			// If not open, return it and try another
-			v.child.Return(port)
 		}
+		// If not open, return it and try another
+		v.child.Return(port)
 	}
 }
 
+// Return returns the port to the pool of available ports.
 func (v *validatingRangePortAllocator) Return(port int) {
 	v.child.Return(port)
 }
@@ -68,10 +74,13 @@ func isPortOpen(port int) bool {
 	if err != nil {
 		return false
 	}
-	ln.Close()
+	if closeErr := ln.Close(); closeErr != nil {
+		logrus.Errorf("Failed to close listener: %v", closeErr)
+	}
 	return true
 }
 
+// NewRangePortAllocator creates a new port allocator that allocates ports in the given range.
 func NewRangePortAllocator(start, end int) PortAllocator {
 	return &validatingRangePortAllocator{
 		child: &rangePortAllocator{

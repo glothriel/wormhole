@@ -30,8 +30,7 @@ func getAppStateChangeGenerator(c *cli.Context) svcdetector.AppStateManager {
 			c.String(stateManagerPathFlag.Name),
 			afero.NewOsFs(),
 		)
-	} else {
-		logrus.Fatalf("No state manager specified, use --%s or --%s", kubernetesFlag.Name, stateManagerPathFlag.Name)
-		return nil
 	}
+	logrus.Fatalf("No state manager specified, use --%s or --%s", kubernetesFlag.Name, stateManagerPathFlag.Name)
+	return nil
 }

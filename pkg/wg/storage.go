@@ -9,6 +9,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// KeyStorage is responsible for storing and loading WireGuard key pair
 type KeyStorage interface {
 	Store(private, public string) error
 	Load() (private, public string, err error)
@@ -37,20 +38,22 @@ func (s *boltDbKeyStorage) Load() (private, public string, err error) {
 	})
 	if private == "" || public == "" {
 		return "", "", errors.New("no keys stored")
-
 	}
 	return private, public, err
 }
 
+// NewBoltKeyStorage creates a new KeyStorage that stores keys in a BoltDB database
 func NewBoltKeyStorage(path string) KeyStorage {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		logrus.Panicf("failed to open bolt db: %v", err)
 	}
-	db.Update(func(tx *bolt.Tx) error {
+	if updateErr := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("keys"))
 		return err
-	})
+	}); updateErr != nil {
+		logrus.Panicf("failed to create bucket: %v", updateErr)
+	}
 	return &boltDbKeyStorage{db}
 }
 
@@ -72,22 +75,25 @@ func (s *inMemoryKeyStorage) Load() (private, public string, err error) {
 
 type noStorage struct{}
 
-func (s *noStorage) Store(private, public string) error {
+func (s *noStorage) Store(_, _ string) error {
 	return nil
 }
 
-func (s *noStorage) Load() (private, public string, err error) {
+func (s *noStorage) Load() (_, _ string, err error) {
 	return "", "", errors.New("no storage")
 }
 
+// NewNoStorage creates a new KeyStorage that does not store keys
 func NewNoStorage() KeyStorage {
 	return &noStorage{}
 }
 
+// NewInMemoryKeyStorage creates a new KeyStorage that stores keys in memory
 func NewInMemoryKeyStorage() KeyStorage {
 	return &inMemoryKeyStorage{}
 }
 
+// GetOrGenerateKeyPair returns the stored key pair or generates a new one
 func GetOrGenerateKeyPair(storage KeyStorage) (string, string, error) {
 	private, public, err := storage.Load()
 	if err == nil {

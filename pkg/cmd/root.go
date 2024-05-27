@@ -46,7 +46,7 @@ func Run() {
 		},
 
 		Before: setLogLevel,
-		ExitErrHandler: func(context *cli.Context, theErr error) {
+		ExitErrHandler: func(_ *cli.Context, _ error) {
 			if logrus.GetLevel() != logrus.DebugLevel {
 				logrus.Error(
 					"Wormhole command failed. For verbose output, please use `wormhole --debug <your-command>`",

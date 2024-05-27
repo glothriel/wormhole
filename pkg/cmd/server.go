@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/glothriel/wormhole/pkg/api"
 
@@ -131,7 +132,8 @@ var listenCommand *cli.Command = &cli.Command{
 			})
 		}
 		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
-			Addr: fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
+			Addr:              fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
+			ReadHeaderTimeout: time.Second * 5,
 		})
 
 		appSource := hello.NewAddressEnrichingAppSource(
@@ -153,7 +155,8 @@ var listenCommand *cli.Command = &cli.Command{
 			return fmt.Errorf("failed to bootstrap wireguard config: %w", updateErr)
 		}
 		peerTransport := hello.NewHTTPServerPairingTransport(&http.Server{
-			Addr: c.String(extServerListenAddress.Name),
+			Addr:              c.String(extServerListenAddress.Name),
+			ReadHeaderTimeout: time.Second * 5,
 		})
 		if c.String(inviteTokenFlag.Name) != "" {
 			peerTransport = hello.NewPSKPairingServerTransport(

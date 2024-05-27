@@ -1,3 +1,4 @@
+// Package nginx implements wormhole integration with NGINX as a proxy server.
 package nginx
 
 import (
@@ -12,7 +13,8 @@ import (
 	"github.com/spf13/afero"
 )
 
-type NginxExposer struct {
+// Exposer is an Exposer implementation that uses NGINX as a proxy server
+type Exposer struct {
 	prefix string
 	path   string
 	fs     afero.Fs
@@ -21,7 +23,8 @@ type NginxExposer struct {
 	ports    PortAllocator
 }
 
-func (n *NginxExposer) Add(app peers.App) (peers.App, error) {
+// Add implements listeners.Exposer
+func (n *Exposer) Add(app peers.App) (peers.App, error) {
 	port, portErr := n.ports.Allocate()
 	if portErr != nil {
 		return peers.App{}, fmt.Errorf("Could not allocate port: %v", portErr)
@@ -46,7 +49,6 @@ server {
 		server.ProxyPass,
 	)), 0644); writeErr != nil {
 		logrus.Errorf("Could not write NGINX config file: %v", writeErr)
-
 	} else {
 		logrus.Infof("Created NGINX config file %s", server.File)
 	}
@@ -57,7 +59,8 @@ server {
 	return peers.WithAddress(app, fmt.Sprintf("localhost:%d", port)), nil
 }
 
-func (n *NginxExposer) Withdraw(app peers.App) error {
+// Withdraw implements listeners.Exposer
+func (n *Exposer) Withdraw(app peers.App) error {
 	path := path.Join(n.path, nginxConfigPath(n.prefix, app))
 	removeErr := n.fs.Remove(path)
 
@@ -68,7 +71,6 @@ func (n *NginxExposer) Withdraw(app peers.App) error {
 			return fmt.Errorf("Could not remove NGINX config file: %v", removeErr)
 		}
 	} else {
-
 		logrus.Infof("Removed NGINX config file %s", path)
 	}
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
@@ -77,7 +79,8 @@ func (n *NginxExposer) Withdraw(app peers.App) error {
 	return nil
 }
 
-func (n *NginxExposer) WithdrawAll() error {
+// WithdrawAll implements listeners.Exposer
+func (n *Exposer) WithdrawAll() error {
 	filesToClean := make([]string, 0)
 	if walkErr := afero.Walk(n.fs, n.path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -113,9 +116,10 @@ func (n *NginxExposer) WithdrawAll() error {
 	return nil
 }
 
+// NewNginxExposer creates a new NGINX exposer
 func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortAllocator) listeners.Exposer {
 	fs := afero.NewOsFs()
-	cg := &NginxExposer{
+	cg := &Exposer{
 		path:   path,
 		prefix: confPrefix,
 		fs:     fs,

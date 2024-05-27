@@ -36,7 +36,8 @@ var kubernetesNamespaceFlag *cli.StringFlag = &cli.StringFlag{
 var kubernetesLabelsFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "kubernetes-labels",
 	Value: "",
-	Usage: "Labels that will be set on proxy service, must match the labels of wormhole server pod. Format: key1=value1,key2=value2",
+	Usage: ("Labels that will be set on proxy service, must match the labels of wormhole server pod. " +
+		"Format: key1=value1,key2=value2"),
 }
 
 var stateManagerPathFlag *cli.StringFlag = &cli.StringFlag{

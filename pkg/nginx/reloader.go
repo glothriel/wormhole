@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/go-ps"
 )
 
+// Reloader is an interface that allows to reload nginx server
 type Reloader interface {
 	Reload() error
 }
@@ -27,7 +28,6 @@ func (r *lowestMatchingProcessIDReloader) Reload() error {
 		if process.Executable() == "nginx" && process.Pid() < nginxMasterPid {
 			nginxMasterPid = process.Pid()
 		}
-
 	}
 	if nginxMasterPid == max {
 		return errors.New("no nginx process found")
@@ -54,6 +54,7 @@ func (r *retryingReloader) Reload() error {
 	)
 }
 
+// NewRetryingReloader creates a new RetryingReloader
 func NewRetryingReloader(child Reloader, tries int) Reloader {
 	return &retryingReloader{
 		child: child,
@@ -61,10 +62,12 @@ func NewRetryingReloader(child Reloader, tries int) Reloader {
 	}
 }
 
+// NewPidBasedReloader creates a new PidBasedReloader
 func NewPidBasedReloader() Reloader {
 	return &lowestMatchingProcessIDReloader{}
 }
 
+// NewDefaultReloader creates a pre-configured reloader, that is retrying 10 times
 func NewDefaultReloader() Reloader {
 	return NewRetryingReloader(NewPidBasedReloader(), 10)
 }

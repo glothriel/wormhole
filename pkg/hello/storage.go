@@ -40,7 +40,7 @@ func (s *inMemoryPeerStorage) GetByName(name string) (PeerInfo, error) {
 
 func (s *inMemoryPeerStorage) List() ([]PeerInfo, error) {
 	var peers []PeerInfo
-	s.peers.Range(func(_, value interface{}) bool {
+	s.peers.Range(func(_, value any) bool {
 		peers = append(peers, value.(PeerInfo))
 		return true
 	})
@@ -157,7 +157,7 @@ func (s *inMemoryAppStorage) Get(peer string, name string) (peers.App, error) {
 
 func (s *inMemoryAppStorage) List() ([]peers.App, error) {
 	var apps []peers.App
-	s.apps.Range(func(_, value interface{}) bool {
+	s.apps.Range(func(_, value any) bool {
 		apps = append(apps, value.(peers.App))
 		return true
 	})

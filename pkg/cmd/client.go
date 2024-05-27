@@ -1,3 +1,4 @@
+// Package cmd provides the command line interface for the wormhole application
 package cmd
 
 import (
@@ -134,8 +135,7 @@ var joinCommand *cli.Command = &cli.Command{
 		if scErr != nil {
 			logrus.Fatalf("Failed to create syncing client: %v", scErr)
 		}
-		sc.Start()
 
-		return nil
+		return sc.Start()
 	},
 }

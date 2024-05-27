@@ -1,3 +1,4 @@
+// Package k8s implements exposer for kubernetes services
 package k8s
 
 import (
@@ -68,14 +69,18 @@ func (factory *k8sServiceExposer) Add(app peers.App) (peers.App, error) {
 		logrus.Debugf("Creating service %s", serviceName)
 		_, upsertErr = servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
 	} else if getErr != nil {
-		return peers.App{}, multierr.Combine(fmt.Errorf("Could not get service %s: %v", serviceName, getErr), factory.Withdraw(addedApp))
+		return peers.App{}, multierr.Combine(
+			fmt.Errorf("Could not get service %s: %v", serviceName, getErr), factory.Withdraw(addedApp),
+		)
 	} else {
 		logrus.Debugf("Updating service %s", serviceName)
 		service.SetResourceVersion(previousService.GetResourceVersion())
 		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
 	}
 	if upsertErr != nil {
-		return peers.App{}, multierr.Combine(fmt.Errorf("Unable to upsert the service: %v", upsertErr), factory.Withdraw(addedApp))
+		return peers.App{}, multierr.Combine(
+			fmt.Errorf("Unable to upsert the service: %v", upsertErr), factory.Withdraw(addedApp),
+		)
 	}
 	return peers.WithAddress(addedApp, fmt.Sprintf("%s.%s:%d", serviceName, factory.namespace, app.OriginalPort)), nil
 }

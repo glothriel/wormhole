@@ -2,8 +2,10 @@ package peers
 
 import "sync"
 
+// Peer represents a peer in the network (either a client or a server)
 type Peer string
 
+// Registry is an interface for managing peers
 type Registry interface {
 	Add(Peer)
 	Exists(Peer) bool
@@ -30,13 +32,14 @@ func (r *registry) Remove(peer Peer) {
 
 func (r *registry) List() []Peer {
 	peers := make([]Peer, 0)
-	r.data.Range(func(key, value interface{}) bool {
+	r.data.Range(func(key, _ any) bool {
 		peers = append(peers, key.(Peer))
 		return true
 	})
 	return peers
 }
 
+// NewRegistry creates a new registry of peers
 func NewRegistry() Registry {
 	return &registry{}
 }

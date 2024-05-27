@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+// Peer represents a single WireGuard peer in the configuration
 type Peer struct {
 	PublicKey  string
 	AllowedIPs string
@@ -19,6 +20,7 @@ type Peer struct {
 	PersistentKeepalive int
 }
 
+// Config represents the WireGuard configuration
 type Config struct {
 	Address    string
 	Subnet     string
@@ -30,6 +32,7 @@ type Config struct {
 	Peers []Peer
 }
 
+// Upsert adds or replaces a peer in the configuration
 func (c *Config) Upsert(p Peer) {
 	// Replace if AllowedIPs is the same
 	for i, peer := range c.Peers {
@@ -39,10 +42,10 @@ func (c *Config) Upsert(p Peer) {
 			return
 		}
 	}
-
 	c.Peers = append(c.Peers, p)
 }
 
+// DeleteByPublicKey removes a peer from the configuration by its public key
 func (c *Config) DeleteByPublicKey(publicKey string) {
 	for i, peer := range c.Peers {
 		if peer.PublicKey == publicKey {
@@ -52,7 +55,7 @@ func (c *Config) DeleteByPublicKey(publicKey string) {
 	}
 }
 
-var theTemplate string = `[Interface]
+var theTemplate = `[Interface]
 Address = {{.Address}}/{{.Subnet}}
 {{if .ListenPort}}ListenPort = {{.ListenPort}}{{end}}
 PrivateKey = {{.PrivateKey}}
@@ -66,6 +69,7 @@ AllowedIPs = {{ .AllowedIPs }}
 {{end}}
 `
 
+// RenderTemplate renders the WireGuard configuration template with the given settings
 func RenderTemplate(settings Config) (string, error) {
 	tmpl, parseErr := template.New("greeting").Parse(theTemplate)
 	if parseErr != nil {
@@ -81,12 +85,14 @@ func RenderTemplate(settings Config) (string, error) {
 	return buffer.String(), nil
 }
 
+// Watcher watches for changes in the WireGuard configuration and updates it
 type Watcher struct {
 	path                string
 	fs                  afero.Fs
 	lastWrittenTemplate string
 }
 
+// Update updates the WireGuard configuration with the given settings
 func (w *Watcher) Update(settings Config) error {
 	content, renderErr := RenderTemplate(settings)
 	if renderErr != nil {
@@ -104,6 +110,7 @@ func (w *Watcher) Update(settings Config) error {
 	return nil
 }
 
+// NewWatcher creates a new Watcher instance
 func NewWatcher(cfgPath string) *Watcher {
 	fs := &afero.Afero{Fs: afero.NewOsFs()}
 	createErr := fs.MkdirAll(filepath.Dir(cfgPath), 0700)
