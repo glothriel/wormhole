@@ -335,7 +335,7 @@ class Helm:
     def __init__(self, cluster):
         self.cluster = cluster
 
-    def install(self, name, values, namespace=None):
+    def install(self, name, values, namespace=None, timeout='2m'):
         self.run(
             [
                 "install",
@@ -343,6 +343,8 @@ class Helm:
                 namespace or name,
                 name,
                 "kubernetes/helm",
+                "-wait ",
+                "--timeout", timeout,
                 "--set",
                 "client.pullPolicy=Never",
                 "--set",

@@ -33,7 +33,7 @@ func (s *inMemoryPeerStorage) GetByName(name string) (PeerInfo, error) {
 	if peer, ok := s.peers.Load(name); ok {
 		return peer.(PeerInfo), nil
 	}
-	return PeerInfo{}, fmt.Errorf("peer with name %s not found", name)
+	return PeerInfo{}, ErrPeerDoesNotExist
 }
 
 func (s *inMemoryPeerStorage) List() ([]PeerInfo, error) {
