@@ -1,3 +1,5 @@
+// Package hello provides the protocol between the client and the server.
+// Ultimately it should be split into two packages, one for peering, one for syncing.
 package hello
 
 import (
@@ -24,6 +26,7 @@ func (s *peerEnrichingAppSource) List() ([]peers.App, error) {
 	return newApps, nil
 }
 
+// NewPeerEnrichingAppSource creates a new AppSource that enriches the apps with the given peer
 func NewPeerEnrichingAppSource(peer string, child AppSource) AppSource {
 	return &peerEnrichingAppSource{
 		peer:  peer,
@@ -54,6 +57,7 @@ func (s *addressEnrichingAppSource) List() ([]peers.App, error) {
 	return newApps, nil
 }
 
+// NewAddressEnrichingAppSource creates a new AppSource that enriches the apps with the given hostname
 func NewAddressEnrichingAppSource(hostname string, child AppSource) AppSource {
 	return &addressEnrichingAppSource{
 		hostname: hostname,

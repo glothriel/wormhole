@@ -6,7 +6,8 @@ import (
 	"github.com/glothriel/wormhole/pkg/peers"
 )
 
-type Marshaler interface {
+// PairingEncoder is an interface for encoding and decoding pairing requests and responses
+type PairingEncoder interface {
 	EncodeRequest(PairingRequest) ([]byte, error)
 	DecodeRequest([]byte) (PairingRequest, error)
 
@@ -36,15 +37,18 @@ func (e *jsonPairingEncoder) DecodeResponse(data []byte) (PairingResponse, error
 	return resp, err
 }
 
-func NewJSONPairingEncoder() Marshaler {
+// NewJSONPairingEncoder creates a new PairingEncoder instance
+func NewJSONPairingEncoder() PairingEncoder {
 	return &jsonPairingEncoder{}
 }
 
+// SyncingMessage is a message that contains a list of apps and the peer that sent them
 type SyncingMessage struct {
 	Peer string
 	Apps []peers.App
 }
 
+// SyncingEncoder is an interface for encoding and decoding syncing messages
 type SyncingEncoder interface {
 	Encode(SyncingMessage) ([]byte, error)
 	Decode([]byte) (SyncingMessage, error)
@@ -62,6 +66,7 @@ func (e *jsonSyncingEncoder) Decode(data []byte) (SyncingMessage, error) {
 	return msg, err
 }
 
-func NewJSONSyncEncoder() SyncingEncoder {
+// NewJSONSyncingEncoder creates a new SyncingEncoder instance
+func NewJSONSyncingEncoder() SyncingEncoder {
 	return &jsonSyncingEncoder{}
 }

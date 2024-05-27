@@ -7,7 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type reservedAddressLister interface {
+// ReservedAddressLister is an interface for listing reserved addresses
+type ReservedAddressLister interface {
 	ReservedAddresses() ([]string, error)
 }
 
@@ -21,22 +22,21 @@ func (p *ipPool) Next() (string, error) {
 	defer p.lock.Unlock()
 	i := p.previous.To4()
 	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
-	v += 1
+	v++
 	v3 := byte(v & 0xFF)
 	v2 := byte((v >> 8) & 0xFF)
 	v1 := byte((v >> 16) & 0xFF)
 	v0 := byte((v >> 24) & 0xFF)
 	p.previous = net.IPv4(v0, v1, v2, v3)
 	return p.previous.String(), nil
-
 }
 
-type reservedAddressesValidatingIpPool struct {
+type reservedAddressesValidatingIPPool struct {
 	child             IPPool
-	reservedAddresses reservedAddressLister
+	reservedAddresses ReservedAddressLister
 }
 
-func (p *reservedAddressesValidatingIpPool) Next() (string, error) {
+func (p *reservedAddressesValidatingIPPool) Next() (string, error) {
 	for {
 		ip, err := p.child.Next()
 		if err != nil {
@@ -61,12 +61,13 @@ func (p *reservedAddressesValidatingIpPool) Next() (string, error) {
 	}
 }
 
-func NewIPPool(starting string, reserved reservedAddressLister) IPPool {
+// NewIPPool creates a new IP pool
+func NewIPPool(starting string, reserved ReservedAddressLister) IPPool {
 	ip := net.ParseIP(starting)
 	if ip == nil {
 		logrus.Panicf("Invalid IP address passed as starting to IP pool: %s", starting)
 	}
-	return &reservedAddressesValidatingIpPool{
+	return &reservedAddressesValidatingIPPool{
 		child:             &ipPool{previous: ip},
 		reservedAddresses: reserved,
 	}
@@ -88,6 +89,7 @@ func (s *storageToReservedAddressListerAdapter) ReservedAddresses() ([]string, e
 	return ips, nil
 }
 
-func NewReservedAddressLister(storage PeerStorage) reservedAddressLister {
+// NewReservedAddressLister creates a new reserved address lister
+func NewReservedAddressLister(storage PeerStorage) ReservedAddressLister {
 	return &storageToReservedAddressListerAdapter{storage: storage}
 }

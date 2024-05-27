@@ -7,16 +7,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// PairingClient is a client that can pair with a server
 type PairingClient struct {
 	clientName string
 	keyPair    KeyPair
 	wgConfig   *wg.Config
 
 	wgReloader WireguardConfigReloader
-	encoder    Marshaler
+	encoder    PairingEncoder
 	transport  PairingClientTransport
 }
 
+// Pair sends a pairing request to the server and returns the response
 func (c *PairingClient) Pair() (PairingResponse, error) {
 	request := PairingRequest{
 		Name: c.clientName,
@@ -46,19 +48,17 @@ func (c *PairingClient) Pair() (PairingResponse, error) {
 		AllowedIPs:          fmt.Sprintf("%s/32,%s/32", decoded.InternalServerIP, decoded.AssignedIP),
 		PersistentKeepalive: 10,
 	})
-	c.wgReloader.Update(*c.wgConfig)
 
-	return decoded, nil
-
+	return decoded, c.wgReloader.Update(*c.wgConfig)
 }
 
+// NewPairingClient creates a new PairingClient instance
 func NewPairingClient(
 	clientName string,
-	serverURL string,
 	wgConfig *wg.Config,
 	keyPair KeyPair,
 	wgReloader WireguardConfigReloader,
-	encoder Marshaler,
+	encoder PairingEncoder,
 	transport PairingClientTransport,
 ) *PairingClient {
 	return &PairingClient{
@@ -71,25 +71,29 @@ func NewPairingClient(
 	}
 }
 
+// MetadataEnricher is an interface that allows transports exchanging information between
+// their client/server implementations
 type MetadataEnricher interface {
 	Metadata() map[string]string
 }
 
+// PairingServer is a server that can pair with multiple clients
 type PairingServer struct {
 	serverName       string     // Name of the server peer
-	publicWgHostPort string     // Public Wireguard host:port, used in Endpoint field of the Wireguard config of other peers
+	publicWgHostPort string     // Public Wireguard host:port
 	wgConfig         *wg.Config // Local Wireguard config
 	keyPair          KeyPair    // Local Wireguard key pair
 
 	wgReloader WireguardConfigReloader
-	marshaler  Marshaler
+	marshaler  PairingEncoder
 	transport  PairingServerTransport
 	ips        IPPool
 	storage    PeerStorage
 	enrichers  []MetadataEnricher
 }
 
-func (s *PairingServer) Start() {
+// Start starts the pairing server
+func (s *PairingServer) Start() { // nolint: funlen, gocognit
 	for incomingRequest := range s.transport.Requests() {
 		request, requestErr := s.marshaler.DecodeRequest(incomingRequest.Request)
 		if requestErr != nil {
@@ -142,7 +146,11 @@ func (s *PairingServer) Start() {
 			PublicKey:  publicKey,
 			AllowedIPs: fmt.Sprintf("%s/32,%s/32", ip, s.wgConfig.Address),
 		})
-		s.wgReloader.Update(*s.wgConfig)
+		wgUpdateErr := s.wgReloader.Update(*s.wgConfig)
+		if wgUpdateErr != nil {
+			incomingRequest.Err <- NewPairingRequestServerError(wgUpdateErr)
+			continue
+		}
 
 		// Enrich metadata
 		metadata := map[string]string{}
@@ -173,13 +181,14 @@ func (s *PairingServer) Start() {
 	}
 }
 
+// NewPairingServer creates a new PairingServer instance
 func NewPairingServer(
 	serverName string,
 	publicWgHostPort string,
 	wgConfig *wg.Config,
 	keyPair KeyPair,
 	wgReloader WireguardConfigReloader,
-	encoder Marshaler,
+	encoder PairingEncoder,
 	transport PairingServerTransport,
 	ips IPPool,
 	storage PeerStorage,

@@ -143,7 +143,7 @@ var listenCommand *cli.Command = &cli.Command{
 			c.String(peerNameFlag.Name),
 			remoteNginxAdapter,
 			appSource,
-			hello.NewJSONSyncEncoder(),
+			hello.NewJSONSyncingEncoder(),
 			syncTransport,
 			peerStorage,
 		)

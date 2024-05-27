@@ -20,19 +20,27 @@ func (t *httpServerPairingTransport) Requests() <-chan IncomingPairingRequest {
 	return t.requests
 }
 
+// NewHTTPServerPairingTransport creates a new PairingServerTransport instance
 func NewHTTPServerPairingTransport(server *http.Server) PairingServerTransport {
 	incoming := make(chan IncomingPairingRequest)
 	router := mux.NewRouter()
-	router.HandleFunc("/pairing", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/pairing", func(w http.ResponseWriter, r *http.Request) { // nolint: dupl
 		var req IncomingPairingRequest
 		req.Request = make([]byte, r.ContentLength)
-		r.Body.Read(req.Request)
+		_, readErr := r.Body.Read(req.Request)
+		if readErr != nil {
+			http.Error(w, readErr.Error(), http.StatusInternalServerError)
+			return
+		}
 		req.Response = make(chan []byte)
 		req.Err = make(chan error)
 		incoming <- req
 		select {
 		case resp := <-req.Response:
-			w.Write(resp)
+			_, writeErr := w.Write(resp)
+			if writeErr != nil {
+				http.Error(w, writeErr.Error(), http.StatusInternalServerError)
+			}
 		case err := <-req.Err:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -68,7 +76,12 @@ func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 		if readErr != nil {
 			logrus.Errorf("Failed to read response body: %v", readErr)
 		}
-		return nil, fmt.Errorf("Server returned status code %d when called %s: %s", resp.StatusCode, postURL, string(respBody))
+		return nil, fmt.Errorf(
+			"Server returned status code %d when called %s: %s",
+			resp.StatusCode,
+			postURL,
+			string(respBody),
+		)
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -77,6 +90,7 @@ func (t *httpClientPairingTransport) Send(req []byte) ([]byte, error) {
 	return respBody, nil
 }
 
+// NewHTTPClientPairingTransport creates a new PairingClientTransport instance
 func NewHTTPClientPairingTransport(serverURL string) PairingClientTransport {
 	return &httpClientPairingTransport{
 		serverURL: serverURL,
@@ -99,19 +113,27 @@ func (t *httpServerSyncingTransport) Metadata() map[string]string {
 	}
 }
 
+// NewHTTPServerSyncingTransport creates a new SyncServerTransport instance
 func NewHTTPServerSyncingTransport(server *http.Server) SyncServerTransport {
 	syncs := make(chan IncomingSyncRequest)
 	router := http.NewServeMux()
-	router.HandleFunc("/sync", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/sync", func(w http.ResponseWriter, r *http.Request) { // nolint: dupl
 		var req IncomingSyncRequest
 		req.Request = make([]byte, r.ContentLength)
-		r.Body.Read(req.Request)
+		_, readErr := r.Body.Read(req.Request)
+		if readErr != nil {
+			http.Error(w, readErr.Error(), http.StatusInternalServerError)
+			return
+		}
 		req.Response = make(chan []byte)
 		req.Err = make(chan error)
 		syncs <- req
 		select {
 		case resp := <-req.Response:
-			w.Write(resp)
+			_, writeErr := w.Write(resp)
+			if writeErr != nil {
+				http.Error(w, writeErr.Error(), http.StatusInternalServerError)
+			}
 		case err := <-req.Err:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -144,10 +166,14 @@ func (t *httpClientSyncingTransport) Sync(req []byte) ([]byte, error) {
 		return nil, err
 	}
 	respBody := make([]byte, resp.ContentLength)
-	resp.Body.Read(respBody)
+	_, readErr := resp.Body.Read(respBody)
+	if readErr != nil {
+		return nil, readErr
+	}
 	return respBody, nil
 }
 
+// NewHTTPClientSyncingTransport creates a new SyncClientTransport instance
 func NewHTTPClientSyncingTransport(serverURL string) SyncClientTransport {
 	return &httpClientSyncingTransport{
 		serverURL: serverURL,

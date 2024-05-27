@@ -89,7 +89,6 @@ var joinCommand *cli.Command = &cli.Command{
 
 		client := hello.NewPairingClient(
 			c.String(peerNameFlag.Name),
-			c.String(pairingServerURL.Name),
 			&wg.Config{
 				PrivateKey: privateKey,
 				Subnet:     "32",
@@ -121,7 +120,7 @@ var joinCommand *cli.Command = &cli.Command{
 		sc, scErr := hello.NewHTTPSyncingClient(
 			c.String(peerNameFlag.Name),
 			appStateChangeGenerator,
-			hello.NewJSONSyncEncoder(),
+			hello.NewJSONSyncingEncoder(),
 			time.Second*5,
 			hello.NewAddressEnrichingAppSource(
 				pairingResponse.AssignedIP,
