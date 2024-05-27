@@ -112,7 +112,10 @@ def kubectl(kind_cluster):
 
 
 @pytest.fixture()
-def fresh_cluster(kind_cluster):
+def fresh_cluster(
+    kind_cluster,
+    docker_images_loaded_into_cluster
+):
     kubectl = Kubectl(kind_cluster)
     starting_namespaces = set(
         [
