@@ -3,8 +3,10 @@ import os
 import shutil
 import signal
 import subprocess
+import socket
 import uuid
 from contextlib import contextmanager
+import tempfile
 
 import psutil
 import pymysql
@@ -18,32 +20,64 @@ def run_process(command, *args, **kwargs):
 
 
 class Server:
-    def __init__(self, executable, metrics_port=8090, acceptor="dummy"):
+    def __init__(
+        self,
+        executable,
+        state_manager_path="/tmp/server-state-manager",
+        nginx_confd_path="/tmp/server-nginx-confd",
+        wireguard_config_path="/tmp/server-wireguard/wg0.conf",
+        wireguard_address="0.0.0.0",
+        wireguard_subnet="24",
+        metrics_port=8090,
+    ):
         self.executable = executable
-        self.process = None
-        self.admin_port = 8081
+        self.state_manager_path = state_manager_path
+        self.nginx_confd_path = nginx_confd_path
+        self.wireguard_config_path = wireguard_config_path
         self.metrics_port = metrics_port
-        self.acceptor = acceptor
+        self.wireguard_address = wireguard_address
+        self.wireguard_subnet = wireguard_subnet
+        self.process = None
 
     def start(self):
+        cmd = [
+            self.executable,
+            "--debug",
+            "--metrics",
+            "--metrics-port",
+            str(self.metrics_port),
+            "listen",
+            "--name",
+            uuid.uuid4().hex,
+            "--directory-state-manager-path",
+            self.state_manager_path,
+            "--nginx-confd-path",
+            self.nginx_confd_path,
+            "--wg-config",
+            self.wireguard_config_path,
+            "--wg-public-host",
+            self.wireguard_address,
+            "--wg-internal-host",
+            self.wireguard_address,
+            "--wg-subnet-mask",
+            self.wireguard_subnet,
+            "--invite-token",
+            "123123",
+        ]
+        print(" ".join([str(i) for i in cmd]))
         self.process = subprocess.Popen(
-            [
-                self.executable,
-                "--debug",
-                "--metrics",
-                "--metrics-port",
-                str(self.metrics_port),
-                "listen",
-                "--acceptor",
-                self.acceptor,
-            ],
+            cmd,
             shell=False,
         )
 
         @retry(delay=0.1, tries=50)
         def _check_if_is_already_opened():
-            # All three ports are opened
-            assert len(psutil.Process(self.process.pid).connections()) == 3
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.connect(('localhost', self.metrics_port))
+                    return True
+                except (ConnectionRefusedError, OSError):
+                    raise Exception("Port is not open yet")
 
         _check_if_is_already_opened()
 
@@ -107,9 +141,20 @@ class MySQLServer:
 
 
 class Client:
-    def __init__(self, executable, exposes, metrics_port=8091):
+    def __init__(
+        self,
+        executable,
+        server,
+        state_manager_path="/tmp/client-state-manager",
+        nginx_confd_path="/tmp/client-nginx-confd",
+        wireguard_config_path="/tmp/client-wireguard/wg0.conf",
+        metrics_port=8091,
+    ):
         self.executable = executable
-        self.exposes = exposes
+        self.server = server
+        self.state_manager_path = state_manager_path
+        self.nginx_confd_path = nginx_confd_path
+        self.wireguard_config_path = wireguard_config_path
         self.metrics_port = metrics_port
         self.process = None
 
@@ -122,19 +167,16 @@ class Client:
             "join",
             "--name",
             uuid.uuid4().hex,
+            "--nginx-confd-path",
+            self.nginx_confd_path,
+            "--wg-config",
+            self.wireguard_config_path,
+            "--directory-state-manager-path",
+            self.state_manager_path,
+            "--invite-token",
+            "123123",
         ]
-        for expose in self.exposes:
-            if type(expose) == str:
-                command += ["--expose", expose]
-            else:
-                command += ["--expose", f"name={expose[0]},address={expose[1]}"]
-
         self.process = subprocess.Popen(command, shell=False)
-        # TODO: Replace with retry once it supports multiple connections
-        import time
-
-        time.sleep(2)
-
         return self
 
     def stop(self):
@@ -144,38 +186,22 @@ class Client:
 
 
 class MockServer:
-    def __init__(self, executable, port=1234, response=None):
-        self.executable = executable
-        self.process = None
-        self.port = port
-        self.response = response
+    def __init__(self, kubectl, wormhole_image):
+        self.namespace = "nginx"
+        self.name = "nginx"
+        self.kubectl = kubectl
 
     def start(self):
-        self.process = subprocess.Popen(
-            [self.executable, "testserver", "--port", str(self.port)]
-            + (["--response", self.response] if self.response else []),
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        self.kubectl.run(["create", "ns", self.namespace])
 
-        @retry(delay=0.1, tries=50)
-        def _check_if_is_already_opened():
-            assert requests.get("http://localhost:1234").status_code == 200
-
-        _check_if_is_already_opened()
+        @retry(tries=20, delay=.5)
+        def _wait_for_mocks():
+            self.kubectl.run(["apply", "-f", "kubernetes/raw/mocks/all.yaml"])
+        _wait_for_mocks()
         return self
 
     def stop(self):
-        return_code = self.process.poll()
-        if return_code is None:
-            return os.kill(self.process.pid, signal.SIGINT)
-        stdout, stderr = self.process.communicate()
-        print(stdout.decode())
-        print(stderr.decode())
-
-    def endpoint(self):
-        return f"localhost:{self.port}"
+        self.kubectl.run(["delete", "ns", self.namespace])
 
 
 @contextmanager
@@ -238,10 +264,11 @@ class Kubectl:
 
 class KindCluster:
 
-    KIND_VERSION = "v0.11.1"
+    KIND_VERSION = "v0.23.0"
 
     def __init__(self, name):
         self.name = name
+        self.existed_before = False
         self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
 
     @property
@@ -252,7 +279,9 @@ class KindCluster:
         return exists
 
     def create(self):
-        assert not self.exists, f"Cannot create cluster {self.name} - it already exists"
+        if self.exists:
+            self.existed_before = True
+            return
         assert not run_process(
             [
                 self.executable(),
@@ -273,6 +302,9 @@ class KindCluster:
 
     def delete(self):
         assert self.exists, f"Cannot delete cluster {self.name} - it does not exist"
+        if self.existed_before:
+            print("Skipping removal of KIND cluster - it existed before the tests were run")
+            return
         assert not run_process(
             [self.executable(), "delete", "cluster", "--name", self.name],
         ).returncode, "Could not delete cluster"
@@ -311,13 +343,10 @@ class Helm:
                 namespace or name,
                 name,
                 "kubernetes/helm",
-                "--wait",
                 "--set",
                 "client.pullPolicy=Never",
                 "--set",
                 "server.pullPolicy=Never",
-                "--set",
-                "docker.version=pytest",
             ]
             + [
                 item
@@ -357,3 +386,82 @@ def download(url, path):
     assert response.status_code < 299, f"Could not download file from {url}"
     with open(path, "wb") as f:
         f.write(response.content)
+
+
+class Nginx:
+
+    YAML = """---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: nginx
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.17.3
+          ports:
+            - containerPort: 80
+"""
+
+    def __init__(self):
+        self.name = "nginx"
+        self.service = "nginx"
+        self.namespace = "nginx"
+
+    def create(self, kubectl):
+        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", suffix=".yaml", delete=False)
+        with open(tmp.name, 'w') as f:
+            f.write(self.YAML)
+        kubectl.run(["create", "ns", self.namespace])
+
+        @retry(tries=20, delay=.5)
+        def _wait_for_nginx():
+            kubectl.run(["apply", "-f", tmp.name])
+        _wait_for_nginx()
+        os.unlink(tmp.name)
+
+    def delete(self, kubectl):
+        kubectl.run(["delete", "ns", self.namespace])
+
+
+class Annotator:
+
+    def __init__(self, mock_server, kubectl, override_name=None):
+        self.mock_server = mock_server
+        self.kubectl = kubectl
+        self.override_name = override_name
+
+    def do(self, key, value):
+        self.kubectl.run(
+            [
+                "-n",
+                self.mock_server.namespace,
+                "annotate",
+                "svc",
+                self.override_name if self.override_name else self.mock_server.name,
+                f"{key}={value}",
+                "--overwrite"
+            ]
+        )

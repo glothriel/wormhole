@@ -19,7 +19,8 @@ spec:
     metadata:
       labels:
         application: {{ template "name-server" . }}
-    spec:
+    spec: 
+      shareProcessNamespace: true
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName }}
       {{- end }}
@@ -40,15 +41,58 @@ spec:
         {{- toYaml .Values.server.tolerations | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ template "name-server" . }}
+      terminationGracePeriodSeconds: 1
       volumes:
+      - name: nginx-conf
+        configMap:
+        
+          name: {{ template "name-server" . }}-nginx
       - name: {{ template "name-server" . }}-tmp
-      {{- if .Values.server.pvc.enabled }}
+      {{- if .Values.devMode.enabled }}
+      - name: {{ template "name-server" . }}-dev
+      - name: {{ template "name-server" . }}-build-cache
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-build-cache
+      - name: {{ template "name-server" . }}-code
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-code
+      {{- end }}
       - name: {{ template "name-server" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}
-      {{- end }}
       containers:
-        - image: {{ $.Values.docker.registry }}/{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
+        - name: nginx
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
+          volumeMounts:
+          - mountPath: "/etc/nginx/nginx.conf"
+            name: nginx-conf
+            subPath: nginx.conf
+            readOnly: true
+          - mountPath: "/etc/nginx/conf.d"
+            name: {{ template "name-server" . }}-persistent
+            subPath: nginx
+          ports:
+          - containerPort: 9000
+        - name: wireguard
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
+          ports:
+            - containerPort: 51820
+              protocol: UDP
+          volumeMounts:
+          - mountPath: "/etc/wireguard"
+            name: {{ template "name-server" . }}-persistent
+            subPath: wireguard
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            capabilities:
+              add:
+              - NET_ADMIN
+       
+        - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           imagePullPolicy: {{ $.Values.server.pullPolicy }}
           {{- with .Values.server.containerSecurityContext }}
@@ -59,6 +103,8 @@ spec:
             httpGet:
               path: /metrics
               port: 8090
+            initialDelaySeconds: 30
+            failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /metrics
@@ -68,23 +114,27 @@ spec:
           ports:
             - containerPort: 8080
             - containerPort: 8081
+            - containerPort: 8082
           volumeMounts:
+
+          {{- if .Values.devMode.enabled }}
+          - mountPath: "/home/go/.cache"
+            name: {{ template "name-server" . }}-build-cache
+          - mountPath: "/src-tmp"
+            name: {{ template "name-server" . }}-code
+          {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-server" . }}-tmp
-      {{- if .Values.server.pvc.enabled }}
           - mountPath: "/storage"
             name: {{ template "name-server" . }}-persistent
-      {{- end }}
-          command:
-            - /usr/bin/wormhole
+          args:
             - --metrics
+            - --debug
             - listen
-            - --acceptor
-            - {{ $.Values.server.acceptor }}
-      {{- if .Values.server.pvc.enabled }}
-            - --acceptor-storage-file-path
-            - /storage
-      {{- end }}
+            - --invite-token
+            - {{ .Values.peering.psk }}
+            - --name
+            - {{ .Values.server.name }}
       {{- if .Values.server.path }}
             - --path
             - {{ .Values.server.path | quote }}
@@ -94,4 +144,31 @@ spec:
             - {{ $.Release.Namespace }}
             - --kubernetes-labels
             - 'application={{ template "name-server" . }}'
+            - '--wg-internal-host={{ $.Values.server.wg.internalHost }}'
+            - '--wg-public-host={{ $.Values.server.wg.publicHost }}'
+            - '--wg-subnet-mask={{ $.Values.server.wg.subnetMask }}'
+            - '--peer-storage-db=/storage/peers.db'
+            - '--key-storage-db=/storage/keys.db'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "name-server" . }}-nginx
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /home/nginx/log/nginx/error.log notice;
+    pid        /home/nginx/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+    
+    stream {
+      include /etc/nginx/conf.d/*.conf;
+    }
+
+
 {{ end }}

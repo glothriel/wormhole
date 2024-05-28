@@ -40,6 +40,7 @@ func (registry *defaultExposedServicesRegistry) isExposed(app peers.App, service
 	if !ok {
 		return false
 	}
+
 	for _, exposedApp := range item.apps {
 		if exposedApp.Name == app.Name && exposedApp.Address == app.Address {
 			return true

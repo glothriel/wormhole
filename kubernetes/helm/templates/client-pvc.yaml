@@ -1,18 +1,53 @@
-{{- if and .Values.server.enabled .Values.server.pvc.enabled }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ template "name-server" . }}
+  name: {{ template "name-client" . }}
   namespace: {{ $.Release.Namespace }}
   labels:
-    application: {{ template "name-server" . }}
+    application: {{ template "name-client" . }}
 spec:
-  {{- if .Values.server.pvc.storageClassName }}
-  storageClassName: {{ .Values.server.pvc.storageClassName }}
+  {{- if .Values.client.pvc.storageClassName }}
+  storageClassName: {{ .Values.client.pvc.storageClassName }}
   {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.server.pvc.storage }}
+      storage: {{ .Values.client.pvc.storage }}
+{{- if .Values.devMode.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "name-client" . }}-build-cache
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-client" . }}
+spec:
+  {{- if .Values.client.pvc.storageClassName }}
+  storageClassName: {{ .Values.client.pvc.storageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.client.pvc.storage }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "name-client" . }}-code
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-client" . }}
+spec:
+  {{- if .Values.client.pvc.storageClassName }}
+  storageClassName: {{ .Values.client.pvc.storageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.client.pvc.storage }}
 {{- end }}

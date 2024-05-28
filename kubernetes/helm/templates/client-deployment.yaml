@@ -19,6 +19,7 @@ spec:
       labels:
         application: {{ template "name-client" . }}
     spec:
+      shareProcessNamespace: true
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName }}
       {{- end }}
@@ -39,15 +40,59 @@ spec:
         {{- toYaml .Values.client.tolerations | nindent 6 }}
       {{- end }}
       serviceAccountName: {{ template "name-client" . }}
+      terminationGracePeriodSeconds: 1
       volumes:
+      - name: nginx-conf
+        configMap:
+          defaultMode: 0755
+          name: {{ template "name-client" . }}-nginx
+      {{- if .Values.devMode.enabled }}
+      - name: {{ template "name-client" . }}-dev
+      - name: {{ template "name-client" . }}-code
+      - name: {{ template "name-client" . }}-build-cache
+        persistentVolumeClaim:
+          claimName: {{ template "name-server" . }}-build-cache
+      {{- end }}
       - name: {{ template "name-client" . }}-tmp
-      {{- if .Values.client.pvc.enabled }}
       - name: {{ template "name-client" . }}-persistent
         persistentVolumeClaim:
           claimName: {{ template "name-client" . }}
-      {{- end }}
       containers:
-        - image: {{ $.Values.docker.registry }}/{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
+        - name: nginx
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.nginxImage }}:{{ $.Values.docker.nginxVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
+          volumeMounts:
+          - mountPath: "/etc/nginx/nginx.conf"
+            name: nginx-conf
+            subPath: nginx.conf
+            readOnly: true
+          - mountPath: "/docker-entrypoint.d/50-reload-if-confd-changes.conf"
+            name: nginx-conf
+            
+            subPath: 50-reload-if-confd-changes.conf
+            readOnly: true
+          - mountPath: "/etc/nginx/conf.d"
+            name: {{ template "name-client" . }}-persistent
+            subPath: nginx
+
+          ports:
+          - containerPort: 9000
+        - name: wireguard
+          image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.wgImage }}:{{ $.Values.docker.wgVersion }}
+          imagePullPolicy: {{ $.Values.server.pullPolicy }}
+          volumeMounts:
+          - mountPath: "/etc/wireguard"
+            name: {{ template "name-client" . }}-persistent
+            subPath: wireguard
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            capabilities:
+              add:
+              - NET_ADMIN
+         
+        - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           imagePullPolicy: {{ $.Values.client.pullPolicy }}
           {{- with .Values.client.containerSecurityContext }}
@@ -58,6 +103,8 @@ spec:
             httpGet:
               path: /metrics
               port: 8090
+            initialDelaySeconds: 30
+            failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /metrics
@@ -66,23 +113,56 @@ spec:
             {{- toYaml .Values.client.resources | nindent 12 }}
 
           volumeMounts:
+          {{- if .Values.devMode.enabled }}
+          - mountPath: "/home/go/.cache"
+            name: {{ template "name-client" . }}-build-cache
+          - mountPath: "/src-tmp"
+            name: {{ template "name-client" . }}-code
+          {{- end }}
           - mountPath: "/tmp"
             name: {{ template "name-client" . }}-tmp
-      {{- if .Values.client.pvc.enabled }}
           - mountPath: "/storage"
             name: {{ template "name-client" . }}-persistent
-      {{- end }}
-          command:
-            - /usr/bin/wormhole
+          args:
             - --metrics
+            - --debug
             - join
+            - --invite-token
+            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes
+            - --kubernetes-namespace
+            - {{ $.Release.Namespace }}
+            - --kubernetes-labels
+            - 'application={{ template "name-client" . }}'
             - --server
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
-      {{- if .Values.client.pvc.enabled }}
-            - --keypair-storage-path
-            - /storage
-      {{- end }}
+            - '--key-storage-db=/storage/keys.db'
+
+            
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "name-client" . }}-nginx
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /home/nginx/log/nginx/error.log notice;
+    pid        /home/nginx/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    stream {
+      include /etc/nginx/conf.d/*.conf;
+    }
+  50-reload-if-confd-changes.conf: |
+    #!/bin/sh
+
+    inotifyd "sh -c '/usr/sbin/nginx -s reload && echo reloaded'" /etc/nginx/conf.d
+
 {{ end }}

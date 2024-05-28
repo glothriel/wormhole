@@ -89,23 +89,26 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 		stopCh := make(chan struct{})
 		go func(stopCh <-chan struct{}, s cache.SharedIndexInformer) {
 			handlers := cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
+				AddFunc: func(obj any) {
 					for _, event := range repository.onAddedOrModified(obj) {
 						theChannel <- event
 					}
 				},
-				UpdateFunc: func(oldObj, obj interface{}) {
+				UpdateFunc: func(_, obj any) {
 					for _, event := range repository.onAddedOrModified(obj) {
 						theChannel <- event
 					}
 				},
-				DeleteFunc: func(obj interface{}) {
+				DeleteFunc: func(obj any) {
 					for _, event := range repository.onDeleted(obj) {
 						theChannel <- event
 					}
 				},
 			}
-			s.AddEventHandler(handlers)
+			_, addEventHandlerErr := s.AddEventHandler(handlers)
+			if addEventHandlerErr != nil {
+				return
+			}
 			s.Run(stopCh)
 		}(stopCh, informer.Informer())
 		sigCh := make(chan os.Signal, 1)
@@ -116,15 +119,15 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 	return theChannel
 }
 
-func (repository defaultServiceRepository) onAddedOrModified(informerObject interface{}) []watchEvent {
+func (repository defaultServiceRepository) onAddedOrModified(informerObject any) []watchEvent {
 	return repository.dispatchEvents(eventTypeAddedOrModified, informerObject)
 }
 
-func (repository defaultServiceRepository) onDeleted(informerObject interface{}) []watchEvent {
+func (repository defaultServiceRepository) onDeleted(informerObject any) []watchEvent {
 	return repository.dispatchEvents(eventTypeDeleted, informerObject)
 }
 
-func (repository defaultServiceRepository) dispatchEvents(eventType int, informerObject interface{}) []watchEvent {
+func (repository defaultServiceRepository) dispatchEvents(eventType int, informerObject any) []watchEvent {
 	u := informerObject.(*unstructured.Unstructured)
 	svc := corev1.Service{}
 	if convertError := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &svc); convertError != nil {

@@ -43,6 +43,14 @@ func (wrapper defaultServiceWrapper) name() string {
 	return exposeName
 }
 
+func (wrapper defaultServiceWrapper) targetLabels() string {
+	labels, labelsOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/labels"]
+	if !labelsOk {
+		return ""
+	}
+	return labels
+}
+
 func (wrapper defaultServiceWrapper) ports() []corev1.ServicePort {
 	ports, portsOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/ports"]
 	if !portsOk {
@@ -87,6 +95,8 @@ func (wrapper defaultServiceWrapper) apps() []peers.App {
 				wrapper.k8sSvc.ObjectMeta.Namespace,
 				portDefinition.Port,
 			),
+			TargetLabels: wrapper.targetLabels(),
+			OriginalPort: portDefinition.Port,
 		})
 	}
 	return apps

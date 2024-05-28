@@ -3,8 +3,26 @@ package svcdetector
 import (
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/client"
+	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
+)
+
+// AppStateManager is an interface for managing the state of apps
+type AppStateManager interface {
+	Changes() chan AppStateChange
+}
+
+// AppStateChange is a struct that represents a change in the app state
+type AppStateChange struct {
+	App   peers.App
+	State string
+}
+
+const (
+	// AppStateChangeAdded represents an app being added
+	AppStateChangeAdded string = "added"
+	// AppStateChangeWithdrawn represents an app being withdrawn
+	AppStateChangeWithdrawn string = "withdrawn"
 )
 
 type stateManager struct {
@@ -12,10 +30,10 @@ type stateManager struct {
 	notifier          *exposedServicesNotifier
 	errorWaitInterval time.Duration
 	registry          exposedServicesRegistry
-	stateChangeChan   chan client.AppStateChange
+	stateChangeChan   chan AppStateChange
 }
 
-func (manager *stateManager) Changes() chan client.AppStateChange {
+func (manager *stateManager) Changes() chan AppStateChange {
 	go func() {
 		for {
 			select {
@@ -23,9 +41,9 @@ func (manager *stateManager) Changes() chan client.AppStateChange {
 				if createdService.shouldBeExposed() {
 					for _, app := range createdService.apps() {
 						if !manager.registry.isExposed(app, createdService) {
-							manager.stateChangeChan <- client.AppStateChange{
+							manager.stateChangeChan <- AppStateChange{
 								App:   app,
-								State: client.AppStateChangeAdded,
+								State: AppStateChangeAdded,
 							}
 							manager.registry.markAsExposed(app, createdService)
 						}
@@ -64,9 +82,9 @@ func (manager *stateManager) cleanupRemoved() {
 	for _, itemToDelete := range itemsToDelete {
 		for _, app := range itemToDelete.apps {
 			manager.registry.markAsWithdrawn(app, itemToDelete.service)
-			manager.stateChangeChan <- client.AppStateChange{
+			manager.stateChangeChan <- AppStateChange{
 				App:   app,
-				State: client.AppStateChangeWithdrawn,
+				State: AppStateChangeWithdrawn,
 			}
 		}
 	}
@@ -77,12 +95,12 @@ func (manager *stateManager) cleanupRemoved() {
 func NewK8sAppStateManager(
 	svcRepository ServiceRepository,
 	cleanupInterval time.Duration,
-) client.AppStateManager {
+) AppStateManager {
 	theManager := &stateManager{
 		repository:        svcRepository,
 		notifier:          newExposedServicesNotifier(svcRepository),
 		errorWaitInterval: time.Second * 30,
-		stateChangeChan:   make(chan client.AppStateChange),
+		stateChangeChan:   make(chan AppStateChange),
 		registry:          newDefaultExposedServicesRegistry(),
 	}
 	ticker := time.NewTicker(cleanupInterval)

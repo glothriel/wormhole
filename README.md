@@ -1,241 +1,124 @@
 # Wormhole
 
-L7 reverse TCP tunnels over websocket, similar to ngrok, teleport or skupper, but implemented specifically for Kubernetes. Mostly a learning project. Allows exposing services from one Kubernetes cluster to another just by annotating them.
+L3 (wireguard) and L4 (NGINX) reverse TCP tunnels over wireguard, similar to ngrok, teleport or skupper, but implemented specifically for Kubernetes. Mostly a learning project. Allows exposing services from one Kubernetes cluster to another just by annotating them.
 
-![overview](docs/overview.jpg "Overview")
+Wormhole is implemented using "Hub and spoke" architecture. One cluster acts as a central hub, while others are clients. Clients can expose services to the hub and the hub can expose services to the clients. Exposing of the services between the clients is **not supported**.
 
-## What should I use this for?
+## Architecture
 
-To be honest, currently you should consider using something like Gravitational Teleport or Hashicorp Boundary. This project was started, because I was not satisfied with Teleport, due to:
-* The nodes forgetting about each other all the time and the need of manual re-connecting them by re-generating invite tokens
-* The proxied sockets on Teleport require SSL certs, that you need to generate by Teleport API. My central cluster is trusted, so this was unnecessary complication and made configuring some integrations I cared about harder and almost impossible to automate.
-* No plug-in integration with kubernetes like wormhole has (just annotate the service and it's automatically mirrored on central cluster)
+Wormhole uses a combination of three components in order to work:
 
-Boundary, when I evaluated it, didn't support reverse tunnels (expected port to be opened on edge infras), so it was out of question.
+* Wormhole controller - a Kubernetes controller that watches for services with a specific annotation and creates tunnels for them
+* Bundled Nginx - a simple Nginx server that is dynamically configured to proxy requests to the tunnels and vice versa
+* Wireguard - a VPN server that is used to create secure tunnels between the clusters, it's also dynamically configured by the controller
 
-## Helm
+This repository contains source code for all of the components.
 
-You can install wormhole using helm. Please clone this repository first.
+![](./docs/overview.jpg)
+
+### Peering
+
+Peering is the process of establishing a connection between two clusters. The peering is performed outside of the tunnel, using the HTTP API exposed by the server over the public internet. The peering by default is performed using HTTP protocol, but you may put the server behind SSL-terminating reverse proxy. Saying that, the communication is encrypted using a PSK, that both the client and server must know prior to the peering. The communication goes as follows.
+
+* Operator deploys the server and client, configuring them with the same PSK, for example `supersecret`
+* Upon startup, the client continuously tries to connect to the server using the HTTP API, encrypting the payload of the request with the PSK
+* The server knowing the PSK, decrypts the payload and checks if the client is allowed to connect. If it's not able to decrypt the payload, it means that the client doesn't know the PSK and the connection is rejected.
+* The peering message looks something like this (of course as stated above it's encrypted):
+    * `{"name": "client1", "wireguard": {"public_key": "xyz...xyz"}, "metadata": {}}`
+* The server checks if declared name matches the public key (if there were previous successful peerings) or creates a new client with the given name and public key. It also updates its Wireguard configuration with the new client and responds with something like this (of course encrypted):
+    * `{"name": "server", "wireguard": {"public_key": "abc...abc"}, "metadata": {}, "assigned_ip": "192.168.11.6", "internal_server_ip": "192.168.11.1"}`
+    * The response is similar, but contains also the server's public key, assigned IP for the client, and the server's internal (VPN) IP address.
+* The client updates its Wireguard configuration with the server's public key and the assigned IP, and starts the Wireguard tunnel. The tunnel is now established and the client can communicate with the server.
+
+### Syncing
+
+Syncing is a process of exchanging information about exposed applications on both client and server. The syncing is performed over the Wireguard tunnel, so it's secure. The syncing goes as follows:
+* Both client and server observe the state of kubernetes services deployed on their respective clusters. If a service is annotated with `wormhole.glothriel.github.com/exposed=yes`, it's considered exposed and added to internal exposed apps registry.
+* Every 5 (configurable) seconds, the client performs a HTTP request over the wireguard tunnel to the server, sending the list of exposed services. It looks like this:
+    * `{"peer": "client1", "apps": [{"name": "nginx", "address": "192.168.1.6:25001", "original_port" :80}]}`
+* The response from the server is exactly the same, but contains the list of exposed services on the server side. The client updates its internal registry with the server's exposed services, both create nginx proxies and respective kubernetes services for the apps exposed by the opposite side.
+
+
+## Usage
+
+You can install wormhole using helm. Please clone this repository first. For server you will need a cluster with LoadBalancer support, for client - any cluster. IP exposed by the server's LoadBalancer must be reachable from the client's cluster.
 
 ### Install server
 
-Server must expose port (container port 8080) for the clients that will be creating reverse tunnels. The port may be exposed directly with service type LoadBalancer (set `server.service.type` to `LoadBalancer`), or you can put wormhole behind Ingress Controller (tested with HAProxy), as it's basically a websocket server. In that case, you need to provide your Ingress resource yourself.
+Server is a central component of wormhole. It allows clients to connect and hosts the tunnels. It exposes two services:
 
-The below commands assume, that you are deploying everything in single cluster just to test things, so it does not care about exposing 8080 port externally at all.
+* HTTP API for peering (initial peering is performed outside of the tunnel)
+* Wireguard server for tunnel
+
+If you'll use DNS, you can install the server in one step (replace 0.0.0.0 with the public hostname), otherwise you'll have to wait for the LoadBalancer to get an IP and update configuration after that.
 
 ```
-kubectl create namespace wormhole-server
-helm install -n wormhole-server whserver kubernetes/helm --set server.enabled=true
+kubectl create namespace wormhole
+
+helm install -n wormhole wh kubernetes/helm --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
+
+# Wait for the LoadBalancer to get an IP
+kubectl get svc -n wormhole
+
+# Update the server with the IP
+helm upgrade -n wormhole wh kubernetes/helm --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="<the new IP>"
 ```
 
 ### Install client
 
-This command allows installing client in the same cluster as server, for testing purposes. If you'd like to deploy client in other cluster, please adjust `client.serverDsn`.
+You should do this on another cluster. If not, change the namespace to say `wormhole-client` to avoid conflicts. Please note the `client.name` parameter - it should be unique for each client. At this point you may add as many clients as you want.
 
 ```
-kubectl create namespace wormhole-client
-helm install -n wormhole-client whclient kubernetes/helm --set client.name=testclient --set client.enabled=true --set client.serverDsn=ws://wormhole-server-whserver.wormhole-server:8080/wh/tunnel
+kubectl create namespace wormhole
+
+helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --set client.name=clientOne
 ```
 
-### Approve pairing request
+### Expose a service
 
-Client when connects to server generates a RSA key pair (in-depth description below in "Authorization & SSL" section). You need to tell the server, that the client is trusted in order for them to start exchanging messages.
-
-In order to do that, review the client logs:
-```
-kubectl logs -n wormhole-client deployment/wormhole-client-whclient
-```
-
-You should see something like this:
-```
-INFO[0000] Log level set to info
-INFO[0000] Sending public key to the server, please make sure, that the fingerprint matches: <FINGERPRINT>
-```
-
-Please copy the fingerprint to clipboard and accept the connection request using the CLI:
+No you can expose a service from one infrastructure to another. Services exposed from the server will be available on all the clients. Services exposed from the client will be available only on the server.
 
 ```
-kubectl exec -n wormhole-server deployment/wormhole-server-whserver -- wormhole requests accept <FINGERPRINT>
+kubectl annotate --overwrite svc --namespace <namespace> <service> wormhole.glothriel.github.com/exposed=yes
 ```
 
-Now the client and server are deployed and paired, you can start annotating services.
+After up to 30 seconds the service will be available on the other side. 
+
+### Customize the exposed services
+
+You can use two additional annotations to customize how the service is exposed on the other side:
 
 ```
-kubectl -n default annotate svc kubernetes wormhole.glothriel.github.com/exposed=yes
+# Customize the service name
+wormhole.glothriel.github.com/name=my-custom-name
+
+# If the service uses more than one port, you can specify which ports should be exposed
+wormhole.glothriel.github.com/ports=http
+wormhole.glothriel.github.com/ports=80,443
 ```
 
-A proxy service should be created in namespace `wormhole-server`: `testclient-default-kubernetes`. All the TCP connections made to the proxy service will be tunelled between the server and client to the destination service.
+## Local development
 
-## APIs
+### Development environment
 
-### Client annotation API
+Requirements:
 
-You can expose a service that is deployed on Client's cluster by annotating it. Here are the annotations you can use:
-
-| Annotation                            | Purpose                                                                                                                           | Example value                     |
-|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
-| wormhole.glothriel.github.com/exposed | Marks a service as exposed. By default all the ports will be exposed on the destination, as separate apps - so separate services. | "1", "yes", "true", "no", "false" |
-| wormhole.glothriel.github.com/name    | Name under which the app will be exposed. If the annotation is not present, the name of the service is used.                      | "prometheus", "loki", "my-app"    |
-| wormhole.glothriel.github.com/ports   | List of ports for given service, that should be exposed. Can use both names and numbers, remember to use strings.                 | "metrics", "1337", "web"          |
-
-### Server Admin API
-
-Server admin API is exposed on port 8081.
-
-#### GET /v1/apps
-
-Returns list of apps exposed by connected clients.
-
-**Example response**:
+* Helm
+* Tilt
+* K3d
 
 ```
-HTTP 200
-Content-Type: application/json
+k3d cluster create wormhole --registry-create wormhole
 
-[
-    {
-        "app": "prometheus",
-        "endpoint": "prometheus-infraone.wormhole-server:8080",
-        "peer": "infraone"
-    },
-    {
-        "app": "prometheus",
-        "endpoint": "prometheus-infratwo.wormhole-server:8080",
-        "peer": "infratwo"
-    }
-]
+tilt up
 ```
 
-#### GET /v1/requests
+First start of wormhole will be really slow - it compiles the go code inside the container. Subsequent starts will be faster, as the go build cache is preserved in PVC.
 
-Displays list of pairing requests - fingerprints only.
-
-**Example response**:
+### Integration tests
 
 ```
-HTTP 200
-Content-Type: application/json
+cd tests && python setup.py develop && cd -
 
-[
-    "231::46::1::217::196",
-    "5::12::142::62::4",
-]
+pytest tests
 ```
-
-#### POST /v1/requests/{fingerprint}
-
-Accepts pairing requests
-
-**Example response**:
-
-```
-HTTP 204
-```
-
-#### DELETE /v1/requests/{fingerprint}
-
-Declines pairing requests
-
-**Example response**:
-
-```
-HTTP 204
-```
-
-
-## Authorization & SSL
-
-Wormhole itself doesn't support SSL, but can be put behind SSL-terminating reverse proxy, like HAProxy or Nginx, as it's just a websocket server. Please remember to set `wss` protocol in `client.serverDsn` value, if doing so.
-
-**Wormhole with its authorization module is safe to operate and encrypts all the traffic even without SSL**. Authorization flow for wormhole goes as follows:
-1. Client checks if 2048 bit RSA key was previously generated, if not, generates new one.
-2. Client calculates a fingerprint (hash) of the key and displays it to the console.
-3. First message when client connects to the server includes RSA public key.
-4. Server receives the public key, calculates the fingerprint and waits for the human operator to manually approve the connection request.
-5. If human operator declines, the connection is closed. If human operator approves, server generates 32 bit AES key, encrypts it with client's RSA public key and sends the AES key back to the client.
-6. All the subsequent messages are encrypted with that AES key.
-
-Security limitations:
-1. At the moment the RSA keys are not automatically rotated, you need to remove them from filesystem manually if you want them rotated (this forces new fingerprint, so you need to re-approve the key next time client connects to the server)
-2. AES key is generated when client connects to the server, so if you want to re-generate the key, you need to force re-connection of the client.
-
-The above flow was optimized to make onboarding new infrastructures a little bit easier. Normally you'd probably just use SSL and sign the client RSA keys beforehand, but you'd need to generate, sign and deliver the certs for each new infra.
-
-## Helm chart
-
-### client
-
-Parameter | Description | Default
-----------|-------------|---------
-client.affinity | | None
-client.containerSecurityContext.allowPrivilegeEscalation | | False
-client.containerSecurityContext.privileged | | False
-client.containerSecurityContext.readOnlyRootFilesystem | | True
-client.enabled | | False
-client.name | | ""
-client.nodeSelector | | None
-client.priorityClassName | | ""
-client.pullPolicy | | Always
-client.pvc.enabled | | False
-client.pvc.storage | | 1Gi
-client.pvc.storageClassName | | ""
-client.resources.limits.cpu | | 0
-client.resources.limits.memory | | 128Mi
-client.resources.requests.cpu | | 0
-client.resources.requests.memory | | 128Mi
-client.securityContext.fsGroup | | 1337
-client.securityContext.runAsGroup | | 1337
-client.securityContext.runAsNonRoot | | True
-client.securityContext.runAsUser | | 1337
-client.serverDsn | | ws://wormhole-server:8080/wh/tunnel
-client.tolerations | | None
-
-### docker
-
-Parameter | Description | Default
-----------|-------------|---------
-docker.image | | glothriel/wormhole
-docker.registry | | ghcr.io
-docker.version | It's advised to change this to a tag | latest
-
-### server
-
-Parameter | Description | Default
-----------|-------------|---------
-server.acceptor | Set to "dummy" to automatically accept all clients | server
-server.affinity | | None
-server.containerSecurityContext.allowPrivilegeEscalation | | False
-server.containerSecurityContext.privileged | | False
-server.containerSecurityContext.readOnlyRootFilesystem | | True
-server.enabled | | False
-server.nodeSelector | | None
-server.path | HTTP path under which the tunnel is opened. If empty uses default from CLI (`/wh/tunnel`) | ""
-server.priorityClassName | | ""
-server.pullPolicy | | Always
-server.pvc.enabled | | False
-server.pvc.storage | | 1Gi
-server.pvc.storageClassName | | ""
-server.resources.limits.cpu | | 0
-server.resources.limits.memory | | 128Mi
-server.resources.requests.cpu | | 0
-server.resources.requests.memory | | 128Mi
-server.securityContext.fsGroup | | 1337
-server.securityContext.runAsGroup | | 1337
-server.securityContext.runAsNonRoot | | True
-server.securityContext.runAsUser | | 1337
-server.service.type | | ClusterIP
-server.tolerations | | None
-
-## FAQ
-
-**Is UDP supported**
-No. Maybe someday.
-
-**How quick it is?**
-It's super slow. It's websockets. The tunnel code itself is closer to a POC than production solution - a lot of allocations, conversions between byte-arrays to strings, encodings, etc. This will definitely be improved once core functionality is finished up, but please note, that very high performance will never be the goal of this project.
-
-**Why websockets?**
-Stubborn on-prem clients are easier to persuade to open an outbound port to a 443 web server, than a random TCP socket. As funny as it seems, this is really the reason.
-
-**Is exposing services from server to client possible?**
-Currently - no. In the future, if i have enough determination - yes.

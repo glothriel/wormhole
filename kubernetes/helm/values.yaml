@@ -3,16 +3,15 @@ client:
 
   name: ""
 
-  serverDsn: "ws://wormhole-server:8080"
+  serverDsn: "ws://wormhole-server:8080/wh/tunnel"
 
   priorityClassName: ""
   pullPolicy: Always
 
-  securityContext:
-    runAsUser: 1337
-    runAsGroup: 1337
+  securityContext: 
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
-    fsGroup: 1337
 
   containerSecurityContext:
     readOnlyRootFilesystem: true
@@ -34,13 +33,16 @@ client:
   nodeSelector: null
   tolerations: null
 
+
   pvc:
-    enabled: false
     storageClassName: ""
     storage: 1Gi
 
+peering:
+  psk: defaultPeeringKeyPleaseChangeMe
 
 server:
+  name: server
   enabled: false
 
   service:
@@ -49,11 +51,11 @@ server:
   priorityClassName: ""
   pullPolicy: Always
 
-  securityContext:
-    runAsUser: 1337
-    runAsGroup: 1337
+  securityContext: 
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
-    fsGroup: 1337
+    fsGroup: 1000
 
   containerSecurityContext:
     readOnlyRootFilesystem: true
@@ -76,15 +78,26 @@ server:
   tolerations: null
 
   pvc:
-    enabled: false
     storageClassName: ""
     storage: 1Gi
+
+  wg:
+    publicHost: ""
+    internalHost: 10.188.0.1
+    subnetMask: 24
 
   acceptor: "server"
   path: ""
 
 docker:
   registry: ghcr.io
-  image: glothriel/wormhole
-  version: latest
+  image: glothriel/wormhole-controller
+  version: 0.9.0-alpha.2
+  wgImage: glothriel/wormhole-wireguard
+  wgVersion: 0.9.0-alpha.2
+  nginxImage: glothriel/wormhole-nginx
+  nginxVersion: 0.9.0-alpha.2
 
+# Dev mode expects dev image with watchexec + go run instead of binary
+devMode:
+  enabled: false
