@@ -1,6 +1,0 @@
-server:
-  enabled: true
-  service:
-    type: LoadBalancer
-  wg:
-    publicHost: "4.182.93.30"
