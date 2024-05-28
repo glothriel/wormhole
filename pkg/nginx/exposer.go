@@ -36,13 +36,13 @@ func (n *Exposer) Add(app peers.App) (peers.App, error) {
 		File:       nginxConfigPath(n.prefix, app),
 		App:        app,
 	}
-	listen := ""
+	listenBlock := ""
 	listenAddrs, listenerErr := n.listener.Addrs(port)
 	if listenerErr != nil || len(listenAddrs) == 0 {
 		logrus.Errorf("Could not get listener addresses: %v", listenerErr)
 	}
 	for _, addr := range listenAddrs {
-		listen += fmt.Sprintf("	listen %s;\n", addr)
+		listenBlock += fmt.Sprintf("	listen %s;\n", addr)
 	}
 	if writeErr := afero.WriteFile(n.fs, path.Join(n.path, server.File), []byte(fmt.Sprintf(`
 # [%s] %s
@@ -53,7 +53,7 @@ server {
 `,
 		server.App.Peer,
 		server.App.Name,
-		listen,
+		listenBlock,
 		server.ProxyPass,
 	)), 0644); writeErr != nil {
 		logrus.Errorf("Could not write NGINX config file: %v", writeErr)
