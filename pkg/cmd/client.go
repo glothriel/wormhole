@@ -50,6 +50,7 @@ var joinCommand *cli.Command = &cli.Command{
 			"local",
 			nginx.NewDefaultReloader(),
 			nginx.NewRangePortAllocator(20000, 25000),
+			nginx.NewOnlyWireguardListener(),
 		))
 
 		remoteNginxExposer := nginx.NewNginxExposer(
@@ -57,6 +58,7 @@ var joinCommand *cli.Command = &cli.Command{
 			"remote",
 			nginx.NewDefaultReloader(),
 			nginx.NewRangePortAllocator(25001, 30000),
+			nginx.NewAllAcceptWireguardListener(),
 		)
 		var effectiveExposer listeners.Exposer = remoteNginxExposer
 
