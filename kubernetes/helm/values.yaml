@@ -1,9 +1,9 @@
 client:
   enabled: false
-
+  debug: false
   name: ""
 
-  serverDsn: "ws://wormhole-server:8080/wh/tunnel"
+  serverDsn: ""
 
   priorityClassName: ""
   pullPolicy: Always
@@ -33,20 +33,17 @@ client:
   nodeSelector: null
   tolerations: null
 
-
   pvc:
     storageClassName: ""
     storage: 1Gi
-
-peering:
-  psk: defaultPeeringKeyPleaseChangeMe
-
+  
 server:
-  name: server
   enabled: false
+  debug: false
+  name: server
 
   service:
-    type: ClusterIP
+    type: LoadBalancer
 
   priorityClassName: ""
   pullPolicy: Always
@@ -86,9 +83,6 @@ server:
     internalHost: 10.188.0.1
     subnetMask: 24
 
-  acceptor: "server"
-  path: ""
-
 docker:
   registry: ghcr.io
   image: glothriel/wormhole-controller
@@ -97,6 +91,10 @@ docker:
   wgVersion: 0.9.0-alpha.2
   nginxImage: glothriel/wormhole-nginx
   nginxVersion: 0.9.0-alpha.2
+
+peering:
+  psk: defaultPeeringKeyPleaseChangeMe
+
 
 # Dev mode expects dev image with watchexec + go run instead of binary
 devMode:

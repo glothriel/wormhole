@@ -48,8 +48,8 @@ var (
 	}
 )
 
-var listenCommand *cli.Command = &cli.Command{
-	Name: "listen",
+var serverCommand *cli.Command = &cli.Command{
+	Name: "server",
 	Flags: []cli.Flag{
 		kubernetesFlag,
 		inviteTokenFlag,
@@ -129,6 +129,7 @@ var listenCommand *cli.Command = &cli.Command{
 		}
 		for _, savedPeer := range savedPeers {
 			wgConfig.Upsert(wg.Peer{
+				Name:       savedPeer.Name,
 				PublicKey:  savedPeer.PublicKey,
 				AllowedIPs: fmt.Sprintf("%s/32,%s/32", savedPeer.IP, wgConfig.Address),
 			})

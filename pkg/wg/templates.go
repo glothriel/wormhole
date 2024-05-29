@@ -13,6 +13,7 @@ import (
 
 // Peer represents a single WireGuard peer in the configuration
 type Peer struct {
+	Name       string
 	PublicKey  string
 	AllowedIPs string
 	Endpoint   string
@@ -61,7 +62,7 @@ Address = {{.Address}}/{{.Subnet}}
 PrivateKey = {{.PrivateKey}}
 
 {{range .Peers}}
-[Peer]
+[Peer] # {{ .Name }}
 PublicKey = {{ .PublicKey }}
 AllowedIPs = {{ .AllowedIPs }}
 {{if .Endpoint}}Endpoint = {{ .Endpoint }}{{end}}

@@ -21,10 +21,7 @@ rules:
       - services
     verbs:
       - get
-      - create
-      - update
       - list
-      - delete
       - watch
 ---
 kind: ClusterRoleBinding
@@ -39,6 +36,42 @@ subjects:
     name: {{ template "name-client" . }}
 roleRef:
   kind: ClusterRole
+  name: {{ template "name-client" . }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "name-client" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-client" . }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - create
+      - update
+      - list
+      - delete
+      - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "name-client" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-client" . }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ $.Release.Namespace }}
+    name: {{ template "name-client" . }}
+roleRef:
+  kind: Role
   name: {{ template "name-client" . }}
   apiGroup: rbac.authorization.k8s.io
 {{ end }}

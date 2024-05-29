@@ -51,9 +51,9 @@ k8s_yaml('./kubernetes/raw/mocks/all.yaml')
 for server in servers:
     k8s_yaml(helm("./kubernetes/helm", namespace=server, set=[
         "server.enabled=true",
-        "server.acceptor=dummy",
         "server.resources.limits.memory=2Gi",
         "server.wg.publicHost=wormhole-server-chart.server.svc.cluster.local",
+        "server.service.type=ClusterIP",
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",

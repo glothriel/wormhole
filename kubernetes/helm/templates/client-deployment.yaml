@@ -47,7 +47,6 @@ spec:
           defaultMode: 0755
           name: {{ template "name-client" . }}-nginx
       {{- if .Values.devMode.enabled }}
-      - name: {{ template "name-client" . }}-dev
       - name: {{ template "name-client" . }}-code
       - name: {{ template "name-client" . }}-build-cache
         persistentVolumeClaim:
@@ -125,8 +124,10 @@ spec:
             name: {{ template "name-client" . }}-persistent
           args:
             - --metrics
+          {{- if .Values.client.debug }}
             - --debug
-            - join
+          {{- end }}
+            - client
             - --invite-token
             - {{ .Values.peering.psk }}
             - --name

@@ -1,0 +1,36 @@
+{{- if .Values.devMode.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "name-server" . }}-build-cache
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  {{- if .Values.server.pvc.storageClassName }}
+  storageClassName: {{ .Values.server.pvc.storageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.server.pvc.storage }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "name-server" . }}-code
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  {{- if .Values.server.pvc.storageClassName }}
+  storageClassName: {{ .Values.server.pvc.storageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.server.pvc.storage }}
+{{- end }}

@@ -49,7 +49,6 @@ spec:
           name: {{ template "name-server" . }}-nginx
       - name: {{ template "name-server" . }}-tmp
       {{- if .Values.devMode.enabled }}
-      - name: {{ template "name-server" . }}-dev
       - name: {{ template "name-server" . }}-build-cache
         persistentVolumeClaim:
           claimName: {{ template "name-server" . }}-build-cache
@@ -129,16 +128,14 @@ spec:
             name: {{ template "name-server" . }}-persistent
           args:
             - --metrics
+          {{- if .Values.server.debug }}
             - --debug
-            - listen
+          {{- end }}
+            - server
             - --invite-token
             - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.server.name }}
-      {{- if .Values.server.path }}
-            - --path
-            - {{ .Values.server.path | quote }}
-      {{- end }}
             - --kubernetes
             - --kubernetes-namespace
             - {{ $.Release.Namespace }}
