@@ -201,4 +201,44 @@ def test_exposing_service_with_changing_ports(
     if 'client-custom' in [
         svc['metadata']['name'] for svc in kubectl.json(["-n", "server", "get", "svc"])["items"]
     ]:
-        pytest.skip("The orphaned service should be removed, but it's not critical, so skipping for now")
+        pytest.skip(
+            "The orphaned service should be removed, but it's not critical, so skipping for now"
+        )
+
+
+def test_connection_via_the_tunnel(
+    kubectl,
+    k8s_server,
+    k8s_client,
+    mock_server,
+):
+
+    annotator = Annotator(mock_server, kubectl)
+    amount_of_services_before_annotation = len(
+        kubectl.json(["-n", "server", "get", "svc"])["items"]
+    )
+    annotator.do("wormhole.glothriel.github.com/exposed", "yes")
+
+    @retry(tries=60, delay=1)
+    def _ensure_that_proxied_service_is_created():
+        assert (
+            len(kubectl.json(["-n", "server", "get", "svc"])["items"])
+            == amount_of_services_before_annotation + 1
+        )
+    _ensure_that_proxied_service_is_created()
+
+    @retry(tries=60, delay=1)
+    def _ensure_that_proxied_service_is_reachable():
+        kubectl.run(
+            [
+                '-n',
+                'nginx',
+                'exec',
+                'deployment/nginx',
+                '--',
+                'curl',
+                'server-nginx-nginx.client.svc.cluster.local'
+            ]
+        )
+
+    _ensure_that_proxied_service_is_reachable()
