@@ -45,14 +45,6 @@ var joinCommand *cli.Command = &cli.Command{
 		}
 		startPrometheusServer(c)
 
-		localListenerRegistry := listeners.NewApps(nginx.NewNginxExposer(
-			c.String(nginxExposerConfdPathFlag.Name),
-			"local",
-			nginx.NewDefaultReloader(),
-			nginx.NewRangePortAllocator(20000, 25000),
-			nginx.NewOnlyWireguardListener(),
-		))
-
 		remoteNginxExposer := nginx.NewNginxExposer(
 			c.String(nginxExposerConfdPathFlag.Name),
 			"remote",
@@ -115,6 +107,13 @@ var joinCommand *cli.Command = &cli.Command{
 			}
 			break
 		}
+		localListenerRegistry := listeners.NewApps(nginx.NewNginxExposer(
+			c.String(nginxExposerConfdPathFlag.Name),
+			"local",
+			nginx.NewDefaultReloader(),
+			nginx.NewRangePortAllocator(20000, 25000),
+			nginx.NewOnlyGivenAddressListener(pairingResponse.AssignedIP),
+		))
 
 		logrus.Infof("Paired with server, assigned IP: %s", pairingResponse.AssignedIP)
 		go localListenerRegistry.Watch(getAppStateChangeGenerator(c).Changes(), make(chan bool))
