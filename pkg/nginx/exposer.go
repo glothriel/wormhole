@@ -6,7 +6,9 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/glothriel/wormhole/pkg/listeners"
 	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
@@ -37,9 +39,13 @@ func (n *Exposer) Add(app peers.App) (peers.App, error) {
 		App:        app,
 	}
 	listenBlock := ""
-	listenAddrs, listenerErr := n.listener.Addrs(port)
-	if listenerErr != nil || len(listenAddrs) == 0 {
-		logrus.Errorf("Could not get listener addresses: %v", listenerErr)
+	listenAddrs := []string{}
+	if listenerErr := retry.Do(func() error {
+		var addrsErr error
+		listenAddrs, addrsErr = n.listener.Addrs(port)
+		return addrsErr
+	}, retry.Attempts(5), retry.Delay(time.Second)); listenerErr != nil {
+		return peers.App{}, fmt.Errorf("Could not get listener addresses: %v", listenerErr)
 	}
 	for _, addr := range listenAddrs {
 		listenBlock += fmt.Sprintf("	listen %s;\n", addr)

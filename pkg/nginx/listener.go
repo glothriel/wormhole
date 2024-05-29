@@ -1,6 +1,7 @@
 package nginx
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -34,13 +35,12 @@ func NewPortOnlyListener() Listener {
 	return &portOnlyListener{}
 }
 
-type wg0FilteringListener struct {
-	lister     networkInterfaceLister
-	includeWg0 bool
+type allAcceptWg0Listener struct {
+	lister networkInterfaceLister
 }
 
 // Addrs implements Listener
-func (a *wg0FilteringListener) Addrs(portNumber int) ([]string, error) {
+func (a *allAcceptWg0Listener) Addrs(portNumber int) ([]string, error) {
 	interfaces, interfacesErr := a.lister.Interfaces()
 	if interfacesErr != nil {
 		return []string{}, interfacesErr
@@ -49,10 +49,7 @@ func (a *wg0FilteringListener) Addrs(portNumber int) ([]string, error) {
 	var allAddrs []string
 
 	for _, iface := range interfaces {
-		if iface.name == "wg0" && !a.includeWg0 {
-			continue
-		}
-		if iface.name != "wg0" && a.includeWg0 {
+		if iface.name == "wg0" {
 			continue
 		}
 
@@ -63,22 +60,36 @@ func (a *wg0FilteringListener) Addrs(portNumber int) ([]string, error) {
 			}
 		}
 	}
+
+	if len(allAddrs) == 0 {
+		return []string{}, errors.New("No network interfaces matching conditions found")
+	}
+
 	return allAddrs, nil
+}
+
+type givenAddressOnlyListener struct {
+	address string
+}
+
+// Addrs implements Listener
+func (l *givenAddressOnlyListener) Addrs(portNumber int) ([]string, error) {
+	return []string{
+		fmt.Sprintf("%s:%d", l.address, portNumber),
+	}, nil
 }
 
 // NewAllAcceptWireguardListener creates a new Listener that listens on all interfaces accept wg0
 func NewAllAcceptWireguardListener() Listener {
-	return &wg0FilteringListener{
-		includeWg0: false,
-		lister:     &defaultNetworkInterfaceLister{},
+	return &allAcceptWg0Listener{
+		lister: &defaultNetworkInterfaceLister{},
 	}
 }
 
-// NewOnlyWireguardListener creates a new Listener that listens on all interfaces
-func NewOnlyWireguardListener() Listener {
-	return &wg0FilteringListener{
-		includeWg0: true,
-		lister:     &defaultNetworkInterfaceLister{},
+// NewOnlyGivenAddressListener creates a new Listener that listens only on given address
+func NewOnlyGivenAddressListener(address string) Listener {
+	return &givenAddressOnlyListener{
+		address: address,
 	}
 }
 
