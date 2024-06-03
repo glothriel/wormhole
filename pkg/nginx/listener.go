@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const wg0InterfaceName = "wg0"
+
 // Listener is an interface for NGINX listeners
 type Listener interface {
 	// Addrs returns a list of addresses that the listener is listening on
@@ -20,19 +22,6 @@ type networkInterface struct {
 
 type networkInterfaceLister interface {
 	Interfaces() ([]networkInterface, error)
-}
-
-type portOnlyListener struct {
-}
-
-// Addrs implements Listener
-func (p *portOnlyListener) Addrs(portNumber int) ([]string, error) {
-	return []string{fmt.Sprintf("%d", portNumber)}, nil
-}
-
-// NewPortOnlyListener creates a new Listener that listens on a single port
-func NewPortOnlyListener() Listener {
-	return &portOnlyListener{}
 }
 
 type allAcceptWg0Listener struct {
@@ -49,7 +38,7 @@ func (a *allAcceptWg0Listener) Addrs(portNumber int) ([]string, error) {
 	var allAddrs []string
 
 	for _, iface := range interfaces {
-		if iface.name == "wg0" {
+		if iface.name == wg0InterfaceName {
 			continue
 		}
 
