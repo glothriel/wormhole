@@ -15,9 +15,10 @@ import (
 
 // Exposer is an Exposer implementation that uses NGINX as a proxy server
 type Exposer struct {
-	prefix string
-	path   string
-	fs     afero.Fs
+	prefix   string
+	path     string
+	fs       afero.Fs
+	listener Listener
 
 	reloader Reloader
 	ports    PortAllocator
@@ -35,17 +36,24 @@ func (n *Exposer) Add(app peers.App) (peers.App, error) {
 		File:       nginxConfigPath(n.prefix, app),
 		App:        app,
 	}
-
+	listenBlock := ""
+	listenAddrs, addrsErr := n.listener.Addrs(port)
+	if addrsErr != nil {
+		return peers.App{}, fmt.Errorf("Could not get listener addresses: %v", addrsErr)
+	}
+	for _, addr := range listenAddrs {
+		listenBlock += fmt.Sprintf("	listen %s;\n", addr)
+	}
 	if writeErr := afero.WriteFile(n.fs, path.Join(n.path, server.File), []byte(fmt.Sprintf(`
 # [%s] %s
 server {
-	listen %d;
+%s
 	proxy_pass %s;
 }
 `,
 		server.App.Peer,
 		server.App.Name,
-		server.ListenPort,
+		listenBlock,
 		server.ProxyPass,
 	)), 0644); writeErr != nil {
 		logrus.Errorf("Could not write NGINX config file: %v", writeErr)
@@ -117,7 +125,9 @@ func (n *Exposer) WithdrawAll() error {
 }
 
 // NewNginxExposer creates a new NGINX exposer
-func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortAllocator) listeners.Exposer {
+func NewNginxExposer(
+	path, confPrefix string, reloader Reloader, allocator PortAllocator, listener Listener,
+) listeners.Exposer {
 	fs := afero.NewOsFs()
 	cg := &Exposer{
 		path:   path,
@@ -126,6 +136,7 @@ func NewNginxExposer(path, confPrefix string, reloader Reloader, allocator PortA
 
 		reloader: reloader,
 		ports:    allocator,
+		listener: listener,
 	}
 	createErr := fs.MkdirAll(path, 0755)
 	if createErr != nil && createErr != afero.ErrDestinationExists {

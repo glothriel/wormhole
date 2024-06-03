@@ -235,6 +235,7 @@ def k8s_server(
         {
             "server.enabled": True,
             "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
+            "server.service.type": "ClusterIP",
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
             "docker.wgImage": wireguard_image.split(":")[0],

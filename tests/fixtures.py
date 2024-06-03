@@ -465,3 +465,14 @@ class Annotator:
                 "--overwrite"
             ]
         )
+
+
+class Services:
+
+    @classmethod
+    def count(cls, kubectl, namespace):
+        return len(kubectl.json(["get", "svc", "-n", namespace])["items"])
+    
+    @classmethod
+    def names(cls, kubectl, namespace):
+        return [item["metadata"]["name"] for item in kubectl.json(["get", "svc", "-n", namespace])["items"]]

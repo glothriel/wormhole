@@ -115,6 +115,14 @@ tilt up
 
 First start of wormhole will be really slow - it compiles the go code inside the container. Subsequent starts will be faster, as the go build cache is preserved in PVC.
 
+The development environment deploys a server, two clients and a mock service, that you can use to test the tunnels.
+
+```
+kubectl annotate --overwrite svc --namespace nginx nginx  wormhole.glothriel.github.com/exposed=yes
+```
+
+The additional services should be immediately created. Please note, that all three workloads are deployed on the same (and by extension are monitoring the same services for annotations), so the nginx will be exposed 4 times - client1 to server, client2 to server, server to client1 and server to client2.
+
 ### Integration tests
 
 ```

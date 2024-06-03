@@ -81,6 +81,7 @@ var listenCommand *cli.Command = &cli.Command{
 			"local",
 			nginx.NewDefaultReloader(),
 			nginx.NewRangePortAllocator(20000, 25000),
+			nginx.NewOnlyGivenAddressListener(c.String(wgAddressFlag.Name)),
 		))
 
 		remoteNginxExposer := nginx.NewNginxExposer(
@@ -88,6 +89,7 @@ var listenCommand *cli.Command = &cli.Command{
 			"remote",
 			nginx.NewDefaultReloader(),
 			nginx.NewRangePortAllocator(25001, 30000),
+			nginx.NewAllAcceptWireguardListener(),
 		)
 		var effectiveExposer listeners.Exposer = remoteNginxExposer
 
