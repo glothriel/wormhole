@@ -1,0 +1,46 @@
+name: Helm
+on:
+  push:
+    tags: ["*"]
+  pull_request:
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set the version (tag)
+        if: github.event_name == 'push'
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      
+      - name: Set the the mock version (PR)
+        if: github.event_name == 'pull_request'
+        run: echo "VERSION=PR-${GITHUB_SHA}" >> $GITHUB_ENV
+      
+      - name: Replace the version in Chart.yaml
+        run: |
+          sed -i "s/version: .*/version: $VERSION/" kubernetes/helm/Chart.yaml
+      
+      - name: Print the changes
+        run: cat kubernetes/helm/Chart.yaml
+      
+      - name: Replace image versions in values.yaml
+        run: |
+          sed -i "s/version: .*GHA/version: $VERSION/" kubernetes/helm/values.yaml
+          sed -i "s/wgVersion: .*GHA/wgVersion: $VERSION/" kubernetes/helm/values.yaml
+          sed -i "s/nginxVersion: .*GHA/nginxVersion: $VERSION/" kubernetes/helm/values.yaml
+
+      - name: Push Helm chart to registry
+        if: github.event_name == 'push' # skip on PRs
+        uses: bsord/helm-push@v4.1.0
+        with:
+          useOCIRegistry: true
+          registry-url:  oci://ghcr.io/${{ github.repository }}
+          username: ${{ github.actor }}
+          access-token: ${{ secrets.GITHUB_TOKEN }}
+          force: true
+          chart-folder: kubernetes/helm

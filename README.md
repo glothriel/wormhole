@@ -55,13 +55,14 @@ If you'll use DNS, you can install the server in one step (replace 0.0.0.0 with 
 ```
 kubectl create namespace wormhole
 
-helm install -n wormhole wh kubernetes/helm --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
+# Replace 1.0.0 with latest version from the releases page
+helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.0.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
 
 # Wait for the LoadBalancer to get an IP
 kubectl get svc -n wormhole
 
 # Update the server with the IP
-helm upgrade -n wormhole wh kubernetes/helm --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="<the new IP>"
+helm upgrade -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.0.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="<the new IP>"
 ```
 
 ### Install client

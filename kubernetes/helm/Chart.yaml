@@ -1,7 +1,7 @@
 ---
 apiVersion: v2
 name: wormhole
-description: Deploys wormhole, that allows connecting kubernetes clusters over encrypted websocket reverse tunnel
+description: Deploys wormhole, that allows connecting kubernetes clusters over wireguard VPN
 type: application
 version: 1.0.0
 maintainers:

@@ -86,11 +86,11 @@ server:
 docker:
   registry: ghcr.io
   image: glothriel/wormhole-controller
-  version: 0.9.0-alpha.2
+  version: latest # GHA
   wgImage: glothriel/wormhole-wireguard
-  wgVersion: 0.9.0-alpha.2
+  wgVersion: latest # GHA
   nginxImage: glothriel/wormhole-nginx
-  nginxVersion: 0.9.0-alpha.2
+  nginxVersion: latest # GHA
 
 peering:
   psk: defaultPeeringKeyPleaseChangeMe
