@@ -24,7 +24,7 @@ var pairingServerURL *cli.StringFlag = &cli.StringFlag{
 }
 
 var clientCommand *cli.Command = &cli.Command{
-	Name: "join",
+	Name: "client",
 	Flags: []cli.Flag{
 		pairingServerURL,
 		inviteTokenFlag,
