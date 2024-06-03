@@ -15,9 +15,8 @@ func Run() {
 		Usage:                "Wormhole is an utility to create reverse websocket tunnels, similar to ngrok",
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
-			listenCommand,
-			joinCommand,
-			// requestsCommand,
+			serverCommand,
+			clientCommand,
 			testserverCommand,
 		},
 		Version: projectVersion,

@@ -23,8 +23,8 @@ var pairingServerURL *cli.StringFlag = &cli.StringFlag{
 	Value: "http://localhost:8080",
 }
 
-var joinCommand *cli.Command = &cli.Command{
-	Name: "join",
+var clientCommand *cli.Command = &cli.Command{
+	Name: "client",
 	Flags: []cli.Flag{
 		pairingServerURL,
 		inviteTokenFlag,
