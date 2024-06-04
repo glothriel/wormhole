@@ -215,6 +215,9 @@ def test_connection_via_the_tunnel(
         )
     _ensure_that_proxied_service_is_created()
 
+    import time
+    time.sleep(1500)
+
     @retry(tries=60, delay=1)
     def _ensure_that_proxied_service_is_reachable():
         kubectl.run(

@@ -2,118 +2,93 @@
 package k8s
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/glothriel/wormhole/pkg/listeners"
 	"github.com/glothriel/wormhole/pkg/peers"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
-type k8sServiceExposer struct {
-	namespace    string
-	child        listeners.Exposer
-	ownSelectors map[string]string
+type clientProvider interface {
+	New() (*kubernetes.Clientset, error)
 }
 
-func (factory *k8sServiceExposer) Add(app peers.App) (peers.App, error) {
+type fromInClusterConfigClientProvider struct{}
+
+func (fromInClusterConfigClientProvider) New() (*kubernetes.Clientset, error) {
 	config, inClusterConfigErr := rest.InClusterConfig()
 	if inClusterConfigErr != nil {
-		return peers.App{}, inClusterConfigErr
+		return nil, inClusterConfigErr
 	}
-	clientset, clientSetErr := kubernetes.NewForConfig(config)
+	return kubernetes.NewForConfig(config)
+}
+
+type k8sResourceExposer struct {
+	namespace string
+	child     listeners.Exposer
+	selectors map[string]string
+
+	managedResources []managedK8sResource
+
+	clientProvider clientProvider
+}
+
+func (exp *k8sResourceExposer) Add(app peers.App) (peers.App, error) {
+	clientset, clientSetErr := exp.clientProvider.New()
 	if clientSetErr != nil {
 		return peers.App{}, clientSetErr
 	}
-	servicesClient := clientset.CoreV1().Services(factory.namespace)
-	addedApp, childFactoryErr := factory.child.Add(app)
+	addedApp, childFactoryErr := exp.child.Add(app)
 	if childFactoryErr != nil {
 		return peers.App{}, childFactoryErr
 	}
-	port, portErr := extractPortFromAddr(addedApp.Address)
-	if portErr != nil {
-		return peers.App{}, multierr.Combine(portErr, factory.Withdraw(addedApp))
+	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
+	for _, managedResource := range exp.managedResources {
+		addErr := managedResource.Add(k8sResourceMetadata{
+			entityName:       entityName,
+			initialApp:       app,
+			childReturnedApp: addedApp,
+		}, clientset)
+		if addErr != nil {
+			return peers.App{}, multierr.Combine(addErr, exp.child.Withdraw(app))
+		}
 	}
-
-	serviceName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: factory.namespace,
-			Labels:    factory.buildLabelsForSvc(),
-			Annotations: map[string]string{
-				"x-wormhole-app":  app.Name,
-				"x-wormhole-peer": app.Peer,
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Port:       app.OriginalPort,
-				TargetPort: intstr.FromInt(port),
-			}},
-			Selector: factory.ownSelectors,
-		},
-	}
-	var upsertErr error
-	previousService, getErr := servicesClient.Get(context.Background(), serviceName, metav1.GetOptions{})
-	if errors.IsNotFound(getErr) {
-		logrus.Debugf("Creating service %s", serviceName)
-		_, upsertErr = servicesClient.Create(context.Background(), service, metav1.CreateOptions{})
-	} else if getErr != nil {
-		return peers.App{}, multierr.Combine(
-			fmt.Errorf("Could not get service %s: %v", serviceName, getErr), factory.Withdraw(addedApp),
-		)
-	} else {
-		logrus.Debugf("Updating service %s", serviceName)
-		service.SetResourceVersion(previousService.GetResourceVersion())
-		_, upsertErr = servicesClient.Update(context.Background(), service, metav1.UpdateOptions{})
-	}
-	if upsertErr != nil {
-		return peers.App{}, multierr.Combine(
-			fmt.Errorf("Unable to upsert the service: %v", upsertErr), factory.Withdraw(addedApp),
-		)
-	}
-	return peers.WithAddress(addedApp, fmt.Sprintf("%s.%s:%d", serviceName, factory.namespace, app.OriginalPort)), nil
+	return peers.WithAddress(addedApp, fmt.Sprintf("%s.%s:%d", entityName, exp.namespace, app.OriginalPort)), nil
 }
 
-func (factory *k8sServiceExposer) Withdraw(app peers.App) error {
-	serviceName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
-	logrus.Debugf("Deleting service %s", serviceName)
-	config, inClusterConfigErr := rest.InClusterConfig()
-	if inClusterConfigErr != nil {
-		return inClusterConfigErr
-	}
-	clientset, clientSetErr := kubernetes.NewForConfig(config)
+func (exp *k8sResourceExposer) Withdraw(app peers.App) error {
+	clientset, clientSetErr := exp.clientProvider.New()
 	if clientSetErr != nil {
 		return clientSetErr
 	}
-	servicesClient := clientset.CoreV1().Services(factory.namespace)
-	deleteErr := servicesClient.Delete(context.Background(), serviceName, metav1.DeleteOptions{})
-	if deleteErr != nil {
-		return fmt.Errorf("Could not delete service %s: %v", serviceName, deleteErr)
+	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
+	for i := range len(exp.managedResources) {
+		managedResource := exp.managedResources[len(exp.managedResources)-1-i]
+		removeErr := managedResource.Remove(entityName, clientset)
+		if removeErr != nil {
+			return removeErr
+		}
 	}
-	return factory.child.Withdraw(app)
+	return exp.child.Withdraw(app)
 }
 
-func (factory *k8sServiceExposer) WithdrawAll() error {
+func (exp *k8sResourceExposer) WithdrawAll() error {
+	clientset, clientSetErr := exp.clientProvider.New()
+	if clientSetErr != nil {
+		return clientSetErr
+	}
+	for i := range len(exp.managedResources) {
+		managedResource := exp.managedResources[len(exp.managedResources)-1-i]
+		removeAllErr := managedResource.RemoveAll(clientset)
+		if removeAllErr != nil {
+			return removeAllErr
+		}
+	}
 	return nil
-}
-
-func (factory *k8sServiceExposer) buildLabelsForSvc() map[string]string {
-	labelsMap := map[string]string{}
-	for sKey, sVal := range factory.ownSelectors {
-		labelsMap[sKey] = sVal
-	}
-	return labelsMap
 }
 
 // NewK8sExposer implements PortOpenerFactory as a decorator over existing PortOpenerFactory, that
@@ -121,12 +96,24 @@ func (factory *k8sServiceExposer) buildLabelsForSvc() map[string]string {
 func NewK8sExposer(
 	namespace string,
 	selectors map[string]string,
-	childFactory listeners.Exposer,
+	childExposer listeners.Exposer,
 ) listeners.Exposer {
-	return &k8sServiceExposer{
-		namespace:    namespace,
-		ownSelectors: selectors,
-		child:        childFactory,
+	return &k8sResourceExposer{
+		namespace:      namespace,
+		selectors:      selectors,
+		child:          childExposer,
+		clientProvider: fromInClusterConfigClientProvider{},
+
+		managedResources: []managedK8sResource{
+			&managedK8sNetworkPolicy{
+				namespace: namespace,
+				selectors: selectors,
+			},
+			&managedK8sService{
+				namespace: namespace,
+				selectors: selectors,
+			},
+		},
 	}
 }
 
@@ -138,6 +125,30 @@ func CSVToMap(csv string) map[string]string {
 		theMap[parsedKVPair[0]] = strings.Join(parsedKVPair[1:], "=")
 	}
 	return theMap
+}
+
+const exposedByLabel = "wormhole.glothriel.github.com/exposed-by"
+const exposedAppLabel = "wormhole.glothriel.github.com/exposed-app"
+const exposedPeerLabel = "wormhole.glothriel.github.com/exposed-peer"
+
+func resourceLabels(app peers.App) map[string]string {
+	return map[string]string{
+		exposedByLabel:   "wormhole",
+		exposedAppLabel:  app.Name,
+		exposedPeerLabel: app.Peer,
+	}
+}
+
+type k8sResourceMetadata struct {
+	entityName       string
+	initialApp       peers.App
+	childReturnedApp peers.App
+}
+
+type managedK8sResource interface {
+	Add(k8sResourceMetadata, *kubernetes.Clientset) error
+	Remove(name string, clientset *kubernetes.Clientset) error
+	RemoveAll(*kubernetes.Clientset) error
 }
 
 func extractPortFromAddr(address string) (int, error) {
