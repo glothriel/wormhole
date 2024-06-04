@@ -43,6 +43,8 @@ Syncing is a process of exchanging information about exposed applications on bot
 
 You can install wormhole using helm. For server you will need a cluster with LoadBalancer support, for client - any cluster. IP exposed by the server's LoadBalancer must be reachable from the client's cluster.
 
+You can optionally install both the server and the client on the same cluster and use ClusterIP service for communication. See the [./Tiltfile](./Tiltfile) for an example, as the development environment uses this approach.
+
 ### Install server
 
 Server is a central component of wormhole. It allows clients to connect and hosts the tunnels. It exposes two services:
@@ -72,7 +74,7 @@ You should do this on another cluster. If not, change the namespace to say `worm
 ```
 kubectl create namespace wormhole
 
-helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --set client.name=clientOne
+helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set client.serverDsn="http://<server.wg.publicHost>:8080" --set client.name=client-one
 ```
 
 ### Expose a service
