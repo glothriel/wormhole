@@ -1,6 +1,6 @@
 # Wormhole
 
-L3 (wireguard) and L4 (NGINX) reverse TCP tunnels over wireguard, similar to ngrok, teleport or skupper, but implemented specifically for Kubernetes. Mostly a learning project. Allows exposing services from one Kubernetes cluster to another just by annotating them.
+Wireguard + Nginx Stream (L4)  reverse TCP tunnels over wireguard, similar to ngrok, teleport or skupper, but implemented specifically for Kubernetes. Mostly a learning project. Allows exposing services from one Kubernetes cluster to another just by annotating them.
 
 Wormhole is implemented using "Hub and spoke" architecture. One cluster acts as a central hub, while others are clients. Clients can expose services to the hub and the hub can expose services to the clients. Exposing of the services between the clients is **not supported**.
 
