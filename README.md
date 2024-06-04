@@ -41,7 +41,7 @@ Syncing is a process of exchanging information about exposed applications on bot
 
 ## Usage
 
-You can install wormhole using helm. Please clone this repository first. For server you will need a cluster with LoadBalancer support, for client - any cluster. IP exposed by the server's LoadBalancer must be reachable from the client's cluster.
+You can install wormhole using helm. For server you will need a cluster with LoadBalancer support, for client - any cluster. IP exposed by the server's LoadBalancer must be reachable from the client's cluster.
 
 ### Install server
 
@@ -77,7 +77,7 @@ helm install -n wormhole wh kubernetes/helm --set client.enabled=true --set clie
 
 ### Expose a service
 
-No you can expose a service from one infrastructure to another. Services exposed from the server will be available on all the clients. Services exposed from the client will be available only on the server.
+Now you can expose a service from one infrastructure to another. Services exposed from the server will be available on all the clients. Services exposed from the client will be available only on the server.
 
 ```
 kubectl annotate --overwrite svc --namespace <namespace> <service> wormhole.glothriel.github.com/exposed=yes
