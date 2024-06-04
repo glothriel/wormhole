@@ -35,7 +35,7 @@ jobs:
           sed -i "s/nginxVersion: .*GHA/nginxVersion: $VERSION/" kubernetes/helm/values.yaml
 
       - name: Push Helm chart to registry
-        if: github.event_name == 'push' # skip on PRs
+        if: github.event_name != 'pull_request' # skip on PRs
         uses: bsord/helm-push@v4.1.0
         with:
           useOCIRegistry: true
