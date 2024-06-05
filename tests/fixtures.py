@@ -367,7 +367,8 @@ class K3dCluster:
         if os.path.isfile("/tmp/k3d-linux-amd64"):
             return "/tmp/k3d-linux-amd64"
         download(
-            f"https://github.com/k3d-io/k3d/releases/download/{self.K3D_VERSION}/k3d-linux-amd64"
+            f"https://github.com/k3d-io/k3d/releases/download/{self.K3D_VERSION}/k3d-linux-amd64",
+            "/tmp/k3d-linux-amd64"
         )
         assert not run_process(["chmod", "+x", "/tmp/k3d-linux-amd64"]).returncode
         return "/tmp/k3d-linux-amd64"
