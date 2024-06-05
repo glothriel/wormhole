@@ -17,8 +17,6 @@ def run_process(process, **kwargs):
     print("\n>>> " + " ".join(process))
     rt = subprocess.run(
         process,
-        # stdout=kwargs.pop("stdout", subprocess.PIPE),
-        # stderr=kwargs.pop("stderr", subprocess.PIPE),
         **kwargs,
     )
     try:

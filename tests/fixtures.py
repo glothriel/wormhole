@@ -111,7 +111,7 @@ class K3dCluster:
     def __init__(self, name):
         self.name = name
         self.existed_before = False
-        self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
+        self.kubeconfig = os.path.join("/tmp", f"k3d-{self.name}-kubeconfig")
 
     @property
     def exists(self):
