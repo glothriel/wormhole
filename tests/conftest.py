@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from .fixtures import Helm, K3dCluster, Kubectl, MockServer, MySQLServer, Curl
+from .fixtures import Helm, K3dCluster, Kubectl, MockServer, Curl
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +32,6 @@ def run_process(process, **kwargs):
             if stderr:
                 logger.error(stderr)
     return rt
-
-
-@pytest.fixture()
-def mysql():
-    mysql = MySQLServer()
-    try:
-        mysql.start()
-        yield mysql
-    finally:
-        mysql.stop()
 
 
 @pytest.fixture()
