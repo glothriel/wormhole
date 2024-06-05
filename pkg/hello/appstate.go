@@ -16,8 +16,8 @@ type AppStateChangeGenerator struct {
 	lock    sync.Mutex
 }
 
-// OnSync is called when a sync message is received
-func (s *AppStateChangeGenerator) OnSync(peer string, apps []peers.App) {
+// SetState is called when a sync message is received
+func (s *AppStateChangeGenerator) SetState(peer string, apps []peers.App) {
 	logrus.Debugf("Received sync from %s with %d apps", peer, len(apps))
 	s.lock.Lock()
 	defer s.lock.Unlock()

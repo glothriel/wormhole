@@ -179,9 +179,11 @@ func (t *httpClientSyncingTransport) Sync(req []byte) ([]byte, error) {
 }
 
 // NewHTTPClientSyncingTransport creates a new SyncClientTransport instance
-func NewHTTPClientSyncingTransport(serverURL string) SyncClientTransport {
+func NewHTTPClientSyncingTransport(serverURL string, timeout time.Duration) SyncClientTransport {
 	return &httpClientSyncingTransport{
 		serverURL: serverURL,
-		client:    &http.Client{},
+		client: &http.Client{
+			Timeout: timeout,
+		},
 	}
 }
