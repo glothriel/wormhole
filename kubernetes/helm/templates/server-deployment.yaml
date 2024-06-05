@@ -136,8 +136,6 @@ spec:
             - --debug
           {{- end }}
             - server
-            - --invite-token
-            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.server.name }}
             - --kubernetes
