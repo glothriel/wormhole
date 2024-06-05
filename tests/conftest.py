@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server, Curl
+from .fixtures import Client, Helm, K3dCluster, Kubectl, MockServer, MySQLServer, Server, Curl
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,8 @@ def mock_server(fresh_cluster, wormhole_image, kubectl):
 
 
 @pytest.fixture(scope="session")
-def kind_cluster():
-    cluster = KindCluster("pytest")
+def kubernetes_cluster():
+    cluster = K3dCluster("pytest")
     try:
         cluster.create()
         yield cluster
@@ -107,16 +107,16 @@ def kind_cluster():
 
 
 @pytest.fixture(scope="session")
-def kubectl(kind_cluster):
-    yield Kubectl(kind_cluster)
+def kubectl(kubernetes_cluster):
+    yield Kubectl(kubernetes_cluster)
 
 
 @pytest.fixture()
 def fresh_cluster(
-    kind_cluster,
+    kubernetes_cluster,
     docker_images_loaded_into_cluster
 ):
-    kubectl = Kubectl(kind_cluster)
+    kubectl = Kubectl(kubernetes_cluster)
     starting_namespaces = set(
         [
             'kube-system',
@@ -127,7 +127,7 @@ def fresh_cluster(
         ]
     )
     try:
-        yield kind_cluster
+        yield kubernetes_cluster
     finally:
         finishing_namespaces = set(
             [item["metadata"]["name"] for item in kubectl.json(["get", "namespaces"])["items"]]
@@ -139,8 +139,8 @@ def fresh_cluster(
 
 
 @pytest.fixture(scope='session')
-def helm(kind_cluster):
-    yield Helm(kind_cluster)
+def helm(kubernetes_cluster):
+    yield Helm(kubernetes_cluster)
 
 
 @pytest.fixture()
@@ -209,10 +209,10 @@ def nginx_image():
 
 
 @pytest.fixture(scope="session")
-def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_image, nginx_image):
-    kind_cluster.load_image(wormhole_image)
-    kind_cluster.load_image(wireguard_image)
-    kind_cluster.load_image(nginx_image)
+def docker_images_loaded_into_cluster(kubernetes_cluster, wormhole_image, wireguard_image, nginx_image):
+    kubernetes_cluster.load_image(wormhole_image)
+    kubernetes_cluster.load_image(wireguard_image)
+    kubernetes_cluster.load_image(nginx_image)
     yield {
         'wormhole': wormhole_image,
         'wireguard': wireguard_image,
@@ -244,6 +244,7 @@ def k8s_server(
         "server",
         {
             "server.enabled": True,
+            "networkPolicies.enabled": True,
             "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
             "server.service.type": "ClusterIP",
             "docker.image": wormhole_image.split(":")[0],
@@ -272,6 +273,7 @@ def k8s_client(
         "client",
         {
             "client.enabled": True,
+            "networkPolicies.enabled": True,
             "client.name": "client",
             "client.serverDsn": "http://wormhole-server-server.server.svc.cluster.local:8080",
             "docker.image": wormhole_image.split(":")[0],

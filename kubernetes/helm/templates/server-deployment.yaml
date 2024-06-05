@@ -135,10 +135,10 @@ spec:
           {{- if .Values.server.debug }}
             - --debug
           {{- end }}
+            - server
           {{- if .Values.networkPolicies.enabled }}
             - --network-policies
           {{- end }}
-            - server
             - --name
             - {{ .Values.server.name }}
             - --kubernetes

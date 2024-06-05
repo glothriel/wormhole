@@ -61,6 +61,7 @@ var serverCommand *cli.Command = &cli.Command{
 		intServerListenPort,
 		kubernetesNamespaceFlag,
 		kubernetesLabelsFlag,
+		enableNetworkPoliciesFlag,
 		peerStorageDBFlag,
 		peerNameFlag,
 		wgAddressFlag,

@@ -365,6 +365,100 @@ class KindCluster:
         )
 
 
+class K3dCluster:
+
+    K3D_VERSION = "v5.6.3"
+
+    def __init__(self, name):
+        self.name = name
+        self.existed_before = False
+        self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
+
+    @property
+    def exists(self):
+        result = self.run(["cluster", "list", "-o", "json"])
+        clusters = json.loads(result.stdout.decode())
+        return self.name in [cluster["name"] for cluster in clusters]
+
+    def create(self):
+        if self.exists:
+            self.existed_before = False
+            return
+        self.run(
+            [
+                "cluster",
+                "create",
+                self.name,
+                "--registry-create",
+                self.name,
+            ],
+        )
+
+        kubeconfig = self.run(
+            [
+                "kubeconfig",
+                "get",
+                self.name,
+            ],
+        ).stdout.decode()
+
+        with open(self.kubeconfig, "w") as f:
+            f.write(kubeconfig)
+
+        @retry(tries=60, delay=2)
+        def wait_for_cluster_availability():
+            Kubectl(self).run(["get", "namespaces"])
+
+        wait_for_cluster_availability()
+
+    def delete(self):
+        if not self.exists:
+            return
+        if self.existed_before or json.loads(os.getenv("REUSE_CLUSTER") or 'false'):
+            print(
+                "Skipping removal of K3d cluster - either it existed before the tests "
+                "were run or REUSE_CLUSTER is set to true"
+            )
+            return
+        self.run(
+            [
+                "cluster",
+                "delete",
+                self.name,
+            ],
+        )
+
+    def executable(self):
+        if shutil.which("k3d"):
+            return shutil.which("k3d")
+        if os.path.isfile("/tmp/k3d-linux-amd64"):
+            return "/tmp/k3d-linux-amd64"
+        download(
+            f"https://github.com/k3d-io/k3d/releases/download/{self.KIND_VERSION}/k3d-linux-amd64"
+        )
+        assert not run_process(["chmod", "+x", "/tmp/k3d-linux-amd64"]).returncode
+        return "/tmp/k3d-linux-amd64"
+
+    def run(self, command):
+        return run_process(
+            [self.executable()] + command,
+            shell=False,
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+
+    def load_image(self, image):
+        self.run(
+            [
+                "image",
+                "import",
+                "-c",
+                self.name,
+                image,
+            ],
+        )
+
+
 class Helm:
 
     HELM_VERSION = "v3.8.2"
