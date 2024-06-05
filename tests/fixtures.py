@@ -298,73 +298,6 @@ class Kubectl:
         return "/tmp/kubectl"
 
 
-class KindCluster:
-
-    KIND_VERSION = "v0.23.0"
-
-    def __init__(self, name):
-        self.name = name
-        self.existed_before = False
-        self.kubeconfig = os.path.join("/tmp", f"kind-{self.name}-kubeconfig")
-
-    @property
-    def exists(self):
-        result = run_process(["docker", "ps", "--format", "{{ .Names }}"], stdout=subprocess.PIPE)
-        assert not result.returncode, "Could not list running docker containers"
-        exists = f"{self.name}-control-plane" in result.stdout.decode()
-        return exists
-
-    def create(self):
-        if self.exists:
-            self.existed_before = True
-            return
-        assert not run_process(
-            [
-                self.executable(),
-                "create",
-                "cluster",
-                "--name",
-                self.name,
-                "--kubeconfig",
-                self.kubeconfig,
-            ],
-        ).returncode, "Could not create cluster"
-
-        @retry(tries=60, delay=2)
-        def wait_for_cluster_availability():
-            Kubectl(self).run(["get", "namespaces"])
-        wait_for_cluster_availability()
-
-        Kubectl(self).run(['create', '-f', 'kubernetes/raw/kind/nps.yaml'])
-
-    def delete(self):
-        assert self.exists, f"Cannot delete cluster {self.name} - it does not exist"
-        if self.existed_before or json.loads(os.getenv("REUSE_CLUSTER") or 'false'):
-            print("Skipping removal of KIND cluster - it existed before the tests were run")
-            return
-        assert not run_process(
-            [self.executable(), "delete", "cluster", "--name", self.name],
-        ).returncode, "Could not delete cluster"
-
-    def executable(self):
-        if shutil.which("kind"):
-            return shutil.which("kind")
-        if os.path.isfile("/tmp/kind-linux-amd64"):
-            return "/tmp/kind-linux-amd64"
-        download(
-            f"https://github.com/kubernetes-sigs/kind/releases/download/{self.KIND_VERSION}/kind-linux-amd64",
-            "/tmp/kind-linux-amd64",
-        )
-        assert not run_process(["chmod", "+x", "/tmp/kind-linux-amd64"]).returncode
-        return "/tmp/kind-linux-amd64"
-
-    def load_image(self, image):
-        run_process(
-            [self.executable(), "load", "docker-image", "--name", self.name, image],
-            check=True,
-        )
-
-
 class K3dCluster:
 
     K3D_VERSION = "v5.6.3"
@@ -434,7 +367,7 @@ class K3dCluster:
         if os.path.isfile("/tmp/k3d-linux-amd64"):
             return "/tmp/k3d-linux-amd64"
         download(
-            f"https://github.com/k3d-io/k3d/releases/download/{self.KIND_VERSION}/k3d-linux-amd64"
+            f"https://github.com/k3d-io/k3d/releases/download/{self.K3D_VERSION}/k3d-linux-amd64"
         )
         assert not run_process(["chmod", "+x", "/tmp/k3d-linux-amd64"]).returncode
         return "/tmp/k3d-linux-amd64"
