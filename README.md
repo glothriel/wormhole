@@ -168,7 +168,7 @@ cd tests && python setup.py develop && cd -
 pytest tests
 ```
 
-If you are re-running the tests multiple times, you may want to reuse the KIND cluster, you can do this by setting the `REUSE_CLUSTER` environment variable to a truthy value.
+If you are re-running the tests multiple times, you may want to reuse the K3d cluster, you can do this by setting the `REUSE_CLUSTER` environment variable to a truthy value. It will then abstain from removing the cluster after the tests are done and reuse it for the next run.
 
 ```
 export REUSE_CLUSTER=1
