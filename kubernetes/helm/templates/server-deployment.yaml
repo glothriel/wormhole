@@ -17,6 +17,8 @@ spec:
     type: Recreate
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/server-config.yaml") . | sha256sum }}
       labels:
         application: {{ template "name-server" . }}
     spec: 
@@ -45,7 +47,6 @@ spec:
       volumes:
       - name: nginx-conf
         configMap:
-        
           name: {{ template "name-server" . }}-nginx
       - name: {{ template "name-server" . }}-tmp
       {{- if .Values.devMode.enabled }}
@@ -93,6 +94,9 @@ spec:
        
         - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
+          envFrom:
+          - secretRef:
+              name: {{ template "name-server" . }}-env
           imagePullPolicy: {{ $.Values.server.pullPolicy }}
           {{- with .Values.server.containerSecurityContext }}
           securityContext:
@@ -132,8 +136,6 @@ spec:
             - --debug
           {{- end }}
             - server
-            - --invite-token
-            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.server.name }}
             - --kubernetes
@@ -147,25 +149,6 @@ spec:
             - '--peer-storage-db=/storage/peers.db'
             - '--key-storage-db=/storage/keys.db'
 
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ template "name-server" . }}-nginx
-data:
-  nginx.conf: |
-    worker_processes  auto;
-
-    error_log  /home/nginx/log/nginx/error.log notice;
-    pid        /home/nginx/nginx.pid;
-
-    events {
-        worker_connections  1024;
-    }
-    
-    stream {
-      include /etc/nginx/conf.d/*.conf;
-    }
 
 
 {{ end }}
