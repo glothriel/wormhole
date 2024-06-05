@@ -22,44 +22,11 @@ const consumesNpLabel = "wormhole.glothriel.github.com/network-policy-consumes-a
 
 func (m *managedK8sNetworkPolicy) Add(metadata k8sResourceMetadata, clientset *kubernetes.Clientset) error {
 	networkPoliciesClient := clientset.NetworkingV1().NetworkPolicies(m.namespace)
-
 	port, portErr := extractPortFromAddr(metadata.childReturnedApp.Address)
 	if portErr != nil {
 		return portErr
 	}
-	proto := v1.ProtocolTCP
-	convertedPort := intstr.FromInt(port)
-	np := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      metadata.entityName,
-			Namespace: m.namespace,
-			Labels:    resourceLabels(metadata.childReturnedApp),
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: metav1.LabelSelector{
-				MatchLabels: m.selectors,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				{
-					Ports: []networkingv1.NetworkPolicyPort{
-						{
-							Protocol: &proto,
-							Port:     &convertedPort,
-						},
-					},
-					From: []networkingv1.NetworkPolicyPeer{
-						{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									consumesNpLabel: metadata.initialApp.Name,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	np := m.npDefinition(port, metadata)
 	var upsertErr error
 	previousNP, getErr := networkPoliciesClient.Get(context.Background(), metadata.entityName, metav1.GetOptions{})
 	if errors.IsNotFound(getErr) {
@@ -76,6 +43,44 @@ func (m *managedK8sNetworkPolicy) Add(metadata k8sResourceMetadata, clientset *k
 		return upsertErr
 	}
 	return nil
+}
+
+func (m *managedK8sNetworkPolicy) npDefinition(port int, metadata k8sResourceMetadata) *networkingv1.NetworkPolicy {
+	protoTCP := v1.ProtocolTCP
+	convertedPort := intstr.FromInt(port)
+
+	return &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      metadata.entityName,
+			Namespace: m.namespace,
+			Labels:    resourceLabels(metadata.childReturnedApp),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: m.selectors,
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Protocol: &protoTCP,
+							Port:     &convertedPort,
+						},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									consumesNpLabel: metadata.initialApp.Name,
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func (m *managedK8sNetworkPolicy) Remove(entityName string, clientset *kubernetes.Clientset) error {
@@ -105,4 +110,11 @@ func (m *managedK8sNetworkPolicy) RemoveAll(clientset *kubernetes.Clientset) err
 		logrus.Infof("Deleted network policy %s", np.Name)
 	}
 	return nil
+}
+
+func newManagedK8sNetworkPolicy(namespace string, selectors map[string]string) managedK8sResource {
+	return &managedK8sNetworkPolicy{
+		namespace: namespace,
+		selectors: selectors,
+	}
 }

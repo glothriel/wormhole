@@ -204,6 +204,42 @@ class MockServer:
         self.kubectl.run(["delete", "ns", self.namespace])
 
 
+class Curl:
+    def __init__(self, kubectl):
+        self.kubectl = kubectl
+
+    def start(self):
+
+        @retry(tries=20, delay=.5)
+        def _wait_for_mocks():
+            self.kubectl.run(["apply", "-f", "kubernetes/raw/curl/all.yaml"])
+        _wait_for_mocks()
+        return self
+
+    def stop(self):
+        self.kubectl.run(["delete", "-f", "kubernetes/raw/curl/all.yaml"])
+
+    def call_with_network_policy(self, command, max_time_seconds=None):
+        return self._call('curl-with-labels', command, max_time_seconds)
+
+    def call_without_network_policy(self, command, max_time_seconds=None):
+        return self._call('curl-no-labels', command, max_time_seconds)
+
+    def _call(self, pod, command, max_time_seconds=None):
+        max_time_seconds = max_time_seconds or 20
+        return self.kubectl.run(
+            [
+                '-n',
+                'default',
+                'exec',
+                f'pod/{pod}',
+                '--',
+                'curl',
+                '-m', str(max_time_seconds),
+            ] + (command if type(command) is list else [command])
+        )
+
+
 @contextmanager
 def launched_in_background(process):
     try:
@@ -297,12 +333,13 @@ class KindCluster:
         @retry(tries=60, delay=2)
         def wait_for_cluster_availability():
             Kubectl(self).run(["get", "namespaces"])
-
         wait_for_cluster_availability()
+
+        Kubectl(self).run(['create', '-f', 'kubernetes/raw/kind/nps.yaml'])
 
     def delete(self):
         assert self.exists, f"Cannot delete cluster {self.name} - it does not exist"
-        if self.existed_before:
+        if self.existed_before or json.loads(os.getenv("REUSE_CLUSTER") or 'false'):
             print("Skipping removal of KIND cluster - it existed before the tests were run")
             return
         assert not run_process(
@@ -386,64 +423,6 @@ def download(url, path):
     assert response.status_code < 299, f"Could not download file from {url}"
     with open(path, "wb") as f:
         f.write(response.content)
-
-
-class Nginx:
-
-    YAML = """---
-apiVersion: v1
-kind: Service
-metadata:
-  name: nginx
-  namespace: nginx
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 80
-  selector:
-    app: nginx
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx
-  namespace: nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:1.17.3
-          ports:
-            - containerPort: 80
-"""
-
-    def __init__(self):
-        self.name = "nginx"
-        self.service = "nginx"
-        self.namespace = "nginx"
-
-    def create(self, kubectl):
-        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", suffix=".yaml", delete=False)
-        with open(tmp.name, 'w') as f:
-            f.write(self.YAML)
-        kubectl.run(["create", "ns", self.namespace])
-
-        @retry(tries=20, delay=.5)
-        def _wait_for_nginx():
-            kubectl.run(["apply", "-f", tmp.name])
-        _wait_for_nginx()
-        os.unlink(tmp.name)
-
-    def delete(self, kubectl):
-        kubectl.run(["delete", "ns", self.namespace])
 
 
 class Annotator:

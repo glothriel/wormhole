@@ -96,24 +96,20 @@ func (exp *k8sResourceExposer) WithdrawAll() error {
 func NewK8sExposer(
 	namespace string,
 	selectors map[string]string,
+	enableNetworkPolicies bool,
 	childExposer listeners.Exposer,
 ) listeners.Exposer {
+	resources := []managedK8sResource{}
+	if enableNetworkPolicies {
+		resources = append(resources, newManagedK8sNetworkPolicy(namespace, selectors))
+	}
 	return &k8sResourceExposer{
 		namespace:      namespace,
 		selectors:      selectors,
 		child:          childExposer,
 		clientProvider: fromInClusterConfigClientProvider{},
 
-		managedResources: []managedK8sResource{
-			&managedK8sNetworkPolicy{
-				namespace: namespace,
-				selectors: selectors,
-			},
-			&managedK8sService{
-				namespace: namespace,
-				selectors: selectors,
-			},
-		},
+		managedResources: append(resources, newManagedK8sService(namespace, selectors)),
 	}
 }
 

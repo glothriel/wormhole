@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server, Nginx
+from .fixtures import Client, Helm, KindCluster, Kubectl, MockServer, MySQLServer, Server, Curl
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def fresh_cluster(
             'default',
             'local-path-storage',
             'kube-node-lease',
-            'kube-public'
+            'kube-public',
         ]
     )
     try:
@@ -218,6 +218,16 @@ def docker_images_loaded_into_cluster(kind_cluster, wormhole_image, wireguard_im
         'wireguard': wireguard_image,
         'nginx': nginx_image,
     }
+
+
+@pytest.fixture(scope="session")
+def curl(kubectl):
+    c = Curl(kubectl)
+    c.start()
+    try:
+        yield c
+    finally:
+        c.stop()
 
 
 @pytest.fixture()

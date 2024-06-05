@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-with-labels
+  namespace: default
+  labels:
+    wormhole.glothriel.github.com/network-policy-consumes-app: nginx-nginx
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+  - name: curl-container
+    image: curlimages/curl
+    command: ["sleep", "999999"]
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-no-labels
+  namespace: default
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+  - name: curl-container
+    image: curlimages/curl
+    command: ["sleep", "999999"]

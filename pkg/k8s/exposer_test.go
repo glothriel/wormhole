@@ -45,26 +45,31 @@ type managedMockResource struct {
 	counter *counter
 }
 
-func (m *managedMockResource) Add(metadata k8sResourceMetadata, clientset *kubernetes.Clientset) error {
+func (m *managedMockResource) Add(metadata k8sResourceMetadata, _ *kubernetes.Clientset) error {
 	m.addCalled = m.counter.next()
 	m.addLastCalledWith = metadata
 	return m.addErr
 }
 
-func (m *managedMockResource) Remove(entityName string, clientset *kubernetes.Clientset) error {
+func (m *managedMockResource) Remove(entityName string, _ *kubernetes.Clientset) error {
 	m.removeCalled = m.counter.next()
 	m.removeLastCalledWith = entityName
 	return m.removeErr
 }
 
-func (m *managedMockResource) RemoveAll(clientset *kubernetes.Clientset) error {
+func (m *managedMockResource) RemoveAll(_ *kubernetes.Clientset) error {
 	m.removeAllCalled = m.counter.next()
 	return m.removeAllErr
 }
 
 func TestExposerAdd(t *testing.T) {
 	// given
-	exposer := NewK8sExposer("namespace", map[string]string{}, listeners.NewNoOpExposer()).(*k8sResourceExposer)
+	exposer := NewK8sExposer(
+		"namespace",
+		map[string]string{},
+		false,
+		listeners.NewNoOpExposer(),
+	).(*k8sResourceExposer)
 	exposer.clientProvider = mockClientProvider{}
 	counter := &counter{}
 	rsc1 := &managedMockResource{counter: counter}
@@ -97,7 +102,12 @@ func TestExposerAdd(t *testing.T) {
 
 func TestExposerWithdraw(t *testing.T) {
 	// given
-	exposer := NewK8sExposer("namespace", map[string]string{}, listeners.NewNoOpExposer()).(*k8sResourceExposer)
+	exposer := NewK8sExposer(
+		"namespace",
+		map[string]string{},
+		false,
+		listeners.NewNoOpExposer(),
+	).(*k8sResourceExposer)
 	exposer.clientProvider = mockClientProvider{}
 	counter := &counter{}
 	rsc1 := &managedMockResource{counter: counter}
@@ -117,7 +127,12 @@ func TestExposerWithdraw(t *testing.T) {
 
 func TestExposerWithdrawAll(t *testing.T) {
 	// given
-	exposer := NewK8sExposer("namespace", map[string]string{}, listeners.NewNoOpExposer()).(*k8sResourceExposer)
+	exposer := NewK8sExposer(
+		"namespace",
+		map[string]string{},
+		false,
+		listeners.NewNoOpExposer(),
+	).(*k8sResourceExposer)
 	exposer.clientProvider = mockClientProvider{}
 	counter := &counter{}
 	rsc1 := &managedMockResource{counter: counter}

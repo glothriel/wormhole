@@ -106,6 +106,7 @@ var serverCommand *cli.Command = &cli.Command{
 			effectiveExposer = k8s.NewK8sExposer(
 				c.String(kubernetesNamespaceFlag.Name),
 				k8s.CSVToMap(c.String(kubernetesLabelsFlag.Name)),
+				c.Bool(enableNetworkPoliciesFlag.Name),
 				remoteNginxExposer,
 			)
 		}

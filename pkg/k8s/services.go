@@ -84,3 +84,10 @@ func (m *managedK8sService) RemoveAll(clientset *kubernetes.Clientset) error { /
 	}
 	return nil
 }
+
+func newManagedK8sService(namespace string, selectors map[string]string) managedK8sResource {
+	return &managedK8sService{
+		namespace: namespace,
+		selectors: selectors,
+	}
+}

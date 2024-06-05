@@ -133,3 +133,10 @@ cd tests && python setup.py develop && cd -
 
 pytest tests
 ```
+
+If you are re-running the tests multiple times, you may want to reuse the KIND cluster, you can do this by setting the `REUSE_CLUSTER` environment variable to a truthy value.
+
+```
+export REUSE_CLUSTER=1
+pytest tests
+```
