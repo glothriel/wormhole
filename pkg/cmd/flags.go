@@ -47,9 +47,10 @@ var stateManagerPathFlag *cli.StringFlag = &cli.StringFlag{
 }
 
 var inviteTokenFlag *cli.StringFlag = &cli.StringFlag{
-	Name:  "invite-token",
-	Usage: "Invite token to use to connect to the wormhole server",
-	Value: "",
+	Name:    "invite-token",
+	Usage:   "Invite token to use to connect to the wormhole server",
+	EnvVars: []string{"INVITE_TOKEN"},
+	Value:   "",
 }
 
 var peerNameFlag *cli.StringFlag = &cli.StringFlag{

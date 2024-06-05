@@ -16,6 +16,8 @@ spec:
     type: Recreate
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/client-config.yaml") . | sha256sum }}
       labels:
         application: {{ template "name-client" . }}
     spec:
@@ -93,6 +95,9 @@ spec:
          
         - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
+          envFrom:
+          - secretRef:
+              name: {{ template "name-client" . }}-env
           imagePullPolicy: {{ $.Values.client.pullPolicy }}
           {{- with .Values.client.containerSecurityContext }}
           securityContext:
@@ -128,8 +133,6 @@ spec:
             - --debug
           {{- end }}
             - client
-            - --invite-token
-            - {{ .Values.peering.psk }}
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes
@@ -141,29 +144,5 @@ spec:
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
             - '--key-storage-db=/storage/keys.db'
 
-            
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ template "name-client" . }}-nginx
-data:
-  nginx.conf: |
-    worker_processes  auto;
-
-    error_log  /home/nginx/log/nginx/error.log notice;
-    pid        /home/nginx/nginx.pid;
-
-    events {
-        worker_connections  1024;
-    }
-
-    stream {
-      include /etc/nginx/conf.d/*.conf;
-    }
-  50-reload-if-confd-changes.conf: |
-    #!/bin/sh
-
-    inotifyd "sh -c '/usr/sbin/nginx -s reload && echo reloaded'" /etc/nginx/conf.d
-
+  
 {{ end }}

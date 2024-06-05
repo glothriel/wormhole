@@ -1,0 +1,31 @@
+{{- if .Values.server.enabled }}       
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "name-server" . }}-nginx
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /home/nginx/log/nginx/error.log notice;
+    pid        /home/nginx/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+    
+    stream {
+      include /etc/nginx/conf.d/*.conf;
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "name-server" . }}-env
+stringData:
+  INVITE_TOKEN: {{ .Values.peering.psk | quote }}
+  
+  
+{{ end }}
