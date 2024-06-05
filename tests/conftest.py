@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from .fixtures import Client, Helm, K3dCluster, Kubectl, MockServer, MySQLServer, Server, Curl
+from .fixtures import Helm, K3dCluster, Kubectl, MockServer, MySQLServer, Curl
 
 logger = logging.getLogger(__name__)
 
@@ -32,49 +32,6 @@ def run_process(process, **kwargs):
             if stderr:
                 logger.error(stderr)
     return rt
-
-
-@pytest.fixture(scope="session")
-def executable():
-    tmp = None
-    try:
-        tmp = tempfile.NamedTemporaryFile(prefix="wormhole", delete=False)
-        run_process(["go", "build", "-o", tmp.name, "main.go"])
-        yield tmp.name
-    finally:
-        os.unlink(tmp.name)
-
-
-@pytest.fixture()
-def client(executable, server, tmpdir):
-    c_subdir = tmpdir.mkdir("client")
-    c = Client(
-        executable,
-        server,
-        c_subdir.mkdir("state-manager"),
-        c_subdir.mkdir("nginx"),
-        c_subdir.mkdir("wireguard").join("wg0.conf"),
-    )
-    try:
-        yield c.start()
-    finally:
-        c.stop()
-
-
-@pytest.fixture()
-def server(executable, tmpdir):
-    s_subdir = tmpdir.mkdir("server")
-    server = Server(
-        executable,
-        s_subdir.mkdir("state-manager"),
-        s_subdir.mkdir("nginx"),
-        s_subdir.mkdir("wireguard").join("wg0.conf"),
-    )
-    try:
-        server.start()
-        yield server
-    finally:
-        server.stop()
 
 
 @pytest.fixture()

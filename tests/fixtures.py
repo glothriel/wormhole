@@ -1,15 +1,10 @@
 import json
 import os
 import shutil
-import signal
 import subprocess
-import socket
-import uuid
 from contextlib import contextmanager
-import tempfile
 
 import psutil
-import pymysql
 import requests
 from retry import retry
 
@@ -17,172 +12,6 @@ from retry import retry
 def run_process(command, *args, **kwargs):
     print(f">>> {' '.join(command)}")
     return subprocess.run(command, *args, **kwargs)
-
-
-class Server:
-    def __init__(
-        self,
-        executable,
-        state_manager_path="/tmp/server-state-manager",
-        nginx_confd_path="/tmp/server-nginx-confd",
-        wireguard_config_path="/tmp/server-wireguard/wg0.conf",
-        wireguard_address="0.0.0.0",
-        wireguard_subnet="24",
-        metrics_port=8090,
-    ):
-        self.executable = executable
-        self.state_manager_path = state_manager_path
-        self.nginx_confd_path = nginx_confd_path
-        self.wireguard_config_path = wireguard_config_path
-        self.metrics_port = metrics_port
-        self.wireguard_address = wireguard_address
-        self.wireguard_subnet = wireguard_subnet
-        self.process = None
-
-    def start(self):
-        cmd = [
-            self.executable,
-            "--debug",
-            "--metrics",
-            "--metrics-port",
-            str(self.metrics_port),
-            "server",
-            "--name",
-            uuid.uuid4().hex,
-            "--directory-state-manager-path",
-            self.state_manager_path,
-            "--nginx-confd-path",
-            self.nginx_confd_path,
-            "--wg-config",
-            self.wireguard_config_path,
-            "--wg-public-host",
-            self.wireguard_address,
-            "--wg-internal-host",
-            self.wireguard_address,
-            "--wg-subnet-mask",
-            self.wireguard_subnet,
-            "--invite-token",
-            "123123",
-        ]
-        print(" ".join([str(i) for i in cmd]))
-        self.process = subprocess.Popen(
-            cmd,
-            shell=False,
-        )
-
-        @retry(delay=0.1, tries=50)
-        def _check_if_is_already_opened():
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                try:
-                    s.connect(('localhost', self.metrics_port))
-                    return True
-                except (ConnectionRefusedError, OSError):
-                    raise Exception("Port is not open yet")
-
-        _check_if_is_already_opened()
-
-        return self
-
-    def stop(self):
-        return_code = self.process.poll()
-        if return_code is None:
-            return os.kill(self.process.pid, signal.SIGINT)
-
-    def admin(self, path):
-        return (
-            f'http://localhost:{self.admin_port}/{path if not path.startswith("/") else path[1:]}'
-        )
-
-
-class MySQLServer:
-    def __init__(self):
-        self.container_id = f"mysql-{uuid.uuid4().hex}"
-        self.host = "localhost"
-        self.port = 3306
-        self.user = "root"
-        self.password = "123123"
-
-    def start(self):
-        process = run_process(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "-d",
-                "--network=host",
-                "--name",
-                self.container_id,
-                "-e",
-                f"MYSQL_ROOT_PASSWORD={self.password}",
-                "mysql:latest",
-            ],
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-
-        self.container_id = process.stdout.decode().strip()
-
-        @retry(delay=2, tries=120)
-        def _check_if_mysql_already_listens():
-            pymysql.connect(host=self.host, user=self.user, password=self.password)
-
-        _check_if_mysql_already_listens()
-
-    def stop(self):
-        run_process(
-            ["docker", "rm", "-f", self.container_id],
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-
-
-class Client:
-    def __init__(
-        self,
-        executable,
-        server,
-        state_manager_path="/tmp/client-state-manager",
-        nginx_confd_path="/tmp/client-nginx-confd",
-        wireguard_config_path="/tmp/client-wireguard/wg0.conf",
-        metrics_port=8091,
-    ):
-        self.executable = executable
-        self.server = server
-        self.state_manager_path = state_manager_path
-        self.nginx_confd_path = nginx_confd_path
-        self.wireguard_config_path = wireguard_config_path
-        self.metrics_port = metrics_port
-        self.process = None
-
-    def start(self):
-        command = [
-            self.executable,
-            "--metrics",
-            "--metrics-port",
-            str(self.metrics_port),
-            "client",
-            "--name",
-            uuid.uuid4().hex,
-            "--nginx-confd-path",
-            self.nginx_confd_path,
-            "--wg-config",
-            self.wireguard_config_path,
-            "--directory-state-manager-path",
-            self.state_manager_path,
-            "--invite-token",
-            "123123",
-        ]
-        self.process = subprocess.Popen(command, shell=False)
-        return self
-
-    def stop(self):
-        return_code = self.process.poll()
-        if return_code is None:
-            return os.kill(self.process.pid, signal.SIGINT)
 
 
 class MockServer:
@@ -238,29 +67,6 @@ class Curl:
                 '-m', str(max_time_seconds),
             ] + (command if type(command) is list else [command])
         )
-
-
-@contextmanager
-def launched_in_background(process):
-    try:
-        process.start()
-        yield process
-    finally:
-        process.stop()
-
-
-def get_number_of_running_goroutines(port=8090):
-    return int(
-        [
-            metrics
-            for metrics in requests.get(f"http://localhost:{port}/metrics").text.split("\n")
-            if metrics.strip().startswith("go_goroutines")
-        ][0].split(" ")[1]
-    )
-
-
-def get_number_of_opened_files(process_owner):
-    return len(psutil.Process(pid=process_owner.process.pid).open_files())
 
 
 class Kubectl:
@@ -479,7 +285,7 @@ class Services:
     @classmethod
     def count(cls, kubectl, namespace):
         return len(kubectl.json(["get", "svc", "-n", namespace])["items"])
-    
+
     @classmethod
     def names(cls, kubectl, namespace):
         return [item["metadata"]["name"] for item in kubectl.json(["get", "svc", "-n", namespace])["items"]]
