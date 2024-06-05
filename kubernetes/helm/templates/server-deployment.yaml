@@ -135,6 +135,9 @@ spec:
           {{- if .Values.server.debug }}
             - --debug
           {{- end }}
+          {{- if .Values.networkPolicies.enabled }}
+            - --network-policies
+          {{- end }}
             - server
             - --name
             - {{ .Values.server.name }}

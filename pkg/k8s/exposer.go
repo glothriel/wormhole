@@ -66,7 +66,7 @@ func (exp *k8sResourceExposer) Withdraw(app peers.App) error {
 		return clientSetErr
 	}
 	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
-	for i := range len(exp.managedResources) {
+	for i := range exp.managedResources {
 		managedResource := exp.managedResources[len(exp.managedResources)-1-i]
 		removeErr := managedResource.Remove(entityName, clientset)
 		if removeErr != nil {
@@ -81,7 +81,7 @@ func (exp *k8sResourceExposer) WithdrawAll() error {
 	if clientSetErr != nil {
 		return clientSetErr
 	}
-	for i := range len(exp.managedResources) {
+	for i := range exp.managedResources {
 		managedResource := exp.managedResources[len(exp.managedResources)-1-i]
 		removeAllErr := managedResource.RemoveAll(clientset)
 		if removeAllErr != nil {
