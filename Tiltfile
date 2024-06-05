@@ -57,6 +57,7 @@ for server in servers:
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",
+        "networkPolicies.enabled=true",
         "docker.registry=",
         "devMode.enabled=true",
     ]))
@@ -70,6 +71,7 @@ for client in clients:
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",
+        "networkPolicies.enabled=true",
         "docker.registry=",
         "devMode.enabled=true",
     ]))

@@ -100,6 +100,40 @@ wormhole.glothriel.github.com/ports=http
 wormhole.glothriel.github.com/ports=80,443
 ```
 
+### Enable creation of network policies
+
+You can secure the services exposed on another end by configuring network policies. Network policies are currently implemented on a per-peer basis, so for example a client may have them enabled and the server may not, or only a subset of clients may have them enabled.
+
+You can enable network policies by setting `--set networkPolicies.enabled=true` helm chart value. Network policies of course in order to work require the cluster that supports them.
+
+When wormhole is deployed with network policies support, each time it exposes a remote service it also creates a matching network policy. The network policy is created in the same namespace as the service and allows filtering of the traffic from other workloads in the cluster to the remote service. 
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    ...
+spec:
+    ingress:
+    - from:
+        - namespaceSelector: {}
+            podSelector:
+                matchLabels:
+                    wormhole.glothriel.github.com/network-policy-consumes-app: <<APP-NAME>>
+        ports:
+        - port: 25001
+            protocol: TCP
+    podSelector:
+        matchLabels:
+            application: wormhole-client-dev1
+    policyTypes:
+    - Ingress
+```
+
+Such policies allow communication from any pod in any namespace, providing, that the pod that tries to communicate has a label `wormhole.glothriel.github.com/network-policy-consumes-app` with the value of the name of the service that is exposed. The app name (unless override by `wormhole.glothriel.github.com/name=my-custom-name`) is `<service-namespace-name>-<service-name>` (for example `default-nginx`) of the service exposed from remote cluster.
+
+Effectively this means, that the permission to communicate is granted per application, not per peer. Having permission to communicate with app having given name, allows the pod to communicate with all the apps with given name, no matter the peer the app is exposed from.
+
 ## Local development
 
 ### Development environment
