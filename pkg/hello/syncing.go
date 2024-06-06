@@ -130,11 +130,10 @@ func (c *SyncingClient) Start() error {
 		if err != nil {
 			if failures >= c.failureThreshold {
 				return fmt.Errorf("Fatal: failed to sync %d times in a row: %v", failures, err)
-			} else {
-				failures++
-				logrus.Errorf("failed to sync apps: %v", err)
-				continue
 			}
+			failures++
+			logrus.Errorf("failed to sync apps: %v", err)
+			continue
 		}
 		failures = 0
 		decodedMsg, decodeErr := c.encoder.Decode(incomingApps)
