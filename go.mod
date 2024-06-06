@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/avast/retry-go/v4 v4.5.1
+	github.com/gin-contrib/pprof v1.5.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/gorilla/mux v1.8.0
 	github.com/mitchellh/go-ps v1.0.0

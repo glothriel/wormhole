@@ -8,6 +8,11 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var debugFlag = &cli.BoolFlag{
+	Name:  "debug",
+	Usage: "Be more verbose when logging stuff",
+}
+
 // Run starts wormgole
 func Run() {
 	app := &cli.App{
@@ -21,10 +26,7 @@ func Run() {
 		},
 		Version: projectVersion,
 		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "debug",
-				Usage: "Be more verbose when logging stuff",
-			},
+			debugFlag,
 			&cli.BoolFlag{
 				Name:  "trace",
 				Usage: "Be even more verbose when logging stuff",

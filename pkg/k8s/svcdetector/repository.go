@@ -45,6 +45,8 @@ func (event watchEvent) isDeleted() bool {
 
 type defaultServiceRepository struct {
 	client dynamic.Interface
+	// it tends to hang after a while
+	serviceInformerRestartInterval time.Duration
 }
 
 func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
@@ -73,20 +75,21 @@ func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
 }
 
 func (repository defaultServiceRepository) watch() chan watchEvent {
-	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
-		repository.client,
-		time.Second*10,
-		metav1.NamespaceAll,
-		nil,
-	)
-	informer := informerFactory.ForResource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "services",
-	})
 	theChannel := make(chan watchEvent)
-	go func() {
-		stopCh := make(chan struct{})
+	runInformerInBg(func() chan struct{} {
+		informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+			repository.client,
+			time.Second*10,
+			metav1.NamespaceAll,
+			nil,
+		)
+		logrus.Debug("Setting up new kubernetes service informer")
+		informer := informerFactory.ForResource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "services",
+		})
+		informerStopChan := make(chan struct{})
 		go func(stopCh <-chan struct{}, s cache.SharedIndexInformer) {
 			handlers := cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj any) {
@@ -110,12 +113,10 @@ func (repository defaultServiceRepository) watch() chan watchEvent {
 				return
 			}
 			s.Run(stopCh)
-		}(stopCh, informer.Informer())
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, os.Interrupt)
-		<-sigCh
-		close(stopCh)
-	}()
+			logrus.Debug("Kubernetes service informer stopped")
+		}(informerStopChan, informer.Informer())
+		return informerStopChan
+	}, repository.serviceInformerRestartInterval)
 	return theChannel
 }
 
@@ -145,6 +146,33 @@ func (repository defaultServiceRepository) dispatchEvents(eventType int, informe
 // NewDefaultServiceRepository creates ServiceRepository instances
 func NewDefaultServiceRepository(client dynamic.Interface) ServiceRepository {
 	return &defaultServiceRepository{
-		client: client,
+		client:                         client,
+		serviceInformerRestartInterval: time.Minute * 5,
 	}
+}
+
+func runInformerInBg(f func() chan struct{}, timeout time.Duration) {
+	go func() {
+		for {
+			timeoutChan := make(chan struct{})
+			go func() {
+				time.Sleep(timeout)
+				select {
+				case timeoutChan <- struct{}{}:
+				default:
+				}
+			}()
+			stopChan := f()
+			sigIngChan := make(chan os.Signal, 1)
+			signal.Notify(sigIngChan, os.Interrupt)
+			select {
+			case <-sigIngChan:
+				close(stopChan)
+				return
+			case <-timeoutChan:
+				logrus.Debug("Timeout reached, restarting kubernetes service informer")
+				close(stopChan)
+			}
+		}
+	}()
 }

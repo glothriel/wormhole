@@ -189,7 +189,7 @@ var serverCommand *cli.Command = &cli.Command{
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appSource),
 				api.NewPeersController(peerStorage, wgConfig, watcher),
-			}).Run(":8082")
+			}, c.Bool(debugFlag.Name)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)
 			}
