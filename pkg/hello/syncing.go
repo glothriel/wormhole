@@ -2,6 +2,7 @@ package hello
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -52,7 +53,7 @@ func (s *SyncingServer) Start() {
 			incomingSync.Err <- peerErr
 			continue
 		}
-		s.stateGenerator.OnSync(
+		s.stateGenerator.SetState(
 			peer.Name,
 			msg.Apps,
 		)
@@ -98,16 +99,18 @@ func NewSyncingServer(
 // SyncingClient is a struct that orchestrates all the operations that are performed client-side
 // when executing app list synchronizations
 type SyncingClient struct {
-	myName       string
-	nginxAdapter *AppStateChangeGenerator
-	encoder      SyncingEncoder
-	interval     time.Duration
-	apps         AppSource
-	transport    SyncClientTransport
+	myName               string
+	stateChangeGenerator *AppStateChangeGenerator
+	encoder              SyncingEncoder
+	interval             time.Duration
+	apps                 AppSource
+	transport            SyncClientTransport
+	failureThreshold     int
 }
 
 // Start starts the syncing client
 func (c *SyncingClient) Start() error {
+	failures := 0
 	for {
 		time.Sleep(c.interval)
 		apps, listErr := c.apps.List()
@@ -125,15 +128,20 @@ func (c *SyncingClient) Start() error {
 		}
 		incomingApps, err := c.transport.Sync(encodedApps)
 		if err != nil {
+			if failures >= c.failureThreshold {
+				return fmt.Errorf("Fatal: failed to sync %d times in a row: %v", failures, err)
+			}
+			failures++
 			logrus.Errorf("failed to sync apps: %v", err)
 			continue
 		}
+		failures = 0
 		decodedMsg, decodeErr := c.encoder.Decode(incomingApps)
 		if decodeErr != nil {
 			logrus.Errorf("failed to decode incoming apps: %v", decodeErr)
 			continue
 		}
-		c.nginxAdapter.OnSync(
+		c.stateChangeGenerator.SetState(
 			decodedMsg.Peer,
 			decodedMsg.Apps,
 		)
@@ -150,12 +158,13 @@ func NewSyncingClient(
 	transport SyncClientTransport,
 ) *SyncingClient {
 	return &SyncingClient{
-		myName:       myName,
-		nginxAdapter: nginxAdapter,
-		encoder:      encoder,
-		interval:     interval,
-		apps:         apps,
-		transport:    transport,
+		myName:               myName,
+		stateChangeGenerator: nginxAdapter,
+		encoder:              encoder,
+		interval:             interval,
+		apps:                 apps,
+		transport:            transport,
+		failureThreshold:     3,
 	}
 }
 
@@ -173,7 +182,7 @@ func NewHTTPSyncingClient(
 	if !ok {
 		return nil, errors.New("sync_server_address not found in pairing response metadata")
 	}
-	transport := NewHTTPClientSyncingTransport(syncServerAddress)
+	transport := NewHTTPClientSyncingTransport(syncServerAddress, 3*time.Second)
 	return NewSyncingClient(
 		myName,
 		nginxAdapter,
