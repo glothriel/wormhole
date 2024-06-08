@@ -3,6 +3,8 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+
+	"github.com/gin-contrib/pprof"
 )
 
 // Controller contains a set of functionalities for the API
@@ -11,7 +13,7 @@ type Controller interface {
 }
 
 // NewAdminAPI bootstraps the creation of the gin engine
-func NewAdminAPI(controllers []Controller) *gin.Engine {
+func NewAdminAPI(controllers []Controller, debug bool) *gin.Engine {
 	r := gin.Default()
 	for _, controller := range controllers {
 		controller.registerRoutes(r)
@@ -22,5 +24,9 @@ func NewAdminAPI(controllers []Controller) *gin.Engine {
 				" for them. If you find a wormhole, you're a very lucky person because they are extremely rare.",
 		})
 	})
+
+	if debug {
+		pprof.Register(r)
+	}
 	return r
 }
