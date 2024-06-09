@@ -136,6 +136,9 @@ spec:
             - --debug
           {{- end }}
             - server
+          {{- if .Values.networkPolicies.enabled }}
+            - --network-policies
+          {{- end }}
             - --name
             - {{ .Values.server.name }}
             - --kubernetes

@@ -13,7 +13,6 @@ setup(
         "cryptography==36.0.2",
         "pytest==7.0.1",
         "psutil==5.9.0",
-        "PyMySQL==1.0.2",
         "requests==2.27.1",
         "retry==0.9.2",
     ],

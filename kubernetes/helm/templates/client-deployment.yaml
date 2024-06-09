@@ -133,6 +133,9 @@ spec:
             - --debug
           {{- end }}
             - client
+          {{- if .Values.networkPolicies.enabled }}
+            - --network-policies
+          {{- end }}
             - --name
             - {{ .Values.client.name | required "Please set client.name" }}
             - --kubernetes

@@ -1,0 +1,28 @@
+{{- if and .Values.server.enabled .Values.networkPolicies.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    application: {{ template "name-server" . }}
+  name: {{ template "name-server" . }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  ingress:
+  - ports:
+    # metrics
+    - port: 8090
+      protocol: TCP
+    # pairing
+    - port: 8080
+      protocol: TCP
+    # vpn
+    - port: 51820
+      protocol: UDP
+  podSelector:
+    matchLabels:
+      application: {{ template "name-server" . }}
+  policyTypes:
+  - Ingress
+
+{{ end }}

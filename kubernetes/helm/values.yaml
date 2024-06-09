@@ -95,6 +95,8 @@ docker:
 peering:
   psk: defaultPeeringKeyPleaseChangeMe
 
+networkPolicies:
+  enabled: false
 
 # Dev mode expects dev image with watchexec + go run instead of binary
 devMode:

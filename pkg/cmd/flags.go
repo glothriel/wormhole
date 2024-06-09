@@ -57,3 +57,9 @@ var peerNameFlag *cli.StringFlag = &cli.StringFlag{
 	Name:     "name",
 	Required: true,
 }
+
+var enableNetworkPoliciesFlag *cli.BoolFlag = &cli.BoolFlag{
+	Name:  "network-policies",
+	Usage: "Enables dynamic creation of network policies for proxy services",
+	Value: false,
+}
