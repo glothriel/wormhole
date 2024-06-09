@@ -132,7 +132,7 @@ spec:
 
 Such policies allow communication from any pod in any namespace, providing, that the pod that tries to communicate has a label `wormhole.glothriel.github.com/network-policy-consumes-app` with the value of the name of the service that is exposed. The app name (unless override by `wormhole.glothriel.github.com/name=my-custom-name`) is `<service-namespace-name>-<service-name>` (for example `default-nginx`) of the service exposed from remote cluster.
 
-Effectively this means, that the permission to communicate is granted per application, not per peer. Having permission to communicate with app having given name, allows the pod to communicate with all the apps with given name, no matter the peer the app is exposed from.
+Effectively this means, that the permission to communicate is granted per application, not per peer. Having permission to communicate with app having given name, allows the pod to communicate with all the apps with given name, no matter the peer the app is exposed from. This is especially important in the context of the server, as it may have multiple clients, all exposing the same app.
 
 ## Local development
 
