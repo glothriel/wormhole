@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/glothriel/wormhole/pkg/hello"
+	"github.com/glothriel/wormhole/pkg/peers"
 )
 
 type appsController struct {
@@ -17,6 +18,9 @@ func (ac *appsController) registerRoutes(r *gin.Engine) {
 				"error": err.Error(),
 			})
 			return
+		}
+		if apps == nil {
+			apps = []peers.App{}
 		}
 		c.JSON(200, apps)
 	})

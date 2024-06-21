@@ -95,6 +95,8 @@ spec:
          
         - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
+          ports:
+          - containerPort: 8082
           envFrom:
           - secretRef:
               name: {{ template "name-client" . }}-env

@@ -58,13 +58,13 @@ If you'll use DNS, you can install the server in one step (replace 0.0.0.0 with 
 kubectl create namespace wormhole
 
 # Replace 1.0.0 with latest version from the releases page
-helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.0.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
+helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.1.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
 
 # Wait for the LoadBalancer to get an IP
 kubectl get svc -n wormhole
 
 # Update the server with the IP
-helm upgrade -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.0.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="<the new IP>"
+helm upgrade -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.1.0 --reuse-values --set server.wg.publicHost="<the new IP>"
 ```
 
 ### Install client
@@ -134,6 +134,54 @@ Such policies allow communication from any pod in any namespace, providing, that
 
 Effectively this means, that the permission to communicate is granted per application, not per peer. Having permission to communicate with app having given name, allows the pod to communicate with all the apps with given name, no matter the peer the app is exposed from. This is especially important in the context of the server, as it may have multiple clients, all exposing the same app.
 
+## HTTP API
+
+Wormhole exposes API, that allows querying apps exposed by remote peers. The API does not require authentication. The API by default listens on port 8082.
+
+### GET /api/apps/v1
+
+This endpoint returns the list of apps exposed locally by the remote peers.
+
+#### Request
+
+No body or query parameters are required.
+
+#### Response
+
+| Property | Required |  Type | Description |
+|:---------|:---------|:-----|:------------|
+| **name** | yes | String | Name of the exposed app |
+| **address**   | yes      | String | `{hostname}:{port}` of the app exposed on the local cluster |
+| **peer**   | yes      | String | Name of the remote peer, that exposed the app |
+
+
+| Code | Description |
+|:-----|:------------|
+|200 Ok | Returned when request was successful |
+|500 Internal server error | Returned when the apps could not be fetched for unknown reasons. |
+
+### GET /api/peers/v1
+
+This endpoint is only available on the server. It returns the list of remote peers that are connected to the server.
+
+#### Request
+
+No body or query parameters are required.
+
+#### Response
+
+| Property | Required |  Type | Description |
+|:---------|:---------|:-----|:------------|
+| **name** | yes | String | Name of the remote peer |
+| **ip**   | yes      | String | IP of the peer in wireguard network |
+| **public_key**   | yes      | String | Wireguard public key of the peer |
+
+
+| Code | Description |
+|:-----|:------------|
+|200 Ok | Returned when request was successful |
+|500 Internal server error | Returned when the peers could not be fetched for unknown reasons. |
+
 ## Local development
 
 ### Development environment
@@ -158,7 +206,7 @@ The development environment deploys a server, two clients and a mock service, th
 kubectl annotate --overwrite svc --namespace nginx nginx  wormhole.glothriel.github.com/exposed=yes
 ```
 
-The additional services should be immediately created. Please note, that all three workloads are deployed on the same (and by extension are monitoring the same services for annotations), so the nginx will be exposed 4 times - client1 to server, client2 to server, server to client1 and server to client2.
+The additional services should be immediately created. Please note, that all three workloads are deployed on the same cluster (and by extension are monitoring the same services for annotations), so the nginx will be exposed 4 times - client1 to server, client2 to server, server to client1 and server to client2.
 
 ### Integration tests
 
