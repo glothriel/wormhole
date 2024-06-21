@@ -20,4 +20,21 @@ spec:
     application: {{ template "name-server" . }}
   sessionAffinity: None
   type: {{ $.Values.server.service.type }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "name-server" . }}-api
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    application: {{ template "name-server" . }}
+spec:
+  ports:
+  - name: api
+    port: 8082
+    targetPort: 8082
+  selector:
+    application: {{ template "name-server" . }}
+  sessionAffinity: None
+  type: ClusterIP
 {{ end }}

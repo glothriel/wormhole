@@ -189,7 +189,7 @@ var serverCommand *cli.Command = &cli.Command{
 		go ss.Start()
 		go func() {
 			err := api.NewAdminAPI([]api.Controller{
-				api.NewAppsController(appSource),
+				api.NewAppsController(appsExposedFromRemote),
 				api.NewPeersController(peerStorage, wgConfig, watcher),
 			}, c.Bool(debugFlag.Name)).Run(":8082")
 			if err != nil {

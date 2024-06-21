@@ -96,8 +96,7 @@ type WireguardConfigReloader interface {
 
 // PeerInfo is a struct that contains information about a peer
 type PeerInfo struct {
-	Name        string `json:"name"`
-	IP          string `json:"ip"`
-	PublicKey   string `json:"public_key"`
-	LastContact int64  `json:"last_contact"`
+	Name      string `json:"name"`
+	IP        string `json:"ip"`
+	PublicKey string `json:"public_key"`
 }

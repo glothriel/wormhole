@@ -4,6 +4,7 @@ package cmd
 import (
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/api"
 	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
 	"github.com/glothriel/wormhole/pkg/listeners"
@@ -138,6 +139,17 @@ var clientCommand *cli.Command = &cli.Command{
 		if scErr != nil {
 			logrus.Fatalf("Failed to create syncing client: %v", scErr)
 		}
+
+		go func() {
+			err := api.NewAdminAPI([]api.Controller{
+				api.NewAppsController(
+					remoteListenerRegistry,
+				),
+			}, c.Bool(debugFlag.Name)).Run(":8082")
+			if err != nil {
+				logrus.Fatalf("Failed to start admin API: %v", err)
+			}
+		}()
 
 		return sc.Start()
 	},

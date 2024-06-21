@@ -7,9 +7,10 @@ import (
 )
 
 type peerController struct {
-	peers    hello.PeerStorage
-	wgConfig *wg.Config
-	watcher  *wg.Watcher
+	peers              hello.PeerStorage
+	wgConfig           *wg.Config
+	watcher            *wg.Watcher
+	enablePeerDeletion bool
 }
 
 func (p *peerController) deletePeer(name string) error {
@@ -46,6 +47,12 @@ func (p *peerController) registerRoutes(r *gin.Engine) {
 	})
 
 	r.DELETE("/api/peers/v1/:name", func(c *gin.Context) {
+		if !p.enablePeerDeletion {
+			c.JSON(403, gin.H{
+				"error": "Peer deletion is disabled",
+			})
+			return
+		}
 		name := c.Param("name")
 		err := p.deletePeer(name)
 		if err != nil {
@@ -64,5 +71,7 @@ func NewPeersController(peers hello.PeerStorage, wgConfig *wg.Config, watcher *w
 		peers:    peers,
 		wgConfig: wgConfig,
 		watcher:  watcher,
+		// We currently don't have authorization in place, disabling peer deletion
+		enablePeerDeletion: false,
 	}
 }
