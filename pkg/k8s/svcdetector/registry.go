@@ -3,18 +3,18 @@ package svcdetector
 import (
 	"sync"
 
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 )
 
 type exposedServicesRegistry interface {
 	all() []registryItem
-	isExposed(app peers.App, svcParser serviceWrapper) bool
-	markAsExposed(app peers.App, svcParser serviceWrapper)
-	markAsWithdrawn(app peers.App, svcParser serviceWrapper)
+	isExposed(app apps.App, svcParser serviceWrapper) bool
+	markAsExposed(app apps.App, svcParser serviceWrapper)
+	markAsWithdrawn(app apps.App, svcParser serviceWrapper)
 }
 
 type registryItem struct {
-	apps    []peers.App
+	apps    []apps.App
 	service serviceWrapper
 }
 
@@ -33,7 +33,7 @@ func (registry *defaultExposedServicesRegistry) all() []registryItem {
 	return theList
 }
 
-func (registry *defaultExposedServicesRegistry) isExposed(app peers.App, service serviceWrapper) bool {
+func (registry *defaultExposedServicesRegistry) isExposed(app apps.App, service serviceWrapper) bool {
 	registry.mtx.Lock()
 	defer registry.mtx.Unlock()
 	item, ok := registry.registryMap[service.id()]
@@ -49,11 +49,11 @@ func (registry *defaultExposedServicesRegistry) isExposed(app peers.App, service
 	return false
 }
 
-func (registry *defaultExposedServicesRegistry) markAsExposed(app peers.App, service serviceWrapper) {
+func (registry *defaultExposedServicesRegistry) markAsExposed(app apps.App, service serviceWrapper) {
 	registry.mtx.Lock()
 	defer registry.mtx.Unlock()
 	_, ok := registry.registryMap[service.id()]
-	previousApps := []peers.App{}
+	previousApps := []apps.App{}
 	if ok {
 		previousApps = registry.registryMap[service.id()].apps
 	}
@@ -63,14 +63,14 @@ func (registry *defaultExposedServicesRegistry) markAsExposed(app peers.App, ser
 	}
 }
 
-func (registry *defaultExposedServicesRegistry) markAsWithdrawn(app peers.App, service serviceWrapper) {
+func (registry *defaultExposedServicesRegistry) markAsWithdrawn(app apps.App, service serviceWrapper) {
 	registry.mtx.Lock()
 	defer registry.mtx.Unlock()
 	item, ok := registry.registryMap[service.id()]
 	if !ok {
 		return
 	}
-	newApps := []peers.App{}
+	newApps := []apps.App{}
 	for _, exposedApp := range item.apps {
 		if exposedApp.Name == app.Name && exposedApp.Address == app.Address {
 			continue

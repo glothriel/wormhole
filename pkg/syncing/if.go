@@ -1,8 +1,8 @@
 package syncing
 
-import "github.com/glothriel/wormhole/pkg/peers"
+import "github.com/glothriel/wormhole/pkg/apps"
 
 // AppSource is an interface for listing apps
 type AppSource interface {
-	List() ([]peers.App, error)
+	List() ([]apps.App, error)
 }

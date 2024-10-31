@@ -1,9 +1,7 @@
 // Package svcdetector orchestrates kubernetes integration
 package svcdetector
 
-import (
-	"github.com/glothriel/wormhole/pkg/peers"
-)
+import "github.com/glothriel/wormhole/pkg/apps"
 
 type itemToDelete registryItem
 
@@ -23,7 +21,7 @@ func (cleaner modifiedAnnotationsCleaner) clean(
 		for _, app := range svc.apps() {
 			if !svc.shouldBeExposed() && registry.isExposed(app, svc) {
 				itemsToDelete = append(itemsToDelete, itemToDelete{
-					apps:    []peers.App{app},
+					apps:    []apps.App{app},
 					service: svc,
 				})
 			}
@@ -78,7 +76,7 @@ func (cleaner removedPortsCleaner) clean(
 				if !exposedAppFound {
 					itemsToDelete = append(itemsToDelete, itemToDelete{
 						service: exposedItem.service,
-						apps:    []peers.App{exposedApp},
+						apps:    []apps.App{exposedApp},
 					})
 				}
 			}

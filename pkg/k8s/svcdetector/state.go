@@ -3,7 +3,7 @@ package svcdetector
 import (
 	"time"
 
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,7 +14,7 @@ type AppStateManager interface {
 
 // AppStateChange is a struct that represents a change in the app state
 type AppStateChange struct {
-	App   peers.App
+	App   apps.App
 	State string
 }
 

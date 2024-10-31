@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 )
 
 type peerEnrichingAppSource struct {
@@ -13,14 +13,14 @@ type peerEnrichingAppSource struct {
 	child AppSource
 }
 
-func (s *peerEnrichingAppSource) List() ([]peers.App, error) {
+func (s *peerEnrichingAppSource) List() ([]apps.App, error) {
 	theApps, err := s.child.List()
 	if err != nil {
 		return nil, err
 	}
-	newApps := make([]peers.App, len(theApps))
+	newApps := make([]apps.App, len(theApps))
 	for i := range theApps {
-		newApps[i] = peers.WithPeer(theApps[i], s.peer)
+		newApps[i] = apps.WithPeer(theApps[i], s.peer)
 	}
 	return newApps, nil
 }
@@ -38,12 +38,12 @@ type addressEnrichingAppSource struct {
 	child    AppSource
 }
 
-func (s *addressEnrichingAppSource) List() ([]peers.App, error) {
+func (s *addressEnrichingAppSource) List() ([]apps.App, error) {
 	theApps, err := s.child.List()
 	if err != nil {
 		return nil, err
 	}
-	newApps := make([]peers.App, len(theApps))
+	newApps := make([]apps.App, len(theApps))
 	for i := range theApps {
 		segments := strings.Split(theApps[i].Address, ":")
 		if len(segments) != 2 {
@@ -51,7 +51,7 @@ func (s *addressEnrichingAppSource) List() ([]peers.App, error) {
 		}
 
 		segments[0] = s.hostname
-		newApps[i] = peers.WithAddress(theApps[i], strings.Join(segments, ":"))
+		newApps[i] = apps.WithAddress(theApps[i], strings.Join(segments, ":"))
 	}
 	return newApps, nil
 }
@@ -68,7 +68,7 @@ type inMemoryAppStorage struct {
 	apps sync.Map
 }
 
-func (s *inMemoryAppStorage) Store(app peers.App) error {
+func (s *inMemoryAppStorage) Store(app apps.App) error {
 	s.apps.Store(app.Peer+app.Name, app)
 	return nil
 }
@@ -78,20 +78,20 @@ func (s *inMemoryAppStorage) Remove(peer string, name string) error {
 	return nil
 }
 
-func (s *inMemoryAppStorage) Get(peer string, name string) (peers.App, error) {
+func (s *inMemoryAppStorage) Get(peer string, name string) (apps.App, error) {
 	if app, ok := s.apps.Load(peer + name); ok {
-		return app.(peers.App), nil
+		return app.(apps.App), nil
 	}
-	return peers.App{}, fmt.Errorf("app with name %s not found", name)
+	return apps.App{}, fmt.Errorf("app with name %s not found", name)
 }
 
-func (s *inMemoryAppStorage) List() ([]peers.App, error) {
-	var apps []peers.App
+func (s *inMemoryAppStorage) List() ([]apps.App, error) {
+	var theApps []apps.App
 	s.apps.Range(func(_, value any) bool {
-		apps = append(apps, value.(peers.App))
+		theApps = append(theApps, value.(apps.App))
 		return true
 	})
-	return apps, nil
+	return theApps, nil
 }
 
 // NewInMemoryAppStorage creates a new in-memory AppSource instance

@@ -3,13 +3,13 @@ package syncing
 import (
 	"encoding/json"
 
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 )
 
 // SyncingMessage is a message that contains a list of apps and the peer that sent them
 type SyncingMessage struct {
 	Peer string
-	Apps []peers.App
+	Apps []apps.App
 }
 
 // SyncingEncoder is an interface for encoding and decoding syncing messages

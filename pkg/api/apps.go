@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/syncing"
 )
 
@@ -12,17 +12,17 @@ type appsController struct {
 
 func (ac *appsController) registerRoutes(r *gin.Engine) {
 	r.GET("/api/apps/v1", func(c *gin.Context) {
-		apps, err := ac.appSource.List()
+		theApps, err := ac.appSource.List()
 		if err != nil {
 			c.JSON(500, gin.H{
 				"error": err.Error(),
 			})
 			return
 		}
-		if apps == nil {
-			apps = []peers.App{}
+		if theApps == nil {
+			theApps = []apps.App{}
 		}
-		c.JSON(200, apps)
+		c.JSON(200, theApps)
 	})
 }
 
