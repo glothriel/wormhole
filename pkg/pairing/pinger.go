@@ -1,4 +1,4 @@
-package hello
+package pairing
 
 import (
 	"fmt"

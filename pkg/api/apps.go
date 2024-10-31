@@ -2,12 +2,12 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/syncing"
 )
 
 type appsController struct {
-	appSource hello.AppSource
+	appSource syncing.AppSource
 }
 
 func (ac *appsController) registerRoutes(r *gin.Engine) {
@@ -27,6 +27,6 @@ func (ac *appsController) registerRoutes(r *gin.Engine) {
 }
 
 // NewAppsController bootstraps creation of the API that allows displaying currently exposed apps
-func NewAppsController(appSource hello.AppSource) Controller {
+func NewAppsController(appSource syncing.AppSource) Controller {
 	return &appsController{appSource: appSource}
 }

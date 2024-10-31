@@ -1,10 +1,9 @@
-// Package hello provides the protocol between the client and the server.
-// Ultimately it should be split into two packages, one for peering, one for syncing.
-package hello
+package syncing
 
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/glothriel/wormhole/pkg/peers"
 )
@@ -63,4 +62,39 @@ func NewAddressEnrichingAppSource(hostname string, child AppSource) AppSource {
 		hostname: hostname,
 		child:    child,
 	}
+}
+
+type inMemoryAppStorage struct {
+	apps sync.Map
+}
+
+func (s *inMemoryAppStorage) Store(app peers.App) error {
+	s.apps.Store(app.Peer+app.Name, app)
+	return nil
+}
+
+func (s *inMemoryAppStorage) Remove(peer string, name string) error {
+	s.apps.Delete(peer + name)
+	return nil
+}
+
+func (s *inMemoryAppStorage) Get(peer string, name string) (peers.App, error) {
+	if app, ok := s.apps.Load(peer + name); ok {
+		return app.(peers.App), nil
+	}
+	return peers.App{}, fmt.Errorf("app with name %s not found", name)
+}
+
+func (s *inMemoryAppStorage) List() ([]peers.App, error) {
+	var apps []peers.App
+	s.apps.Range(func(_, value any) bool {
+		apps = append(apps, value.(peers.App))
+		return true
+	})
+	return apps, nil
+}
+
+// NewInMemoryAppStorage creates a new in-memory AppSource instance
+func NewInMemoryAppStorage() AppSource {
+	return &inMemoryAppStorage{}
 }

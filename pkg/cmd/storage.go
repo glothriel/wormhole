@@ -1,16 +1,16 @@
 package cmd
 
 import (
-	"github.com/glothriel/wormhole/pkg/hello"
+	"github.com/glothriel/wormhole/pkg/pairing"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/urfave/cli/v2"
 )
 
-func getPeerStorage(c *cli.Context) hello.PeerStorage {
+func getPeerStorage(c *cli.Context) pairing.PeerStorage {
 	if c.String(peerStorageDBFlag.Name) == "" {
-		return hello.NewInMemoryPeerStorage()
+		return pairing.NewInMemoryPeerStorage()
 	}
-	return hello.NewBoltPeerStorage(c.String(peerStorageDBFlag.Name))
+	return pairing.NewBoltPeerStorage(c.String(peerStorageDBFlag.Name))
 }
 
 func getKeyStorage(c *cli.Context) wg.KeyStorage {

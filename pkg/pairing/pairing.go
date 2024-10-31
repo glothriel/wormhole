@@ -1,4 +1,4 @@
-package hello
+package pairing
 
 import (
 	"encoding/json"
@@ -9,6 +9,35 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// PairingRequest is a request to pair with a server
+type PairingRequest struct {
+	Name string `json:"name"` // Name of the peer, that requests pairing,
+	//  for example `dev1`, `us-east-1`, etc
+	Wireguard PairingRequestWireguardConfig `json:"wireguard"`
+	Metadata  map[string]string             `json:"metadata"` // Any protocol-specific metadata
+}
+
+// PairingRequestWireguardConfig is a wireguard configuration for the pairing request
+type PairingRequestWireguardConfig struct {
+	PublicKey string `json:"public_key"`
+}
+
+// PairingResponse is a response to a pairing request
+type PairingResponse struct {
+	Name       string `json:"name"`        // Name of the server peer
+	AssignedIP string `json:"assigned_ip"` // IP that the server assigned to the peer,
+	// that requested pairing
+	InternalServerIP string                         `json:"internal_server_ip"` // IP of the server in the internal network
+	Wireguard        PairingResponseWireguardConfig `json:"wireguard"`
+	Metadata         map[string]string              `json:"metadata"` // Any protocol-specific metadata
+}
+
+// PairingResponseWireguardConfig is a wireguard configuration for the pairing response
+type PairingResponseWireguardConfig struct {
+	PublicKey string `json:"public_key"`
+	Endpoint  string `json:"endpoint"`
+}
+
 // PairingClient allows pairing with a server
 type PairingClient interface {
 	Pair() (PairingResponse, error)
@@ -18,7 +47,7 @@ type keyCachingPairingClient struct {
 	client     PairingClient
 	storage    KeyCachingPairingClientStorage
 	wgConfig   *wg.Config
-	wgReloader WireguardConfigReloader
+	wgReloader wg.WireguardConfigReloader
 
 	pinger pinger
 }
@@ -68,7 +97,7 @@ func NewKeyCachingPairingClient(
 	storage KeyCachingPairingClientStorage,
 	wgConfig *wg.Config,
 
-	wgReloader WireguardConfigReloader,
+	wgReloader wg.WireguardConfigReloader,
 	client PairingClient,
 ) PairingClient {
 	return &keyCachingPairingClient{
@@ -159,7 +188,7 @@ type defaultPairingClient struct {
 	keyPair    KeyPair
 	wgConfig   *wg.Config
 
-	wgReloader WireguardConfigReloader
+	wgReloader wg.WireguardConfigReloader
 	encoder    PairingEncoder
 	transport  PairingClientTransport
 }
@@ -204,7 +233,7 @@ func NewDefaultPairingClient(
 	clientName string,
 	wgConfig *wg.Config,
 	keyPair KeyPair,
-	wgReloader WireguardConfigReloader,
+	wgReloader wg.WireguardConfigReloader,
 	encoder PairingEncoder,
 	transport PairingClientTransport,
 ) PairingClient {
@@ -231,7 +260,7 @@ type PairingServer struct {
 	wgConfig         *wg.Config // Local Wireguard config
 	keyPair          KeyPair    // Local Wireguard key pair
 
-	wgReloader WireguardConfigReloader
+	wgReloader wg.WireguardConfigReloader
 	marshaler  PairingEncoder
 	transport  PairingServerTransport
 	ips        IPPool
@@ -335,7 +364,7 @@ func NewPairingServer(
 	publicWgHostPort string,
 	wgConfig *wg.Config,
 	keyPair KeyPair,
-	wgReloader WireguardConfigReloader,
+	wgReloader wg.WireguardConfigReloader,
 	encoder PairingEncoder,
 	transport PairingServerTransport,
 	ips IPPool,
