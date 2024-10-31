@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/listeners"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
@@ -25,10 +25,10 @@ type Exposer struct {
 }
 
 // Add implements listeners.Exposer
-func (n *Exposer) Add(app peers.App) (peers.App, error) {
+func (n *Exposer) Add(app apps.App) (apps.App, error) {
 	port, portErr := n.ports.Allocate()
 	if portErr != nil {
-		return peers.App{}, fmt.Errorf("Could not allocate port: %v", portErr)
+		return apps.App{}, fmt.Errorf("Could not allocate port: %v", portErr)
 	}
 	server := StreamServer{
 		ListenPort: port,
@@ -39,7 +39,7 @@ func (n *Exposer) Add(app peers.App) (peers.App, error) {
 	listenBlock := ""
 	listenAddrs, addrsErr := n.listener.Addrs(port)
 	if addrsErr != nil {
-		return peers.App{}, fmt.Errorf("Could not get listener addresses: %v", addrsErr)
+		return apps.App{}, fmt.Errorf("Could not get listener addresses: %v", addrsErr)
 	}
 	for _, addr := range listenAddrs {
 		listenBlock += fmt.Sprintf("	listen %s;\n", addr)
@@ -64,11 +64,11 @@ server {
 	if reloaderErr := n.reloader.Reload(); reloaderErr != nil {
 		logrus.Errorf("Could not reload NGINX: %v", reloaderErr)
 	}
-	return peers.WithAddress(app, fmt.Sprintf("localhost:%d", port)), nil
+	return apps.WithAddress(app, fmt.Sprintf("localhost:%d", port)), nil
 }
 
 // Withdraw implements listeners.Exposer
-func (n *Exposer) Withdraw(app peers.App) error {
+func (n *Exposer) Withdraw(app apps.App) error {
 	path := path.Join(n.path, nginxConfigPath(n.prefix, app))
 	removeErr := n.fs.Remove(path)
 
@@ -150,7 +150,7 @@ func NewNginxExposer(
 	return cg
 }
 
-func nginxConfigPath(prefix string, app peers.App) string {
+func nginxConfigPath(prefix string, app apps.App) string {
 	if app.Peer == "" {
 		return fmt.Sprintf("%s-%s.conf", prefix, app.Name)
 	}

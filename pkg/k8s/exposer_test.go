@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/listeners"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes"
 )
@@ -77,7 +77,7 @@ func TestExposerAdd(t *testing.T) {
 	exposer.managedResources = []managedK8sResource{rsc1, rsc2}
 
 	// when
-	newApp, err := exposer.Add(peers.App{
+	newApp, err := exposer.Add(apps.App{
 		Name:         "nginxname",
 		Peer:         "nginxpeer",
 		OriginalPort: 80,
@@ -89,10 +89,10 @@ func TestExposerAdd(t *testing.T) {
 	assert.Equal(t, 1, rsc2.addCalled)
 	assert.Equal(t, k8sResourceMetadata{
 		entityName:       "nginxpeer-nginxname",
-		initialApp:       peers.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
-		childReturnedApp: peers.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
+		initialApp:       apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
+		childReturnedApp: apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
 	}, rsc2.addLastCalledWith)
-	assert.Equal(t, peers.App{
+	assert.Equal(t, apps.App{
 		Name:         "nginxname",
 		Peer:         "nginxpeer",
 		OriginalPort: 80,
@@ -115,7 +115,7 @@ func TestExposerWithdraw(t *testing.T) {
 	exposer.managedResources = []managedK8sResource{rsc1, rsc2}
 
 	// when
-	err := exposer.Withdraw(peers.App{})
+	err := exposer.Withdraw(apps.App{})
 
 	// then
 	assert.NoError(t, err)

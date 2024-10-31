@@ -1,4 +1,4 @@
-package hello
+package syncing
 
 import (
 	"fmt"

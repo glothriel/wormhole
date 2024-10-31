@@ -1,10 +1,11 @@
-package hello
+package syncing
 
 import (
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/glothriel/wormhole/pkg/pairing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +38,7 @@ type SyncingServer struct {
 
 	encoder   SyncingEncoder
 	transport SyncServerTransport
-	peers     PeerStorage
+	peers     pairing.PeerStorage
 }
 
 // Start starts the syncing server
@@ -84,7 +85,7 @@ func NewSyncingServer(
 	apps AppSource,
 	encoder SyncingEncoder,
 	transport SyncServerTransport,
-	peers PeerStorage,
+	peers pairing.PeerStorage,
 ) *SyncingServer {
 	return &SyncingServer{
 		myName:         myName,
@@ -175,7 +176,7 @@ func NewHTTPSyncingClient(
 	encoder SyncingEncoder,
 	interval time.Duration,
 	apps AppSource,
-	pr PairingResponse,
+	pr pairing.PairingResponse,
 
 ) (*SyncingClient, error) {
 	syncServerAddress, ok := pr.Metadata["sync_server_address"]
