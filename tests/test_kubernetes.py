@@ -235,3 +235,30 @@ def test_connection_via_the_tunnel(
             'http://server-nginx-nginx.client.svc.cluster.local',
             max_time_seconds=10,
         )
+
+
+
+def test_reconnecting_clients_with_keys(
+    kubectl,
+    k8s_server,
+    k8s_client,
+    mock_server,
+):
+
+    @retry(tries=int(DEFAULT_RETRY_TRIES / 10), delay=DEFAULT_RETRY_DELAY)
+    def _wait_for_peers_paired_using_psk():
+        assert "Paired with server, assigned IP" in kubectl.run(
+            ["-n", "client", "logs", "-l", "application=wormhole-client-client", "-c", "wormhole"]
+        ).stdout.decode()
+
+    _wait_for_peers_paired_using_psk()
+
+    kubectl.run(["-n", "client", "delete", "pod", "-l", "application=wormhole-client-client"])
+
+    @retry(tries=int(DEFAULT_RETRY_TRIES / 10), delay=DEFAULT_RETRY_DELAY)
+    def _wait_for_peers_paired_using_keys():
+        assert "using IP from the cache" in kubectl.run(
+            ["-n", "client", "logs", "-l", "application=wormhole-client-client", "-c", "wormhole"]
+        ).stdout.decode()
+
+    _wait_for_peers_paired_using_keys()

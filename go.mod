@@ -6,6 +6,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/gin-contrib/pprof v1.5.0
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-ping/ping v1.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/prometheus/client_golang v1.12.1
@@ -69,6 +70,7 @@ require (
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
+	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect

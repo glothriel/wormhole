@@ -22,6 +22,11 @@ var keyStorageDBFlag *cli.StringFlag = &cli.StringFlag{
 	Value: "",
 }
 
+var pairingClientCacheDBPath *cli.StringFlag = &cli.StringFlag{
+	Name:  "pairing-client-cache-db",
+	Value: "",
+}
+
 var kubernetesFlag *cli.BoolFlag = &cli.BoolFlag{
 	Name:  "kubernetes",
 	Usage: "Use kubernetes to create proxy services",

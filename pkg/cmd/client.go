@@ -38,12 +38,13 @@ var clientCommand *cli.Command = &cli.Command{
 		helloRetryIntervalFlag,
 		nginxExposerConfdPathFlag,
 		wireguardConfigFilePathFlag,
+		pairingClientCacheDBPath,
 		keyStorageDBFlag,
 	},
 	Action: func(c *cli.Context) error {
 		privateKey, publicKey, keyErr := wg.GetOrGenerateKeyPair(getKeyStorage(c))
 		if keyErr != nil {
-			logrus.Fatalf("Failed to get or generate key pair: %v", keyErr)
+			logrus.Fatalf("Failed to get key pair: %v", keyErr)
 		}
 		startPrometheusServer(c)
 
@@ -85,21 +86,37 @@ var clientCommand *cli.Command = &cli.Command{
 			)
 		}
 
-		client := hello.NewPairingClient(
-			c.String(peerNameFlag.Name),
-			&wg.Config{
-				PrivateKey: privateKey,
-				Subnet:     "32",
-			},
-
-			hello.KeyPair{
-				PublicKey:  publicKey,
-				PrivateKey: privateKey,
-			},
-			wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name)),
-			hello.NewJSONPairingEncoder(),
-			transport,
+		pairingKeyCache := hello.NewInMemoryKeyCachingPairingClientStorage()
+		if c.String(pairingClientCacheDBPath.Name) != "" {
+			var err error
+			pairingKeyCache, err = hello.NewBoltKeyCachingPairingClientStorage(c.String(pairingClientCacheDBPath.Name))
+			if err != nil {
+				logrus.Fatalf("Failed to create pairing key cache: %v", err)
+			}
+		}
+		wgReloader := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
+		wgConfig := &wg.Config{
+			PrivateKey: privateKey,
+			Subnet:     "32",
+		}
+		keyPair := hello.KeyPair{
+			PublicKey:  publicKey,
+			PrivateKey: privateKey,
+		}
+		client := hello.NewKeyCachingPairingClient(
+			pairingKeyCache,
+			wgConfig,
+			wgReloader,
+			hello.NewDefaultPairingClient(
+				c.String(peerNameFlag.Name),
+				wgConfig,
+				keyPair,
+				wgReloader,
+				hello.NewJSONPairingEncoder(),
+				transport,
+			),
 		)
+
 		var pairingResponse hello.PairingResponse
 		for {
 			var err error
