@@ -148,6 +148,7 @@ spec:
             - --server
             - {{ .Values.client.serverDsn | required "Please set client.serverDsn" }}
             - '--key-storage-db=/storage/keys.db'
+            - '--pairing-client-cache-db=/storage/keycache.db'
 
   
 {{ end }}

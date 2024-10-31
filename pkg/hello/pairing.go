@@ -1,14 +1,160 @@
 package hello
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
+	bolt "go.etcd.io/bbolt"
 )
 
-// PairingClient is a client that can pair with a server
-type PairingClient struct {
+// PairingClient allows pairing with a server
+type PairingClient interface {
+	Pair() (PairingResponse, error)
+}
+
+type keyCachingPairingClient struct {
+	client     PairingClient
+	storage    KeyCachingPairingClientStorage
+	wgConfig   *wg.Config
+	wgReloader WireguardConfigReloader
+
+	pinger pinger
+}
+
+func (c *keyCachingPairingClient) Pair() (PairingResponse, error) {
+	response, getErr := c.storage.Get()
+	if getErr == nil {
+		c.wgConfig.Address = response.AssignedIP
+		c.wgConfig.Upsert(wg.Peer{
+			Name:                response.Name,
+			Endpoint:            response.Wireguard.Endpoint,
+			PublicKey:           response.Wireguard.PublicKey,
+			AllowedIPs:          fmt.Sprintf("%s/32,%s/32", response.InternalServerIP, response.AssignedIP),
+			PersistentKeepalive: 10,
+		})
+
+		updateErr := c.wgReloader.Update(*c.wgConfig)
+		if updateErr != nil {
+			logrus.Errorf("Failed to update Wireguard config: %v", updateErr)
+		}
+		logrus.Infof(
+			"Trying to ping server %s with the config from the cache", response.InternalServerIP,
+		)
+		pingerErr := c.pinger.Ping(response.InternalServerIP)
+		if pingerErr == nil {
+			logrus.Infof("Successfully pinged server %s, using IP from the cache", response.InternalServerIP)
+			return response, nil
+		}
+		logrus.Warnf("Failed to ping server %s: %v, attempting to pair using PSK", response.InternalServerIP, pingerErr)
+	} else {
+		logrus.Info("No cached pairing response found, pairing with server")
+	}
+	childResponse, pairErr := c.client.Pair()
+	if pairErr != nil {
+		return PairingResponse{}, pairErr
+	}
+	setErr := c.storage.Set(childResponse)
+	if setErr != nil {
+		logrus.Errorf("Failed to store pairing response: %v", setErr)
+	}
+
+	return childResponse, nil
+}
+
+// NewKeyCachingPairingClient is a decorator that tries to cache the keys obtained by child client
+func NewKeyCachingPairingClient(
+	storage KeyCachingPairingClientStorage,
+	wgConfig *wg.Config,
+
+	wgReloader WireguardConfigReloader,
+	client PairingClient,
+) PairingClient {
+	return &keyCachingPairingClient{
+		client:     client,
+		storage:    storage,
+		wgReloader: wgReloader,
+		wgConfig:   wgConfig,
+
+		pinger: &retryingPinger{&defaultPinger{}},
+	}
+}
+
+// KeyCachingPairingClientStorage is a storage for pairing responses cache
+type KeyCachingPairingClientStorage interface {
+	Set(PairingResponse) error
+	Get() (PairingResponse, error)
+}
+
+type boltKeyCachingPairingClientStorage struct {
+	db *bolt.DB
+}
+
+func (s *boltKeyCachingPairingClientStorage) Get() (PairingResponse, error) {
+	var response PairingResponse
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("pairing"))
+		if bucket == nil {
+			return fmt.Errorf("bucket does not exist")
+		}
+		data := bucket.Get([]byte("response"))
+		if data == nil {
+			return fmt.Errorf("response does not exist")
+		}
+		return json.Unmarshal(data, &response)
+	})
+	return response, err
+}
+
+func (s *boltKeyCachingPairingClientStorage) Set(response PairingResponse) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		bucket, createErr := tx.CreateBucketIfNotExists([]byte("pairing"))
+		if createErr != nil {
+			return createErr
+		}
+		encoded, encodeErr := json.Marshal(response)
+		if encodeErr != nil {
+			return encodeErr
+		}
+		return bucket.Put([]byte("response"), encoded)
+	})
+}
+
+// NewBoltKeyCachingPairingClientStorage creates a new KeyCachingPairingClientStorage backed by a bolt database
+func NewBoltKeyCachingPairingClientStorage(path string) (KeyCachingPairingClientStorage, error) {
+	db, err := bolt.Open(path, 0600, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &boltKeyCachingPairingClientStorage{db: db}, nil
+}
+
+type inMemoryKeyCachingPairingClientStorage struct {
+	isSet    bool
+	response PairingResponse
+}
+
+func (s *inMemoryKeyCachingPairingClientStorage) Get() (PairingResponse, error) {
+	if !s.isSet {
+		return PairingResponse{}, fmt.Errorf("response not set")
+	}
+	return s.response, nil
+}
+
+func (s *inMemoryKeyCachingPairingClientStorage) Set(response PairingResponse) error {
+	s.response = response
+	s.isSet = true
+	return nil
+}
+
+// NewInMemoryKeyCachingPairingClientStorage creates a new KeyCachingPairingClientStorage backed by memory
+func NewInMemoryKeyCachingPairingClientStorage() KeyCachingPairingClientStorage {
+	return &inMemoryKeyCachingPairingClientStorage{}
+}
+
+// defaultPairingClient is a client that can pair with a server
+type defaultPairingClient struct {
 	clientName string
 	keyPair    KeyPair
 	wgConfig   *wg.Config
@@ -19,7 +165,7 @@ type PairingClient struct {
 }
 
 // Pair sends a pairing request to the server and returns the response
-func (c *PairingClient) Pair() (PairingResponse, error) {
+func (c *defaultPairingClient) Pair() (PairingResponse, error) {
 	request := PairingRequest{
 		Name: c.clientName,
 		Wireguard: PairingRequestWireguardConfig{
@@ -53,16 +199,16 @@ func (c *PairingClient) Pair() (PairingResponse, error) {
 	return decoded, c.wgReloader.Update(*c.wgConfig)
 }
 
-// NewPairingClient creates a new PairingClient instance
-func NewPairingClient(
+// NewDefaultPairingClient executes HTTP pairing requests to the server
+func NewDefaultPairingClient(
 	clientName string,
 	wgConfig *wg.Config,
 	keyPair KeyPair,
 	wgReloader WireguardConfigReloader,
 	encoder PairingEncoder,
 	transport PairingClientTransport,
-) *PairingClient {
-	return &PairingClient{
+) PairingClient {
+	return &defaultPairingClient{
 		clientName: clientName,
 		keyPair:    keyPair,
 		wgConfig:   wgConfig,

@@ -2,10 +2,12 @@ package svcdetector
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -67,13 +69,33 @@ func (wrapper defaultServiceWrapper) ports() []corev1.ServicePort {
 			}
 		} else {
 			for _, portDefinition := range wrapper.k8sSvc.Spec.Ports {
-				if portDefinition.Port == int32(portAsNumber) {
+				portAsInt32, portErr := safePortConversion(portAsNumber)
+				if portErr != nil {
+					logrus.Errorf("invalid port number: %v", portErr)
+					continue
+				}
+
+				if portDefinition.Port == portAsInt32 {
 					thePorts = append(thePorts, *portDefinition.DeepCopy())
 				}
 			}
 		}
 	}
 	return thePorts
+}
+
+func safePortConversion(portNumber int64) (int32, error) {
+	// Check lower bound
+	if portNumber < 0 {
+		return 0, fmt.Errorf("port number cannot be negative: %d", portNumber)
+	}
+
+	// Check upper bound
+	if portNumber > math.MaxInt32 {
+		return 0, fmt.Errorf("port number exceeds maximum int32 value: %d", portNumber)
+	}
+
+	return int32(portNumber), nil // nolint: gosec
 }
 
 func (wrapper defaultServiceWrapper) apps() []peers.App {

@@ -16,8 +16,9 @@ var debugFlag = &cli.BoolFlag{
 // Run starts wormgole
 func Run() {
 	app := &cli.App{
-		Name:                 "wormhole",
-		Usage:                "Wormhole is an utility to create reverse websocket tunnels, similar to ngrok",
+		Name: "wormhole",
+		Usage: ("Wormhole is an utility to create reverse websocket tunnels, " +
+			"similar to ngrok, but designed to be used in a kubernetes cluster"),
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			serverCommand,
