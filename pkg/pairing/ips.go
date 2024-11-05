@@ -1,4 +1,4 @@
-package hello
+package pairing
 
 import (
 	"net"
@@ -12,12 +12,17 @@ type ReservedAddressLister interface {
 	ReservedAddresses() ([]string, error)
 }
 
-type ipPool struct {
+// IPPool is an interface for managing IP addresses
+type IPPool interface {
+	Next() (string, error)
+}
+
+type defaultIPPool struct {
 	previous net.IP
 	lock     sync.Mutex
 }
 
-func (p *ipPool) Next() (string, error) {
+func (p *defaultIPPool) Next() (string, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	i := p.previous.To4()
@@ -68,7 +73,7 @@ func NewIPPool(starting string, reserved ReservedAddressLister) IPPool {
 		logrus.Panicf("Invalid IP address passed as starting to IP pool: %s", starting)
 	}
 	return &reservedAddressesValidatingIPPool{
-		child:             &ipPool{previous: ip},
+		child:             &defaultIPPool{previous: ip},
 		reservedAddresses: reserved,
 	}
 }

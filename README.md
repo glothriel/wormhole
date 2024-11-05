@@ -85,7 +85,7 @@ Now you can expose a service from one infrastructure to another. Services expose
 kubectl annotate --overwrite svc --namespace <namespace> <service> wormhole.glothriel.github.com/exposed=yes
 ```
 
-After up to 30 seconds the service will be available on the other side. 
+After up to 30 seconds the service will be available on the other side.
 
 ### Customize the exposed services
 
@@ -106,7 +106,7 @@ You can secure the services exposed on another end by configuring network polici
 
 You can enable network policies by setting `--set networkPolicies.enabled=true` helm chart value. Network policies of course in order to work require the cluster that supports them.
 
-When wormhole is deployed with network policies support, each time it exposes a remote service it also creates a matching network policy. The network policy is created in the same namespace as the service and allows filtering of the traffic from other workloads in the cluster to the remote service. 
+When wormhole is deployed with network policies support, each time it exposes a remote service it also creates a matching network policy. The network policy is created in the same namespace as the service and allows filtering of the traffic from other workloads in the cluster to the remote service.
 
 ```
 apiVersion: networking.k8s.io/v1
@@ -136,11 +136,11 @@ Effectively this means, that the permission to communicate is granted per applic
 
 ## HTTP API
 
-Wormhole exposes API, that allows querying apps exposed by remote peers. The API does not require authentication. The API by default listens on port 8082.
+Wormhole exposes API, that allows querying apps exposed by remote apps. The API does not require authentication. The API by default listens on port 8082.
 
 ### GET /api/apps/v1
 
-This endpoint returns the list of apps exposed locally by the remote peers.
+This endpoint returns the list of apps exposed locally by the remote apps.
 
 #### Request
 

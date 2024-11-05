@@ -1,4 +1,4 @@
-package hello
+package syncing
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ func (m *mockSyncClientTransport) Sync(data []byte) ([]byte, error) {
 
 func TestClientStartFailsAfterXSyncFailures(t *testing.T) {
 	// given
-	client := NewSyncingClient(
+	client := NewClient(
 		"client",
 		NewAppStateChangeGenerator(),
 		NewJSONSyncingEncoder(),

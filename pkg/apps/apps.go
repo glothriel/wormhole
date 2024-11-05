@@ -1,5 +1,5 @@
-// Package peers defines basic structures for apps and peers
-package peers
+// Package apps defines basic structures for apps
+package apps
 
 // App represents an application that can be peered
 type App struct {

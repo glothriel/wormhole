@@ -1,8 +1,6 @@
 package nginx
 
-import (
-	"github.com/glothriel/wormhole/pkg/peers"
-)
+import "github.com/glothriel/wormhole/pkg/apps"
 
 // StreamServer is a struct that holds components of Nginx configuration related to
 // "server" directive
@@ -11,5 +9,5 @@ type StreamServer struct {
 	ListenPort int
 	ProxyPass  string
 
-	App peers.App
+	App apps.App
 }

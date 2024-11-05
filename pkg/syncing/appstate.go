@@ -1,47 +1,47 @@
-package hello
+package syncing
 
 import (
 	"sync"
 
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 )
 
 // AppStateChangeGenerator is a generator that listens for changes in the app state and generates events
 type AppStateChangeGenerator struct {
-	peerApps map[string][]peers.App
+	peerApps map[string][]apps.App
 
 	changes chan svcdetector.AppStateChange
 	lock    sync.Mutex
 }
 
-// SetState is called when a sync message is received
-func (s *AppStateChangeGenerator) SetState(peer string, apps []peers.App) {
-	logrus.Debugf("Received sync from %s with %d apps", peer, len(apps))
+// UpdateForPeer is called when a sync message is received
+func (s *AppStateChangeGenerator) UpdateForPeer(peer string, theApps []apps.App) {
+	logrus.Debugf("Received sync from %s with %d apps", peer, len(theApps))
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	apps = patchPeer(apps, peer)
+	theApps = patchPeer(theApps, peer)
 	oldApps, oldAppsOk := s.peerApps[peer]
 	if !oldAppsOk {
-		oldApps = make([]peers.App, 0)
+		oldApps = make([]apps.App, 0)
 	}
-	addedApps := make([]peers.App, 0)
-	removedApps := make([]peers.App, 0)
-	changedApps := make([]peers.App, 0)
+	addedApps := make([]apps.App, 0)
+	removedApps := make([]apps.App, 0)
+	changedApps := make([]apps.App, 0)
 
-	for _, app := range apps {
+	for _, app := range theApps {
 		if !contains(oldApps, app) {
 			addedApps = append(addedApps, app)
 		}
 	}
 	for _, oldApp := range oldApps {
-		if !contains(apps, oldApp) {
+		if !contains(theApps, oldApp) {
 			removedApps = append(removedApps, oldApp)
 		}
 	}
 
-	for _, app := range apps {
+	for _, app := range theApps {
 		for _, oldApp := range oldApps {
 			if app.Name == oldApp.Name && app.Address != oldApp.Address {
 				changedApps = append(changedApps, app)
@@ -77,7 +77,7 @@ func (s *AppStateChangeGenerator) SetState(peer string, apps []peers.App) {
 		}
 	}
 
-	s.peerApps[peer] = apps
+	s.peerApps[peer] = theApps
 }
 
 // Changes returns the channel where changes are sent
@@ -88,12 +88,12 @@ func (s *AppStateChangeGenerator) Changes() chan svcdetector.AppStateChange {
 // NewAppStateChangeGenerator creates a new AppStateChangeGenerator
 func NewAppStateChangeGenerator() *AppStateChangeGenerator {
 	return &AppStateChangeGenerator{
-		peerApps: make(map[string][]peers.App),
+		peerApps: make(map[string][]apps.App),
 		changes:  make(chan svcdetector.AppStateChange),
 	}
 }
 
-func contains(apps []peers.App, app peers.App) bool {
+func contains(apps []apps.App, app apps.App) bool {
 	for _, a := range apps {
 		if a.Name == app.Name {
 			return true
@@ -102,9 +102,9 @@ func contains(apps []peers.App, app peers.App) bool {
 	return false
 }
 
-func patchPeer(a []peers.App, peerName string) []peers.App {
+func patchPeer(a []apps.App, peerName string) []apps.App {
 	for i := range a {
-		a[i] = peers.WithPeer(a[i], peerName)
+		a[i] = apps.WithPeer(a[i], peerName)
 	}
 	return a
 }

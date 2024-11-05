@@ -2,12 +2,12 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/glothriel/wormhole/pkg/hello"
+	"github.com/glothriel/wormhole/pkg/pairing"
 	"github.com/glothriel/wormhole/pkg/wg"
 )
 
 type peerController struct {
-	peers              hello.PeerStorage
+	peers              pairing.PeerStorage
 	wgConfig           *wg.Config
 	watcher            *wg.Watcher
 	enablePeerDeletion bool
@@ -66,7 +66,7 @@ func (p *peerController) registerRoutes(r *gin.Engine) {
 }
 
 // NewPeersController allows querying and manipulation of the connected peers
-func NewPeersController(peers hello.PeerStorage, wgConfig *wg.Config, watcher *wg.Watcher) Controller {
+func NewPeersController(peers pairing.PeerStorage, wgConfig *wg.Config, watcher *wg.Watcher) Controller {
 	return &peerController{
 		peers:    peers,
 		wgConfig: wgConfig,

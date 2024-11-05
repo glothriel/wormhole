@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/api"
-	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
 	"github.com/glothriel/wormhole/pkg/listeners"
 	"github.com/glothriel/wormhole/pkg/nginx"
+	"github.com/glothriel/wormhole/pkg/pairing"
+	"github.com/glothriel/wormhole/pkg/syncing"
 	"github.com/glothriel/wormhole/pkg/wg"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -76,20 +77,20 @@ var clientCommand *cli.Command = &cli.Command{
 		}
 		remoteListenerRegistry := listeners.NewApps(effectiveExposer)
 
-		appStateChangeGenerator := hello.NewAppStateChangeGenerator()
+		appStateChangeGenerator := syncing.NewAppStateChangeGenerator()
 
-		transport := hello.NewHTTPClientPairingTransport(c.String(pairingServerURL.Name))
+		transport := pairing.NewHTTPClientPairingTransport(c.String(pairingServerURL.Name))
 		if c.String(inviteTokenFlag.Name) != "" {
-			transport = hello.NewPSKClientPairingTransport(
+			transport = pairing.NewPSKClientPairingTransport(
 				c.String(inviteTokenFlag.Name),
 				transport,
 			)
 		}
 
-		pairingKeyCache := hello.NewInMemoryKeyCachingPairingClientStorage()
+		pairingKeyCache := pairing.NewInMemoryKeyCachingPairingClientStorage()
 		if c.String(pairingClientCacheDBPath.Name) != "" {
 			var err error
-			pairingKeyCache, err = hello.NewBoltKeyCachingPairingClientStorage(c.String(pairingClientCacheDBPath.Name))
+			pairingKeyCache, err = pairing.NewBoltKeyCachingPairingClientStorage(c.String(pairingClientCacheDBPath.Name))
 			if err != nil {
 				logrus.Fatalf("Failed to create pairing key cache: %v", err)
 			}
@@ -99,25 +100,25 @@ var clientCommand *cli.Command = &cli.Command{
 			PrivateKey: privateKey,
 			Subnet:     "32",
 		}
-		keyPair := hello.KeyPair{
+		keyPair := pairing.KeyPair{
 			PublicKey:  publicKey,
 			PrivateKey: privateKey,
 		}
-		client := hello.NewKeyCachingPairingClient(
+		client := pairing.NewKeyCachingPairingClient(
 			pairingKeyCache,
 			wgConfig,
 			wgReloader,
-			hello.NewDefaultPairingClient(
+			pairing.NewDefaultPairingClient(
 				c.String(peerNameFlag.Name),
 				wgConfig,
 				keyPair,
 				wgReloader,
-				hello.NewJSONPairingEncoder(),
+				pairing.NewJSONPairingEncoder(),
 				transport,
 			),
 		)
 
-		var pairingResponse hello.PairingResponse
+		var pairingResponse pairing.Response
 		for {
 			var err error
 			if pairingResponse, err = client.Pair(); err != nil {
@@ -139,14 +140,14 @@ var clientCommand *cli.Command = &cli.Command{
 		go localListenerRegistry.Watch(getAppStateChangeGenerator(c).Changes(), make(chan bool))
 		go remoteListenerRegistry.Watch(appStateChangeGenerator.Changes(), make(chan bool))
 
-		sc, scErr := hello.NewHTTPSyncingClient(
+		sc, scErr := syncing.NewHTTPClient(
 			c.String(peerNameFlag.Name),
 			appStateChangeGenerator,
-			hello.NewJSONSyncingEncoder(),
+			syncing.NewJSONSyncingEncoder(),
 			time.Second*5,
-			hello.NewAddressEnrichingAppSource(
+			syncing.NewAddressEnrichingAppSource(
 				pairingResponse.AssignedIP,
-				hello.NewPeerEnrichingAppSource(
+				syncing.NewPeerEnrichingAppSource(
 					c.String(peerNameFlag.Name),
 					localListenerRegistry,
 				),

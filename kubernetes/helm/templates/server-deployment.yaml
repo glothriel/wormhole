@@ -21,7 +21,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/server-config.yaml") . | sha256sum }}
       labels:
         application: {{ template "name-server" . }}
-    spec: 
+    spec:
       shareProcessNamespace: true
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName }}
@@ -91,7 +91,7 @@ spec:
             capabilities:
               add:
               - NET_ADMIN
-       
+
         - image: {{ $.Values.docker.registry }}{{ if $.Values.docker.registry }}/{{ end }}{{ $.Values.docker.image }}:{{ $.Values.docker.version }}
           name: wormhole
           envFrom:
