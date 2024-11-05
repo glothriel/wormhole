@@ -31,10 +31,9 @@ func (n *Exposer) Add(app apps.App) (apps.App, error) {
 		return apps.App{}, fmt.Errorf("Could not allocate port: %v", portErr)
 	}
 	server := StreamServer{
-		ListenPort: port,
-		ProxyPass:  app.Address,
-		File:       nginxConfigPath(n.prefix, app),
-		App:        app,
+		ProxyPass: app.Address,
+		File:      nginxConfigPath(n.prefix, app),
+		App:       app,
 	}
 	listenBlock := ""
 	listenAddrs, addrsErr := n.listener.Addrs(port)
