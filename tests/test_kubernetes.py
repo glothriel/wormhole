@@ -64,7 +64,6 @@ def test_annotating_with_custom_name_correctly_sets_remote_name(
     _ensure_that_proxied_service_is_deleted()
 
 
-@pytest.mark.skip(reason="currently fails")
 def test_deleting_annotated_service_removes_it_from_peers(
     kubectl,
     k8s_server,

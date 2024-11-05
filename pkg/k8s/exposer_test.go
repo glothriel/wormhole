@@ -88,9 +88,9 @@ func TestExposerAdd(t *testing.T) {
 	assert.Equal(t, 0, rsc1.addCalled)
 	assert.Equal(t, 1, rsc2.addCalled)
 	assert.Equal(t, k8sResourceMetadata{
-		entityName:       "nginxpeer-nginxname",
-		initialApp:       apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
-		childReturnedApp: apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
+		entityName:      "nginxpeer-nginxname",
+		originalApp:     apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
+		afterExposedApp: apps.App{Name: "nginxname", Peer: "nginxpeer", OriginalPort: 80},
 	}, rsc2.addLastCalledWith)
 	assert.Equal(t, apps.App{
 		Name:         "nginxname",

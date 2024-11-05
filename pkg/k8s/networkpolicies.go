@@ -22,7 +22,7 @@ const consumesNpLabel = "wormhole.glothriel.github.com/network-policy-consumes-a
 
 func (m *managedK8sNetworkPolicy) Add(metadata k8sResourceMetadata, clientset *kubernetes.Clientset) error {
 	networkPoliciesClient := clientset.NetworkingV1().NetworkPolicies(m.namespace)
-	port, portErr := extractPortFromAddr(metadata.childReturnedApp.Address)
+	port, portErr := extractPortFromAddr(metadata.afterExposedApp.Address)
 	if portErr != nil {
 		return portErr
 	}
@@ -53,7 +53,7 @@ func (m *managedK8sNetworkPolicy) npDefinition(port int, metadata k8sResourceMet
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      metadata.entityName,
 			Namespace: m.namespace,
-			Labels:    resourceLabels(metadata.childReturnedApp),
+			Labels:    resourceLabels(metadata.afterExposedApp),
 		},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{
@@ -71,7 +71,7 @@ func (m *managedK8sNetworkPolicy) npDefinition(port int, metadata k8sResourceMet
 						{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
-									consumesNpLabel: metadata.initialApp.Name,
+									consumesNpLabel: metadata.originalApp.Name,
 								},
 							},
 							NamespaceSelector: &metav1.LabelSelector{},

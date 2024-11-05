@@ -77,8 +77,9 @@ func (manager *stateManager) cleanupRemoved() {
 			logrus.Errorf("Unable to cleanup exposed services: %v", cleanErr)
 			return
 		}
-		itemsToDelete = append(itemsFromCleaner, itemsFromCleaner...)
+		itemsToDelete = append(itemsToDelete, itemsFromCleaner...)
 	}
+
 	for _, itemToDelete := range itemsToDelete {
 		for _, app := range itemToDelete.apps {
 			manager.registry.markAsWithdrawn(app, itemToDelete.service)

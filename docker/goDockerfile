@@ -1,7 +1,7 @@
 ARG GO_VERSION=1.22.0
 
-# Build stage
-FROM golang:${GO_VERSION}-bookworm AS run
+# Base stage
+FROM golang:${GO_VERSION}-bookworm AS base
 ARG PROJECT
 ARG USER_ID
 ARG GROUP_ID
@@ -30,33 +30,38 @@ COPY ${PROJECT}/pkg ./pkg
 COPY ${PROJECT}/main.go ./main.go
 
 
-# Dev stage, can be used for development using docker-compose "build.target" config
+# A stage that downloadcs watchexec, made separate to avoid redownloading on every change
 FROM golang:${GO_VERSION}-bookworm as we
 RUN apt update  && apt install -y xz-utils
 ADD https://github.com/watchexec/watchexec/releases/download/v1.25.1/watchexec-1.25.1-x86_64-unknown-linux-gnu.tar.xz .
 RUN tar -xvf watchexec-1.25.1-x86_64-unknown-linux-gnu.tar.xz
 RUN mv watchexec-1.25.1-x86_64-unknown-linux-gnu/watchexec /usr/local/bin
 
-FROM run as dev
+# Dev stage used when executing the container in development mode, for Tilt
+FROM base as dev
 WORKDIR /tmp
 USER root
 COPY --from=we /usr/local/bin/watchexec /usr/local/bin/watchexec
 USER go
 COPY ${PROJECT}/docker/go/dev-entrypoint.sh /dev-entrypoint.sh
 WORKDIR /src
-RUN mkdir -p /home/go/.cache/go-build
 ARG VERSION=dev
 ENV VERSION=${VERSION}
 ENV HOME=/home/go
 ENTRYPOINT ["/dev-entrypoint.sh"]
 
-FROM run as build
+# Build stage, uses the base stage and builds binary, used for docker images built for production and e2e tests
+FROM base as build
+USER root
 WORKDIR /src
-RUN CGO_ENABLED=1 go build \
-    -installsuffix 'static' \
+ENV GOCACHE=/root/.cache/go-build
+RUN mkdir -p /root/.cache/go-build
+RUN --mount=type=cache,target="/root/.cache/go-build",rw CGO_ENABLED=1 go build \
     -o /home/go/app ./main.go
+RUN chown -R go:go /home/go
+USER go
 
-# Prod stage, uses distrolless image
+# Prod stage, wraps build stage result in distroless image
 FROM gcr.io/distroless/base AS prod
 ARG VERSION=dev
 ENV VERSION=${VERSION}

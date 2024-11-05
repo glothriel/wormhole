@@ -20,7 +20,7 @@ type managedK8sService struct {
 func (m *managedK8sService) Add(metadata k8sResourceMetadata, clientset *kubernetes.Clientset) error {
 	servicesClient := clientset.CoreV1().Services(m.namespace)
 
-	port, portErr := extractPortFromAddr(metadata.childReturnedApp.Address)
+	port, portErr := extractPortFromAddr(metadata.afterExposedApp.Address)
 	if portErr != nil {
 		return portErr
 	}
@@ -28,11 +28,11 @@ func (m *managedK8sService) Add(metadata k8sResourceMetadata, clientset *kuberne
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      metadata.entityName,
 			Namespace: m.namespace,
-			Labels:    resourceLabels(metadata.childReturnedApp),
+			Labels:    resourceLabels(metadata.afterExposedApp),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
-				Port:       metadata.initialApp.OriginalPort,
+				Port:       metadata.originalApp.OriginalPort,
 				TargetPort: intstr.FromInt(port),
 			}},
 			Selector: m.selectors,

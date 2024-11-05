@@ -1,7 +1,9 @@
 // Package svcdetector orchestrates kubernetes integration
 package svcdetector
 
-import "github.com/glothriel/wormhole/pkg/apps"
+import (
+	"github.com/glothriel/wormhole/pkg/apps"
+)
 
 type itemToDelete registryItem
 

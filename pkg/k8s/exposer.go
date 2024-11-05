@@ -49,9 +49,9 @@ func (exp *k8sResourceExposer) Add(app apps.App) (apps.App, error) {
 	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
 	for _, managedResource := range exp.managedResources {
 		addErr := managedResource.Add(k8sResourceMetadata{
-			entityName:       entityName,
-			initialApp:       app,
-			childReturnedApp: addedApp,
+			entityName:      entityName,
+			originalApp:     app,
+			afterExposedApp: addedApp,
 		}, clientset)
 		if addErr != nil {
 			return apps.App{}, multierr.Combine(addErr, exp.child.Withdraw(app))
@@ -113,32 +113,10 @@ func NewK8sExposer(
 	}
 }
 
-// CSVToMap converts key1=v1,key2=v2 entries into flat string map
-func CSVToMap(csv string) map[string]string {
-	theMap := map[string]string{}
-	for _, kvPair := range strings.Split(csv, ",") {
-		parsedKVPair := strings.Split(kvPair, "=")
-		theMap[parsedKVPair[0]] = strings.Join(parsedKVPair[1:], "=")
-	}
-	return theMap
-}
-
-const exposedByLabel = "wormhole.glothriel.github.com/exposed-by"
-const exposedAppLabel = "wormhole.glothriel.github.com/exposed-app"
-const exposedPeerLabel = "wormhole.glothriel.github.com/exposed-peer"
-
-func resourceLabels(app apps.App) map[string]string {
-	return map[string]string{
-		exposedByLabel:   "wormhole",
-		exposedAppLabel:  app.Name,
-		exposedPeerLabel: app.Peer,
-	}
-}
-
 type k8sResourceMetadata struct {
-	entityName       string
-	initialApp       apps.App
-	childReturnedApp apps.App
+	entityName      string
+	originalApp     apps.App
+	afterExposedApp apps.App
 }
 
 type managedK8sResource interface {
