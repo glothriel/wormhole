@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/api"
+	"github.com/glothriel/wormhole/pkg/pairing"
+	"github.com/glothriel/wormhole/pkg/syncing"
 
-	"github.com/glothriel/wormhole/pkg/hello"
 	"github.com/glothriel/wormhole/pkg/k8s"
 	"github.com/glothriel/wormhole/pkg/listeners"
 	"github.com/glothriel/wormhole/pkg/nginx"
@@ -115,7 +116,7 @@ var serverCommand *cli.Command = &cli.Command{
 
 		go appsExposedHere.Watch(getAppStateChangeGenerator(c).Changes(), make(chan bool))
 
-		remoteNginxAdapter := hello.NewAppStateChangeGenerator()
+		remoteNginxAdapter := syncing.NewAppStateChangeGenerator()
 		go appsExposedFromRemote.Watch(remoteNginxAdapter.Changes(), make(chan bool))
 
 		wgConfig := &wg.Config{
@@ -136,21 +137,21 @@ var serverCommand *cli.Command = &cli.Command{
 				AllowedIPs: fmt.Sprintf("%s/32,%s/32", savedPeer.IP, wgConfig.Address),
 			})
 		}
-		syncTransport := hello.NewHTTPServerSyncingTransport(&http.Server{
+		syncTransport := syncing.NewHTTPServerSyncingTransport(&http.Server{
 			Addr:              fmt.Sprintf("%s:%d", c.String(wgAddressFlag.Name), c.Int(intServerListenPort.Name)),
 			ReadHeaderTimeout: time.Second * 5,
 		})
 
-		appSource := hello.NewAddressEnrichingAppSource(
+		appSource := syncing.NewAddressEnrichingAppSource(
 			wgConfig.Address,
-			hello.NewPeerEnrichingAppSource("server", appsExposedHere),
+			syncing.NewPeerEnrichingAppSource("server", appsExposedHere),
 		)
 
-		ss := hello.NewSyncingServer(
+		ss := syncing.NewServer(
 			c.String(peerNameFlag.Name),
 			remoteNginxAdapter,
 			appSource,
-			hello.NewJSONSyncingEncoder(),
+			syncing.NewJSONSyncingEncoder(),
 			syncTransport,
 			peerStorage,
 		)
@@ -159,32 +160,32 @@ var serverCommand *cli.Command = &cli.Command{
 		if updateErr != nil {
 			return fmt.Errorf("failed to bootstrap wireguard config: %w", updateErr)
 		}
-		peerTransport := hello.NewHTTPServerPairingTransport(&http.Server{
+		peerTransport := pairing.NewHTTPServerPairingTransport(&http.Server{
 			Addr:              c.String(extServerListenAddress.Name),
 			ReadHeaderTimeout: time.Second * 5,
 		})
 		if c.String(inviteTokenFlag.Name) != "" {
-			peerTransport = hello.NewPSKPairingServerTransport(
+			peerTransport = pairing.NewPSKPairingServerTransport(
 				c.String(inviteTokenFlag.Name),
 				peerTransport,
 			)
 		}
-		ps := hello.NewPairingServer(
+		ps := pairing.NewServer(
 			"server",
 			fmt.Sprintf("%s:%d", c.String(wgPublicHostFlag.Name), c.Int(wgPortFlag.Name)),
 			wgConfig,
-			hello.KeyPair{
+			pairing.KeyPair{
 				PublicKey:  publicKey,
 				PrivateKey: privateKey,
 			},
 			watcher,
-			hello.NewJSONPairingEncoder(),
+			pairing.NewJSONPairingEncoder(),
 			peerTransport,
-			hello.NewIPPool(c.String(wgAddressFlag.Name), hello.NewReservedAddressLister(
+			pairing.NewIPPool(c.String(wgAddressFlag.Name), pairing.NewReservedAddressLister(
 				peerStorage,
 			)),
 			peerStorage,
-			[]hello.MetadataEnricher{syncTransport},
+			[]pairing.MetadataEnricher{syncTransport},
 		)
 		go ss.Start()
 		go func() {

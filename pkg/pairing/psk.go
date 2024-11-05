@@ -1,4 +1,4 @@
-package hello
+package pairing
 
 import (
 	"crypto/aes"
@@ -11,7 +11,7 @@ import (
 
 type pskPairingServerTransport struct {
 	psk   string
-	child PairingServerTransport
+	child ServerTransport
 }
 
 func (t *pskPairingServerTransport) Requests() <-chan IncomingPairingRequest {
@@ -51,7 +51,7 @@ func (t *pskPairingServerTransport) Requests() <-chan IncomingPairingRequest {
 
 // NewPSKPairingServerTransport creates a new PairingServerTransport, that encrypts and
 // decrypts requests using the provided pre-shared key (psk).
-func NewPSKPairingServerTransport(psk string, child PairingServerTransport) PairingServerTransport {
+func NewPSKPairingServerTransport(psk string, child ServerTransport) ServerTransport {
 	return &pskPairingServerTransport{
 		child: child,
 		psk:   psk,
@@ -60,7 +60,7 @@ func NewPSKPairingServerTransport(psk string, child PairingServerTransport) Pair
 
 type pskPairingClientTransport struct {
 	psk   string
-	child PairingClientTransport
+	child ClientTransport
 }
 
 func (t *pskPairingClientTransport) Send(req []byte) ([]byte, error) {
@@ -81,7 +81,7 @@ func (t *pskPairingClientTransport) Send(req []byte) ([]byte, error) {
 
 // NewPSKClientPairingTransport creates a new PairingClientTransport, that encrypts and
 // decrypts requests using the provided pre-shared key (psk).
-func NewPSKClientPairingTransport(psk string, child PairingClientTransport) PairingClientTransport {
+func NewPSKClientPairingTransport(psk string, child ClientTransport) ClientTransport {
 	return &pskPairingClientTransport{
 		child: child,
 		psk:   psk,

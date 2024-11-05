@@ -2,27 +2,27 @@
 package listeners
 
 import (
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/k8s/svcdetector"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"github.com/sirupsen/logrus"
 )
 
 // Exposer reacts to changes in the app state and perform necessary actions like opening sockets,
 // creating kube services, etc.
 type Exposer interface {
-	Add(app peers.App) (peers.App, error)
-	Withdraw(app peers.App) error
+	Add(app apps.App) (apps.App, error)
+	Withdraw(app apps.App) error
 	WithdrawAll() error
 }
 
 type noOpExposer struct {
 }
 
-func (e *noOpExposer) Add(app peers.App) (peers.App, error) {
+func (e *noOpExposer) Add(app apps.App) (apps.App, error) {
 	return app, nil
 }
 
-func (e *noOpExposer) Withdraw(_ peers.App) error {
+func (e *noOpExposer) Withdraw(_ apps.App) error {
 	return nil
 }
 
@@ -38,7 +38,7 @@ func NewNoOpExposer() Exposer {
 // Registry is a registry of apps, that also listens for changes in the app state and triggers the exposer
 type Registry struct {
 	Exposer Exposer
-	apps    []peers.App
+	apps    []apps.App
 }
 
 // Watch listens for changes in the app state and triggers the exposer
@@ -75,7 +75,7 @@ func (g *Registry) Watch(c chan svcdetector.AppStateChange, done chan bool) { //
 }
 
 // List returns the list of apps
-func (g *Registry) List() ([]peers.App, error) {
+func (g *Registry) List() ([]apps.App, error) {
 	return g.apps, nil
 }
 

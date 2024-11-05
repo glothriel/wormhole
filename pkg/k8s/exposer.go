@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/glothriel/wormhole/pkg/listeners"
-	"github.com/glothriel/wormhole/pkg/peers"
 	"go.uber.org/multierr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -37,14 +37,14 @@ type k8sResourceExposer struct {
 	clientProvider clientProvider
 }
 
-func (exp *k8sResourceExposer) Add(app peers.App) (peers.App, error) {
+func (exp *k8sResourceExposer) Add(app apps.App) (apps.App, error) {
 	clientset, clientSetErr := exp.clientProvider.New()
 	if clientSetErr != nil {
-		return peers.App{}, clientSetErr
+		return apps.App{}, clientSetErr
 	}
 	addedApp, childFactoryErr := exp.child.Add(app)
 	if childFactoryErr != nil {
-		return peers.App{}, childFactoryErr
+		return apps.App{}, childFactoryErr
 	}
 	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
 	for _, managedResource := range exp.managedResources {
@@ -54,13 +54,13 @@ func (exp *k8sResourceExposer) Add(app peers.App) (peers.App, error) {
 			childReturnedApp: addedApp,
 		}, clientset)
 		if addErr != nil {
-			return peers.App{}, multierr.Combine(addErr, exp.child.Withdraw(app))
+			return apps.App{}, multierr.Combine(addErr, exp.child.Withdraw(app))
 		}
 	}
-	return peers.WithAddress(addedApp, fmt.Sprintf("%s.%s:%d", entityName, exp.namespace, app.OriginalPort)), nil
+	return apps.WithAddress(addedApp, fmt.Sprintf("%s.%s:%d", entityName, exp.namespace, app.OriginalPort)), nil
 }
 
-func (exp *k8sResourceExposer) Withdraw(app peers.App) error {
+func (exp *k8sResourceExposer) Withdraw(app apps.App) error {
 	clientset, clientSetErr := exp.clientProvider.New()
 	if clientSetErr != nil {
 		return clientSetErr
@@ -127,7 +127,7 @@ const exposedByLabel = "wormhole.glothriel.github.com/exposed-by"
 const exposedAppLabel = "wormhole.glothriel.github.com/exposed-app"
 const exposedPeerLabel = "wormhole.glothriel.github.com/exposed-peer"
 
-func resourceLabels(app peers.App) map[string]string {
+func resourceLabels(app apps.App) map[string]string {
 	return map[string]string{
 		exposedByLabel:   "wormhole",
 		exposedAppLabel:  app.Name,
@@ -137,8 +137,8 @@ func resourceLabels(app peers.App) map[string]string {
 
 type k8sResourceMetadata struct {
 	entityName       string
-	initialApp       peers.App
-	childReturnedApp peers.App
+	initialApp       apps.App
+	childReturnedApp apps.App
 }
 
 type managedK8sResource interface {

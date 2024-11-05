@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/glothriel/wormhole/pkg/peers"
+	"github.com/glothriel/wormhole/pkg/apps"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -15,7 +15,7 @@ type serviceWrapper interface {
 	id() string
 	shouldBeExposed() bool
 	name() string
-	apps() []peers.App
+	apps() []apps.App
 }
 
 type defaultServiceWrapper struct {
@@ -98,8 +98,8 @@ func safePortConversion(portNumber int64) (int32, error) {
 	return int32(portNumber), nil // nolint: gosec
 }
 
-func (wrapper defaultServiceWrapper) apps() []peers.App {
-	apps := make([]peers.App, 0)
+func (wrapper defaultServiceWrapper) apps() []apps.App {
+	theApps := make([]apps.App, 0)
 	exposedPorts := wrapper.ports()
 	for _, portDefinition := range exposedPorts {
 		if portDefinition.Protocol != "TCP" {
@@ -109,7 +109,7 @@ func (wrapper defaultServiceWrapper) apps() []peers.App {
 		if len(exposedPorts) > 1 {
 			portName = fmt.Sprintf("%s-%s", wrapper.name(), portDefinition.Name)
 		}
-		apps = append(apps, peers.App{
+		theApps = append(theApps, apps.App{
 			Name: portName,
 			Address: fmt.Sprintf(
 				"%s.%s:%d",
@@ -121,7 +121,7 @@ func (wrapper defaultServiceWrapper) apps() []peers.App {
 			OriginalPort: portDefinition.Port,
 		})
 	}
-	return apps
+	return theApps
 }
 
 func newDefaultServiceWrapper(svc *corev1.Service) defaultServiceWrapper {
