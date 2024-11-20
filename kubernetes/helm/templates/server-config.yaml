@@ -4,6 +4,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "name-server" . }}-nginx
+  namespace: {{ $.Release.Namespace }}
 data:
   nginx.conf: |
     worker_processes  auto;
@@ -24,6 +25,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ template "name-server" . }}-env
+  namespace: {{ $.Release.Namespace }}
 stringData:
   INVITE_TOKEN: {{ .Values.peering.psk | quote }}
   

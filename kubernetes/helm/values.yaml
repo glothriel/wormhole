@@ -43,6 +43,7 @@ server:
   name: server
 
   service:
+    annotations: null
     type: LoadBalancer
 
   priorityClassName: ""
@@ -91,6 +92,7 @@ docker:
   wgVersion: latest # GHA
   nginxImage: glothriel/wormhole-nginx
   nginxVersion: latest # GHA
+  pullSecrets: null
 
 peering:
   psk: defaultPeeringKeyPleaseChangeMe

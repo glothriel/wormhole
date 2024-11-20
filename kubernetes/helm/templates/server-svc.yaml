@@ -7,6 +7,10 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     application: {{ template "name-server" . }}
+  {{- if .Values.server.service.annotations }}
+  annotations:
+    {{- toYaml .Values.server.service.annotations | nindent 4 }}
+  {{- end }}
 spec:
   ports:
   - name: data
