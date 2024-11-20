@@ -190,7 +190,7 @@ def k8s_server(
         {
             "server.enabled": True,
             "networkPolicies.enabled": True,
-            "server.wg.publicHost": "wormhole-server-server.server.svc.cluster.local",
+            "server.wg.publicHost": "wormhole-server.server.svc.cluster.local",
             "server.service.type": "ClusterIP",
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
@@ -220,7 +220,7 @@ def k8s_client(
             "client.enabled": True,
             "networkPolicies.enabled": True,
             "client.name": "client",
-            "client.serverDsn": "http://wormhole-server-server.server.svc.cluster.local:8080",
+            "client.serverDsn": "http://wormhole-server.server.svc.cluster.local:8080",
             "docker.image": wormhole_image.split(":")[0],
             "docker.version": wormhole_image.split(":")[1],
             "docker.wgImage": wireguard_image.split(":")[0],
