@@ -22,6 +22,10 @@ spec:
       labels:
         application: {{ template "name-server" . }}
     spec:
+      {{- if .Values.docker.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.docker.imagePullSecrets | nindent 8 }}
+      {{- end }}
       shareProcessNamespace: true
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName }}
