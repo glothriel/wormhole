@@ -2,6 +2,8 @@
 package k8s
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,7 +48,7 @@ func (exp *k8sResourceExposer) Add(app apps.App) (apps.App, error) {
 	if childFactoryErr != nil {
 		return apps.App{}, childFactoryErr
 	}
-	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
+	entityName := capName(fmt.Sprintf("%s-%s", app.Peer, app.Name))
 	for _, managedResource := range exp.managedResources {
 		addErr := managedResource.Add(k8sResourceMetadata{
 			entityName:      entityName,
@@ -65,7 +67,7 @@ func (exp *k8sResourceExposer) Withdraw(app apps.App) error {
 	if clientSetErr != nil {
 		return clientSetErr
 	}
-	entityName := fmt.Sprintf("%s-%s", app.Peer, app.Name)
+	entityName := capName(fmt.Sprintf("%s-%s", app.Peer, app.Name))
 	for i := range exp.managedResources {
 		managedResource := exp.managedResources[len(exp.managedResources)-1-i]
 		removeErr := managedResource.Remove(entityName, clientset)
@@ -128,4 +130,32 @@ type managedK8sResource interface {
 func extractPortFromAddr(address string) (int, error) {
 	parts := strings.Split(address, ":")
 	return strconv.Atoi(parts[1])
+}
+
+func capName(name string) string {
+	if len(name) <= 63 {
+		return name
+	}
+
+	// Calculate hash of the full name
+	hasher := sha256.New()
+	hasher.Write([]byte(name))
+	hash := hex.EncodeToString(hasher.Sum(nil))[:8] // Take first 8 chars of hash
+
+	// We need 9 chars for "-" + hash
+	// So we can search up to position 54 (63 - 9 = 54)
+	searchStart := 32
+	searchEnd := 54
+
+	substring := name[searchStart:searchEnd]
+	hyphenIndex := strings.LastIndex(substring, "-")
+
+	if hyphenIndex != -1 {
+		// Found hyphen in the search range
+		actualIndex := searchStart + hyphenIndex
+		return name[:actualIndex] + "-" + hash
+	}
+
+	// No suitable hyphen found, cut at position 54
+	return name[:54] + "-" + hash
 }

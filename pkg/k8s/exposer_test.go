@@ -149,3 +149,15 @@ func TestExposerWithdrawAll(t *testing.T) {
 	assert.Equal(t, 0, rsc2.removeAllCalled)
 	assert.Equal(t, 1, rsc1.removeAllCalled)
 }
+
+func TestCapName(t *testing.T) {
+	assert.Equal(t, "", capName(""))
+	assert.Equal(t, "foo-bar-baz", capName("foo-bar-baz"))
+	assert.Equal(
+		t,
+		"alpha-beta-gamma-delta-epsilon-zeta-eta-iota-kappa-76198ab9",
+		capName(
+			"alpha-beta-gamma-delta-epsilon-zeta-eta-iota-kappa-lambda-mi-ni-xi-omikron-pi-rho-sigma",
+		),
+	)
+}
