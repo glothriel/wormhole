@@ -58,11 +58,13 @@ func (m *managedK8sService) Add(metadata k8sResourceMetadata, clientset *kuberne
 
 func (m *managedK8sService) Remove(entityName string, clientset *kubernetes.Clientset) error {
 	servicesClient := clientset.CoreV1().Services(m.namespace)
-	deleteErr := servicesClient.Delete(context.Background(), entityName, metav1.DeleteOptions{})
+	deleteErr := servicesClient.Delete(context.Background(), capName(
+		entityName,
+	), metav1.DeleteOptions{})
 	if deleteErr != nil {
-		return fmt.Errorf("Could not delete service %s: %v", entityName, deleteErr)
+		return fmt.Errorf("Could not delete service %s: %v", capName(entityName), deleteErr)
 	}
-	logrus.Infof("Deleted service %s", entityName)
+	logrus.Infof("Deleted service %s", capName(entityName))
 	return nil
 }
 
