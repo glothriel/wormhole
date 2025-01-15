@@ -10,6 +10,9 @@ metadata:
 spec:
   ingress:
   - ports:
+    # api
+    - port: 8082
+      protocol: TCP
     # metrics
     - port: 8090
       protocol: TCP
