@@ -64,6 +64,7 @@ var serverCommand *cli.Command = &cli.Command{
 		kubernetesLabelsFlag,
 		enableNetworkPoliciesFlag,
 		peerStorageDBFlag,
+		peerControllerEnableDeletionFlag,
 		peerNameFlag,
 		wgAddressFlag,
 		wgSubnetFlag,
@@ -189,9 +190,13 @@ var serverCommand *cli.Command = &cli.Command{
 		)
 		go ss.Start()
 		go func() {
+			peerControllerSettings := []api.PeerControllerSettings{}
+			if c.Bool(peerControllerEnableDeletionFlag.Name) {
+				peerControllerSettings = append(peerControllerSettings, api.EnablePeerDeletion)
+			}
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appsExposedFromRemote),
-				api.NewPeersController(peerStorage, wgConfig, watcher),
+				api.NewPeersController(peerStorage, wgConfig, watcher, peerControllerSettings...),
 			}, c.Bool(debugFlag.Name)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)
