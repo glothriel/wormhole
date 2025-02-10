@@ -6,19 +6,16 @@ import (
 	"github.com/glothriel/wormhole/pkg/wg"
 )
 
-type peerController struct {
+// PeerController is a controller for managing peers
+type PeerController struct {
 	peers              pairing.PeerStorage
 	wgConfig           *wg.Config
 	watcher            *wg.Watcher
 	enablePeerDeletion bool
 }
 
-func (p *peerController) deletePeer(name string) error {
+func (p *PeerController) deletePeer(name string) error {
 	peerInfo, err := p.peers.GetByName(name)
-	if err != nil {
-		return err
-	}
-	err = p.peers.DeleteByName(name)
 	if err != nil {
 		return err
 	}
@@ -27,10 +24,14 @@ func (p *peerController) deletePeer(name string) error {
 	if err != nil {
 		return err
 	}
+	err = p.peers.DeleteByName(name)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (p *peerController) registerRoutes(r *gin.Engine) {
+func (p *PeerController) registerRoutes(r *gin.Engine) {
 	r.GET("/api/peers/v1", func(c *gin.Context) {
 		peerList, err := p.peers.List()
 		if err != nil {
@@ -65,13 +66,30 @@ func (p *peerController) registerRoutes(r *gin.Engine) {
 	})
 }
 
+// PeerControllerSettings is a type for setting up the PeerController
+type PeerControllerSettings func(*PeerController)
+
+// EnablePeerDeletion enables peer deletion
+func EnablePeerDeletion(controller *PeerController) {
+	controller.enablePeerDeletion = true
+}
+
 // NewPeersController allows querying and manipulation of the connected peers
-func NewPeersController(peers pairing.PeerStorage, wgConfig *wg.Config, watcher *wg.Watcher) Controller {
-	return &peerController{
+func NewPeersController(
+	peers pairing.PeerStorage,
+	wgConfig *wg.Config,
+	watcher *wg.Watcher,
+	settings ...PeerControllerSettings,
+) Controller {
+	theController := &PeerController{
 		peers:    peers,
 		wgConfig: wgConfig,
 		watcher:  watcher,
 		// We currently don't have authorization in place, disabling peer deletion
 		enablePeerDeletion: false,
 	}
+	for _, setting := range settings {
+		setting(theController)
+	}
+	return theController
 }

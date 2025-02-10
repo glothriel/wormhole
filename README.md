@@ -57,14 +57,18 @@ If you'll use DNS, you can install the server in one step (replace 0.0.0.0 with 
 ```
 kubectl create namespace wormhole
 
+LATEST_VERSION=$(curl -s https://api.github.com/repos/glothriel/wormhole/releases/latest | grep -Po '"tag_name": "\K.*?(?=")')
+
+echo "Latest version is $LATEST_VERSION"
+
 # Replace 1.0.0 with latest version from the releases page
-helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.1.0 --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
+helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version $LATEST_VERSION --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
 
 # Wait for the LoadBalancer to get an IP
 kubectl get svc -n wormhole
 
 # Update the server with the IP
-helm upgrade -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version 1.1.0 --reuse-values --set server.wg.publicHost="<the new IP>"
+helm upgrade -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version $LATEST_VERSION --reuse-values --set server.wg.publicHost="<the new IP>"
 ```
 
 ### Install client
@@ -181,6 +185,21 @@ No body or query parameters are required.
 |:-----|:------------|
 |200 Ok | Returned when request was successful |
 |500 Internal server error | Returned when the peers could not be fetched for unknown reasons. |
+
+### DELETE /api/peers/v1/{name}
+
+This endpoint is only available on the server. It allows removing a peer from the server. The peer will be disconnected and all the apps exposed by the peer will be removed.
+
+#### Request
+
+No body or query parameters are required.
+
+#### Response
+
+| Code | Description |
+|:-----|:------------|
+|204 No content | Returned when request was successful |
+|500 Internal server error | Returned when the peer could not be deleted from unknown reason. |
 
 ## Local development
 

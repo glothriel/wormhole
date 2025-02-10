@@ -17,6 +17,11 @@ var peerStorageDBFlag *cli.StringFlag = &cli.StringFlag{
 	Value: "",
 }
 
+var peerControllerEnableDeletionFlag *cli.BoolFlag = &cli.BoolFlag{
+	Name:  "peer-controller-enable-deletion",
+	Value: false,
+}
+
 var keyStorageDBFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "key-storage-db",
 	Value: "",

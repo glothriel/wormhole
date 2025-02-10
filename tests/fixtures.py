@@ -147,7 +147,6 @@ class K3dCluster:
         @retry(tries=60, delay=2)
         def wait_for_cluster_availability():
             Kubectl(self).run(["get", "namespaces"])
-
         wait_for_cluster_availability()
 
     def delete(self):

@@ -10,14 +10,14 @@ ARG GROUP_ID
 # If the group doesn't exist, use 'go' as the group name
 # This is required because MacOS has strage behavior with GIDs (Default user has GID ~20)
 RUN if ! getent group ${GROUP_ID} > /dev/null 2>&1; then \
-        GROUP_NAME=go; \
-        addgroup -g ${GROUP_ID} ${GROUP_NAME}; \
-        echo $GROUP_NAME > /tmp/groupfile; \
+    GROUP_NAME=go; \
+    addgroup -g ${GROUP_ID} ${GROUP_NAME}; \
+    echo $GROUP_NAME > /tmp/groupfile; \
     else \
-        GROUP_NAME=$(getent group ${GROUP_ID} | cut -d: -f1); \
-        echo $GROUP_NAME > /tmp/groupfile; \
+    GROUP_NAME=$(getent group ${GROUP_ID} | cut -d: -f1); \
+    echo $GROUP_NAME > /tmp/groupfile; \
     fi
-    
+
 # Add the 'go' user with the specified USER_ID and add to the determined group
 RUN groupadd -g ${GROUP_ID} go
 RUN useradd -u ${USER_ID} -g ${GROUP_ID} -m go
@@ -31,14 +31,14 @@ COPY ${PROJECT}/main.go ./main.go
 
 
 # A stage that downloadcs watchexec, made separate to avoid redownloading on every change
-FROM golang:${GO_VERSION}-bookworm as we
+FROM golang:${GO_VERSION}-bookworm AS we
 RUN apt update  && apt install -y xz-utils
 ADD https://github.com/watchexec/watchexec/releases/download/v1.25.1/watchexec-1.25.1-x86_64-unknown-linux-gnu.tar.xz .
 RUN tar -xvf watchexec-1.25.1-x86_64-unknown-linux-gnu.tar.xz
 RUN mv watchexec-1.25.1-x86_64-unknown-linux-gnu/watchexec /usr/local/bin
 
 # Dev stage used when executing the container in development mode, for Tilt
-FROM base as dev
+FROM base AS dev
 WORKDIR /tmp
 USER root
 COPY --from=we /usr/local/bin/watchexec /usr/local/bin/watchexec
@@ -51,7 +51,7 @@ ENV HOME=/home/go
 ENTRYPOINT ["/dev-entrypoint.sh"]
 
 # Build stage, uses the base stage and builds binary, used for docker images built for production and e2e tests
-FROM base as build
+FROM base AS build
 USER root
 WORKDIR /src
 ENV GOCACHE=/root/.cache/go-build
