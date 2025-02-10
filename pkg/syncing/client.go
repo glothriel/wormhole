@@ -19,6 +19,7 @@ type Client struct {
 	apps                 AppSource
 	transport            ClientTransport
 	failureThreshold     int
+	metadata             MetadataFactory
 }
 
 // Start starts the syncing client
@@ -31,9 +32,15 @@ func (c *Client) Start() error {
 			logrus.Errorf("failed to list apps: %v", listErr)
 			continue
 		}
+		metadata, metadataErr := c.metadata.Get()
+		if metadataErr != nil {
+			logrus.Errorf("failed to get metadata: %v", metadataErr)
+			continue
+		}
 		encodedApps, encodeErr := c.encoder.Encode(Message{
-			Peer: c.myName,
-			Apps: apps,
+			Peer:     c.myName,
+			Metadata: metadata,
+			Apps:     apps,
 		})
 		if encodeErr != nil {
 			logrus.Errorf("failed to encode apps: %v", encodeErr)
@@ -69,6 +76,7 @@ func NewClient(
 	interval time.Duration,
 	apps AppSource,
 	transport ClientTransport,
+	MetadataFactory MetadataFactory,
 ) *Client {
 	return &Client{
 		myName:               myName,
@@ -78,6 +86,7 @@ func NewClient(
 		apps:                 apps,
 		transport:            transport,
 		failureThreshold:     3,
+		metadata:             MetadataFactory,
 	}
 }
 
@@ -89,6 +98,7 @@ func NewHTTPClient(
 	interval time.Duration,
 	apps AppSource,
 	pr pairing.Response,
+	metadata MetadataFactory,
 
 ) (*Client, error) {
 	syncServerAddress, ok := pr.Metadata["sync_server_address"]
@@ -103,5 +113,6 @@ func NewHTTPClient(
 		interval,
 		apps,
 		transport,
+		metadata,
 	), nil
 }

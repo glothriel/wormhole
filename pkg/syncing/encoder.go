@@ -8,8 +8,9 @@ import (
 
 // Message is a message that contains a list of apps and the peer that sent them
 type Message struct {
-	Peer string
-	Apps []apps.App
+	Peer     string
+	Metadata Metadata
+	Apps     []apps.App
 }
 
 // Encoder is an interface for encoding and decoding syncing messages

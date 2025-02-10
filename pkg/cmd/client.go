@@ -153,6 +153,9 @@ var clientCommand *cli.Command = &cli.Command{
 				),
 			),
 			pairingResponse,
+			syncing.NewStaticMetadataFactory(syncing.Metadata{
+				"foo": "bar",
+			}),
 		)
 		if scErr != nil {
 			logrus.Fatalf("Failed to create syncing client: %v", scErr)
