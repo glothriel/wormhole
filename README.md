@@ -61,7 +61,6 @@ LATEST_VERSION=$(curl -s https://api.github.com/repos/glothriel/wormhole/release
 
 echo "Latest version is $LATEST_VERSION"
 
-# Replace 1.0.0 with latest version from the releases page
 helm install -n wormhole wh oci://ghcr.io/glothriel/wormhole/wormhole --version $LATEST_VERSION --set server.enabled=true --set server.service.type=LoadBalancer --set server.wg.publicHost="0.0.0.0"
 
 # Wait for the LoadBalancer to get an IP
