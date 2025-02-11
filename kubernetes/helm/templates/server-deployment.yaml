@@ -154,6 +154,7 @@ spec:
             - '--wg-public-host={{ $.Values.server.wg.publicHost }}'
             - '--wg-subnet-mask={{ $.Values.server.wg.subnetMask }}'
             - '--peer-storage-db=/storage/peers.db'
+            - '--peer-metadata-storage-db=/storage/peers-metadata.db'
             - '--key-storage-db=/storage/keys.db'
 
 

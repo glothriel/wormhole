@@ -42,7 +42,6 @@ type PeersV2ListItem struct {
 
 func (p *PeerController) registerRoutes(r *gin.Engine) {
 	r.GET("/api/peers/v1", func(c *gin.Context) {
-
 		peerList, err := p.peers.List()
 		if err != nil {
 			c.JSON(500, gin.H{
@@ -58,7 +57,6 @@ func (p *PeerController) registerRoutes(r *gin.Engine) {
 	})
 
 	r.GET("/api/peers/v2", func(c *gin.Context) {
-
 		peerList, err := p.peers.List()
 		if err != nil {
 			c.JSON(500, gin.H{

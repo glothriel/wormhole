@@ -68,6 +68,7 @@ for client in clients:
         "client.name=" + client,
         "client.serverDsn=http://wormhole-server.server.svc.cluster.local:8080",
         "client.resources.limits.memory=2Gi",
+        "client.syncMetadata.metadata_key=metadata_value_"+client,
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",

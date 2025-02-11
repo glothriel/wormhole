@@ -64,6 +64,7 @@ var serverCommand *cli.Command = &cli.Command{
 		kubernetesLabelsFlag,
 		enableNetworkPoliciesFlag,
 		peerStorageDBFlag,
+		peerMetadataStorageDBFlag,
 		peerControllerEnableDeletionFlag,
 		peerNameFlag,
 		wgAddressFlag,
@@ -148,7 +149,7 @@ var serverCommand *cli.Command = &cli.Command{
 			syncing.NewPeerEnrichingAppSource("server", appsExposedHere),
 		)
 
-		metadataStorage := syncing.NewInMemoryMetadataStorage()
+		metadataStorage := getPeerMetadataStorage(c)
 
 		ss := syncing.NewServer(
 			c.String(peerNameFlag.Name),

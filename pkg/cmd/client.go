@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/glothriel/wormhole/pkg/api"
@@ -35,6 +36,7 @@ var clientCommand *cli.Command = &cli.Command{
 		kubernetesNamespaceFlag,
 		kubernetesLabelsFlag,
 		peerNameFlag,
+		clientMetadataFlag,
 		enableNetworkPoliciesFlag,
 		helloRetryIntervalFlag,
 		nginxExposerConfdPathFlag,
@@ -153,9 +155,7 @@ var clientCommand *cli.Command = &cli.Command{
 				),
 			),
 			pairingResponse,
-			syncing.NewStaticMetadataFactory(syncing.Metadata{
-				"foo": "bar",
-			}),
+			syncing.NewStaticMetadataFactory(getClientMetadata(c)),
 		)
 		if scErr != nil {
 			logrus.Fatalf("Failed to create syncing client: %v", scErr)
@@ -174,4 +174,15 @@ var clientCommand *cli.Command = &cli.Command{
 
 		return sc.Start()
 	},
+}
+
+func getClientMetadata(c *cli.Context) syncing.Metadata {
+	metadata := syncing.Metadata{}
+	if c.String(clientMetadataFlag.Name) != "" {
+		unmarshalErr := json.Unmarshal([]byte(c.String(clientMetadataFlag.Name)), &metadata)
+		if unmarshalErr != nil {
+			logrus.Fatalf("Failed to unmarshal metadata: %v", unmarshalErr)
+		}
+	}
+	return metadata
 }
