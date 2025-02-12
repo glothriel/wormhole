@@ -1,7 +1,6 @@
 package pairing
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/glothriel/wormhole/pkg/wg"
@@ -62,13 +61,11 @@ func (s *Server) Start() { // nolint: funlen, gocognit
 			}
 		} else {
 			if existingPeer.PublicKey != request.Wireguard.PublicKey {
-				logrus.Errorf(
-					"attempted peering from peer `%s`: error, public key mismatch. "+
+
+				incomingRequest.Err <- NewClientError(
+					fmt.Errorf("attempted peering from peer `%s`: error, public key mismatch. "+
 						"There's existing peer `%s` with a different public key.",
-					request.Name, existingPeer.Name,
-				)
-				incomingRequest.Err <- NewServerError(
-					errors.New("please see the server log for error details"),
+						request.Name, existingPeer.Name),
 				)
 				continue
 			}
