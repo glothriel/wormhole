@@ -13,7 +13,6 @@ def test_changing_annotation_causes_creating_proxy_service(
     k8s_client,
     mock_server,
 ):
-
     annotator = Annotator(mock_server, kubectl)
     amount_of_services_before_annotation = Services.count(kubectl, "server")
     annotator.do("wormhole.glothriel.github.com/exposed", "yes")
@@ -200,7 +199,6 @@ def test_connection_via_the_tunnel(
     mock_server,
     curl,
 ):
-
     annotator = Annotator(mock_server, kubectl)
     amount_of_services_before_annotation = Services.count(kubectl, "server")
     annotator.do("wormhole.glothriel.github.com/exposed", "yes")
@@ -235,7 +233,6 @@ def test_reconnecting_clients_with_keys(
     k8s_client,
     mock_server,
 ):
-
     @retry(tries=int(DEFAULT_RETRY_TRIES / 10), delay=DEFAULT_RETRY_DELAY)
     def _wait_for_peers_paired_using_psk():
         assert (
