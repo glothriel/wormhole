@@ -205,10 +205,11 @@ class Helm:
     def __init__(self, cluster):
         self.cluster = cluster
 
-    def install(self, name, values, namespace=None):
+    def install(self, name, values, namespace=None, reuse_values=False):
         self.run(
             [
-                "install",
+                "upgrade",
+                "--install",
                 "-n",
                 namespace or name,
                 name,
@@ -222,7 +223,7 @@ class Helm:
                 item
                 for sublist in [["--set", f"{k}={v}"] for k, v in values.items()]
                 for item in sublist
-            ]
+            ] + (["--reuse-values"] if reuse_values else []),
         )
 
     def run(self, command):
