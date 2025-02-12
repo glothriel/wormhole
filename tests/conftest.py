@@ -57,18 +57,15 @@ def kubectl(kubernetes_cluster):
 
 
 @pytest.fixture()
-def fresh_cluster(
-    kubernetes_cluster,
-    docker_images_loaded_into_cluster
-):
+def fresh_cluster(kubernetes_cluster, docker_images_loaded_into_cluster):
     kubectl = Kubectl(kubernetes_cluster)
     starting_namespaces = set(
         [
-            'kube-system',
-            'default',
-            'local-path-storage',
-            'kube-node-lease',
-            'kube-public',
+            "kube-system",
+            "default",
+            "local-path-storage",
+            "kube-node-lease",
+            "kube-public",
         ]
     )
     try:
@@ -83,7 +80,7 @@ def fresh_cluster(
             print(f"Deleted namespace {namespace_to_be_deleted}")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def helm(kubernetes_cluster):
     yield Helm(kubernetes_cluster)
 
@@ -154,14 +151,16 @@ def nginx_image():
 
 
 @pytest.fixture(scope="session")
-def docker_images_loaded_into_cluster(kubernetes_cluster, wormhole_image, wireguard_image, nginx_image):
+def docker_images_loaded_into_cluster(
+    kubernetes_cluster, wormhole_image, wireguard_image, nginx_image
+):
     kubernetes_cluster.load_image(wormhole_image)
     kubernetes_cluster.load_image(wireguard_image)
     kubernetes_cluster.load_image(nginx_image)
     yield {
-        'wormhole': wormhole_image,
-        'wireguard': wireguard_image,
-        'nginx': nginx_image,
+        "wormhole": wormhole_image,
+        "wireguard": wireguard_image,
+        "nginx": nginx_image,
     }
 
 
@@ -212,7 +211,6 @@ def k8s_client(
     nginx_image,
     fresh_cluster,
 ):
-
     kubectl.run(["create", "namespace", "client"])
     helm.install(
         "client",

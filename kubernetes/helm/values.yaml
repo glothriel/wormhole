@@ -3,6 +3,8 @@ client:
   debug: false
   name: ""
 
+  syncMetadata: {}
+
   serverDsn: ""
 
   priorityClassName: ""

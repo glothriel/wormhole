@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"github.com/glothriel/wormhole/pkg/pairing"
+	"github.com/glothriel/wormhole/pkg/syncing"
 	"github.com/glothriel/wormhole/pkg/wg"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -18,4 +20,18 @@ func getKeyStorage(c *cli.Context) wg.KeyStorage {
 		return wg.NewInMemoryKeyStorage()
 	}
 	return wg.NewBoltKeyStorage(c.String(keyStorageDBFlag.Name))
+}
+
+func getPeerMetadataStorage(c *cli.Context) syncing.MetadataStorage {
+	theStorage := syncing.NewInMemoryMetadataStorage()
+	if c.String(peerMetadataStorageDBFlag.Name) != "" {
+		boltStorage, boltMetadataStorage := syncing.NewBoltMetadataStorage(c.String(peerMetadataStorageDBFlag.Name))
+		if boltMetadataStorage != nil {
+			logrus.Fatalf("Failed to create metadata storage: %v", boltMetadataStorage)
+		}
+		theStorage = syncing.NewCachingMetadataStorage(
+			boltStorage,
+		)
+	}
+	return theStorage
 }

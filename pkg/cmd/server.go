@@ -64,6 +64,7 @@ var serverCommand *cli.Command = &cli.Command{
 		kubernetesLabelsFlag,
 		enableNetworkPoliciesFlag,
 		peerStorageDBFlag,
+		peerMetadataStorageDBFlag,
 		peerControllerEnableDeletionFlag,
 		peerNameFlag,
 		wgAddressFlag,
@@ -148,6 +149,8 @@ var serverCommand *cli.Command = &cli.Command{
 			syncing.NewPeerEnrichingAppSource("server", appsExposedHere),
 		)
 
+		metadataStorage := getPeerMetadataStorage(c)
+
 		ss := syncing.NewServer(
 			c.String(peerNameFlag.Name),
 			remoteNginxAdapter,
@@ -155,6 +158,7 @@ var serverCommand *cli.Command = &cli.Command{
 			syncing.NewJSONSyncingEncoder(),
 			syncTransport,
 			peerStorage,
+			metadataStorage,
 		)
 		watcher := wg.NewWatcher(c.String(wireguardConfigFilePathFlag.Name))
 		updateErr := watcher.Update(*wgConfig)
@@ -196,7 +200,7 @@ var serverCommand *cli.Command = &cli.Command{
 			}
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appsExposedFromRemote),
-				api.NewPeersController(peerStorage, wgConfig, watcher, peerControllerSettings...),
+				api.NewPeersController(peerStorage, wgConfig, watcher, metadataStorage, peerControllerSettings...),
 			}, c.Bool(debugFlag.Name)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)

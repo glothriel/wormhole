@@ -52,7 +52,7 @@ for server in servers:
     k8s_yaml(helm("./kubernetes/helm", namespace=server, set=[
         "server.enabled=true",
         "server.resources.limits.memory=2Gi",
-        "server.wg.publicHost=wormhole-server-chart.server.svc.cluster.local",
+        "server.wg.publicHost=wormhole-server.server.svc.cluster.local",
         "server.service.type=ClusterIP",
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
@@ -66,8 +66,9 @@ for client in clients:
     k8s_yaml(helm("./kubernetes/helm", namespace=client, name=client, set=[
         "client.enabled=true",
         "client.name=" + client,
-        "client.serverDsn=http://wormhole-server-chart.server.svc.cluster.local:8080",
+        "client.serverDsn=http://wormhole-server.server.svc.cluster.local:8080",
         "client.resources.limits.memory=2Gi",
+        "client.syncMetadata.metadata_key=metadata_value_"+client,
         "docker.image=wormhole-controller",
         "docker.wgImage=wormhole-wireguard",
         "docker.nginxImage=wormhole-nginx",

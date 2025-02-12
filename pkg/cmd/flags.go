@@ -17,6 +17,18 @@ var peerStorageDBFlag *cli.StringFlag = &cli.StringFlag{
 	Value: "",
 }
 
+var peerMetadataStorageDBFlag *cli.StringFlag = &cli.StringFlag{
+	Name:  "peer-metadata-storage-db",
+	Value: "",
+}
+
+var clientMetadataFlag *cli.StringFlag = &cli.StringFlag{
+	Name:    "client-metadata",
+	Value:   "{}",
+	EnvVars: []string{"CLIENT_METADATA"},
+	Usage:   "JSON-formatted metadata to send to the server with every sync request",
+}
+
 var peerControllerEnableDeletionFlag *cli.BoolFlag = &cli.BoolFlag{
 	Name:  "peer-controller-enable-deletion",
 	Value: false,

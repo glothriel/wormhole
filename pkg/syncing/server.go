@@ -34,6 +34,7 @@ type Server struct {
 	encoder   Encoder
 	transport ServerTransport
 	peers     pairing.PeerStorage
+	metadata  MetadataStorage
 }
 
 // Start starts the syncing server
@@ -44,9 +45,15 @@ func (s *Server) Start() {
 			incomingSync.Err <- decodeErr
 			continue
 		}
+
 		peer, peerErr := s.peers.GetByName(msg.Peer)
 		if peerErr != nil {
 			incomingSync.Err <- peerErr
+			continue
+		}
+		metadataSetErr := s.metadata.Set(peer.Name, msg.Metadata)
+		if metadataSetErr != nil {
+			incomingSync.Err <- metadataSetErr
 			continue
 		}
 		s.stateGenerator.UpdateForPeer(
@@ -81,6 +88,7 @@ func NewServer(
 	encoder Encoder,
 	transport ServerTransport,
 	peers pairing.PeerStorage,
+	metadata MetadataStorage,
 ) *Server {
 	return &Server{
 		myName:         myName,
@@ -89,5 +97,6 @@ func NewServer(
 		encoder:        encoder,
 		transport:      transport,
 		peers:          peers,
+		metadata:       metadata,
 	}
 }

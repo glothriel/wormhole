@@ -29,6 +29,7 @@ func TestClientStartFailsAfterXSyncFailures(t *testing.T) {
 		&mockSyncClientTransport{
 			returnError: fmt.Errorf("sync failed"),
 		},
+		NewStaticMetadataFactory(Metadata{}),
 	)
 
 	// when

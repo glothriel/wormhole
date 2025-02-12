@@ -185,6 +185,30 @@ No body or query parameters are required.
 |200 Ok | Returned when request was successful |
 |500 Internal server error | Returned when the peers could not be fetched for unknown reasons. |
 
+
+### GET /api/peers/v2
+
+This endpoint is only available on the server. It returns the list of remote peers that are connected to the server.
+
+#### Request
+
+No body or query parameters are required.
+
+#### Response
+
+| Property | Required |  Type | Description |
+|:---------|:---------|:-----|:------------|
+| **name** | yes | String | Name of the remote peer |
+| **metadata**   | yes      | Object | Key/Value pairs, that were sent with the latest sync from the client |
+
+
+
+| Code | Description |
+|:-----|:------------|
+|200 Ok | Returned when request was successful |
+|500 Internal server error | Returned when the peers could not be fetched for unknown reasons. |
+
+
 ### DELETE /api/peers/v1/{name}
 
 This endpoint is only available on the server. It allows removing a peer from the server. The peer will be disconnected and all the apps exposed by the peer will be removed.

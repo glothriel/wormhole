@@ -23,9 +23,10 @@ class MockServer:
     def start(self):
         self.kubectl.run(["create", "ns", self.namespace])
 
-        @retry(tries=20, delay=.5)
+        @retry(tries=20, delay=0.5)
         def _wait_for_mocks():
             self.kubectl.run(["apply", "-f", "kubernetes/raw/mocks/all.yaml"])
+
         _wait_for_mocks()
         return self
 
@@ -38,10 +39,10 @@ class Curl:
         self.kubectl = kubectl
 
     def start(self):
-
-        @retry(tries=20, delay=.5)
+        @retry(tries=20, delay=0.5)
         def _wait_for_mocks():
             self.kubectl.run(["apply", "-f", "kubernetes/raw/curl/all.yaml"])
+
         _wait_for_mocks()
         return self
 
@@ -49,23 +50,25 @@ class Curl:
         self.kubectl.run(["delete", "-f", "kubernetes/raw/curl/all.yaml"])
 
     def call_with_network_policy(self, command, max_time_seconds=None):
-        return self._call('curl-with-labels', command, max_time_seconds)
+        return self._call("curl-with-labels", command, max_time_seconds)
 
     def call_without_network_policy(self, command, max_time_seconds=None):
-        return self._call('curl-no-labels', command, max_time_seconds)
+        return self._call("curl-no-labels", command, max_time_seconds)
 
     def _call(self, pod, command, max_time_seconds=None):
         max_time_seconds = max_time_seconds or 20
         return self.kubectl.run(
             [
-                '-n',
-                'default',
-                'exec',
-                f'pod/{pod}',
-                '--',
-                'curl',
-                '-m', str(max_time_seconds),
-            ] + (command if type(command) is list else [command])
+                "-n",
+                "default",
+                "exec",
+                f"pod/{pod}",
+                "--",
+                "curl",
+                "-m",
+                str(max_time_seconds),
+            ]
+            + (command if type(command) is list else [command])
         )
 
 
@@ -105,7 +108,6 @@ class Kubectl:
 
 
 class K3dCluster:
-
     K3D_VERSION = "v5.6.3"
 
     def __init__(self, name):
@@ -147,12 +149,13 @@ class K3dCluster:
         @retry(tries=60, delay=2)
         def wait_for_cluster_availability():
             Kubectl(self).run(["get", "namespaces"])
+
         wait_for_cluster_availability()
 
     def delete(self):
         if not self.exists:
             return
-        if self.existed_before or json.loads(os.getenv("REUSE_CLUSTER") or 'false'):
+        if self.existed_before or json.loads(os.getenv("REUSE_CLUSTER") or "false"):
             print(
                 "Skipping removal of K3d cluster - either it existed before the tests "
                 "were run or REUSE_CLUSTER is set to true"
@@ -173,7 +176,7 @@ class K3dCluster:
             return "/tmp/k3d-linux-amd64"
         download(
             f"https://github.com/k3d-io/k3d/releases/download/{self.K3D_VERSION}/k3d-linux-amd64",
-            "/tmp/k3d-linux-amd64"
+            "/tmp/k3d-linux-amd64",
         )
         assert not run_process(["chmod", "+x", "/tmp/k3d-linux-amd64"]).returncode
         return "/tmp/k3d-linux-amd64"
@@ -199,16 +202,16 @@ class K3dCluster:
 
 
 class Helm:
-
     HELM_VERSION = "v3.8.2"
 
     def __init__(self, cluster):
         self.cluster = cluster
 
-    def install(self, name, values, namespace=None):
+    def install(self, name, values, namespace=None, reuse_values=False):
         self.run(
             [
-                "install",
+                "upgrade",
+                "--install",
                 "-n",
                 namespace or name,
                 name,
@@ -223,6 +226,7 @@ class Helm:
                 for sublist in [["--set", f"{k}={v}"] for k, v in values.items()]
                 for item in sublist
             ]
+            + (["--reuse-values"] if reuse_values else []),
         )
 
     def run(self, command):
@@ -259,7 +263,6 @@ def download(url, path):
 
 
 class Annotator:
-
     def __init__(self, mock_server, kubectl, override_name=None):
         self.mock_server = mock_server
         self.kubectl = kubectl
@@ -274,17 +277,19 @@ class Annotator:
                 "svc",
                 self.override_name if self.override_name else self.mock_server.name,
                 f"{key}={value}",
-                "--overwrite"
+                "--overwrite",
             ]
         )
 
 
 class Services:
-
     @classmethod
     def count(cls, kubectl, namespace):
         return len(kubectl.json(["get", "svc", "-n", namespace])["items"])
 
     @classmethod
     def names(cls, kubectl, namespace):
-        return [item["metadata"]["name"] for item in kubectl.json(["get", "svc", "-n", namespace])["items"]]
+        return [
+            item["metadata"]["name"]
+            for item in kubectl.json(["get", "svc", "-n", namespace])["items"]
+        ]

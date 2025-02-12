@@ -28,5 +28,6 @@ metadata:
   namespace: {{ $.Release.Namespace }}
 stringData:
   INVITE_TOKEN: {{ quote .Values.peering.psk }}
+  CLIENT_METADATA: {{ $.Values.client.syncMetadata | toJson | quote }}
 
 {{ end }}
