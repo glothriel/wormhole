@@ -30,6 +30,8 @@ var clientCommand *cli.Command = &cli.Command{
 	Name: "client",
 	Flags: []cli.Flag{
 		pairingServerURL,
+		basicAuthUsernameFlag,
+		basicAuthPasswordFlag,
 		inviteTokenFlag,
 		kubernetesFlag,
 		stateManagerPathFlag,
@@ -166,7 +168,7 @@ var clientCommand *cli.Command = &cli.Command{
 				api.NewAppsController(
 					remoteListenerRegistry,
 				),
-			}, c.Bool(debugFlag.Name)).Run(":8082")
+			}, configureAPIServer(c)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)
 			}

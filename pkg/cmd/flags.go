@@ -29,11 +29,6 @@ var clientMetadataFlag *cli.StringFlag = &cli.StringFlag{
 	Usage:   "JSON-formatted metadata to send to the server with every sync request",
 }
 
-var peerControllerEnableDeletionFlag *cli.BoolFlag = &cli.BoolFlag{
-	Name:  "peer-controller-enable-deletion",
-	Value: false,
-}
-
 var keyStorageDBFlag *cli.StringFlag = &cli.StringFlag{
 	Name:  "key-storage-db",
 	Value: "",
@@ -84,4 +79,18 @@ var enableNetworkPoliciesFlag *cli.BoolFlag = &cli.BoolFlag{
 	Name:  "network-policies",
 	Usage: "Enables dynamic creation of network policies for proxy services",
 	Value: false,
+}
+
+var basicAuthUsernameFlag *cli.StringFlag = &cli.StringFlag{
+	Name:    "basic-auth-username",
+	Usage:   "Basic auth username, used only for subset (state changing) of endpoints",
+	EnvVars: []string{"BASIC_AUTH_USERNAME"},
+	Value:   "",
+}
+
+var basicAuthPasswordFlag *cli.StringFlag = &cli.StringFlag{
+	Name:    "basic-auth-password",
+	Usage:   "Basic auth password, used only for subset (state changing) of endpoints",
+	EnvVars: []string{"BASIC_AUTH_PASSWORD"},
+	Value:   "",
 }

@@ -54,6 +54,8 @@ var serverCommand *cli.Command = &cli.Command{
 	Flags: []cli.Flag{
 		kubernetesFlag,
 		inviteTokenFlag,
+		basicAuthUsernameFlag,
+		basicAuthPasswordFlag,
 		stateManagerPathFlag,
 		nginxExposerConfdPathFlag,
 		wgPublicHostFlag,
@@ -65,7 +67,6 @@ var serverCommand *cli.Command = &cli.Command{
 		enableNetworkPoliciesFlag,
 		peerStorageDBFlag,
 		peerMetadataStorageDBFlag,
-		peerControllerEnableDeletionFlag,
 		peerNameFlag,
 		wgAddressFlag,
 		wgSubnetFlag,
@@ -194,14 +195,10 @@ var serverCommand *cli.Command = &cli.Command{
 		)
 		go ss.Start()
 		go func() {
-			peerControllerSettings := []api.PeerControllerSettings{}
-			if c.Bool(peerControllerEnableDeletionFlag.Name) {
-				peerControllerSettings = append(peerControllerSettings, api.EnablePeerDeletion)
-			}
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appsExposedFromRemote),
-				api.NewPeersController(peerStorage, wgConfig, watcher, metadataStorage, peerControllerSettings...),
-			}, c.Bool(debugFlag.Name)).Run(":8082")
+				api.NewPeersController(peerStorage, wgConfig, watcher, metadataStorage),
+			}, configureAPIServer(c)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)
 			}

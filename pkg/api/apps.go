@@ -10,7 +10,7 @@ type appsController struct {
 	appSource syncing.AppSource
 }
 
-func (ac *appsController) registerRoutes(r *gin.Engine) {
+func (ac *appsController) registerRoutes(r *gin.Engine, _ ServerSettings) {
 	r.GET("/api/apps/v1", func(c *gin.Context) {
 		theApps, err := ac.appSource.List()
 		if err != nil {

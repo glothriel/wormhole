@@ -28,6 +28,8 @@ metadata:
   namespace: {{ $.Release.Namespace }}
 stringData:
   INVITE_TOKEN: {{ .Values.peering.psk | quote }}
+  BASIC_AUTH_USERNAME: {{ .Values.server.basicAuth.username | quote }}
+  BASIC_AUTH_PASSWORD: {{ .Values.server.basicAuth.password | quote }}
   
   
 {{ end }}

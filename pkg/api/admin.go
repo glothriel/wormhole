@@ -9,14 +9,41 @@ import (
 
 // Controller contains a set of functionalities for the API
 type Controller interface {
-	registerRoutes(r *gin.Engine)
+	registerRoutes(r *gin.Engine, s ServerSettings)
+}
+
+// ServerSettings contains the settings for the server
+type ServerSettings struct {
+	Debug             bool
+	BasicAuthEnabled  bool
+	BasicAuthUsername string
+	BasicAuthPassword string
+}
+
+// NewServerSettings creates a new server settings object
+func NewServerSettings() ServerSettings {
+	return ServerSettings{}
+}
+
+// WithDebug sets the debug flag
+func (ss ServerSettings) WithDebug(debug bool) ServerSettings {
+	ss.Debug = debug
+	return ss
+}
+
+// WithBasicAuth allows configuration of basic auth
+func (ss ServerSettings) WithBasicAuth(username, password string) ServerSettings {
+	ss.BasicAuthEnabled = true
+	ss.BasicAuthUsername = username
+	ss.BasicAuthPassword = password
+	return ss
 }
 
 // NewAdminAPI bootstraps the creation of the gin engine
-func NewAdminAPI(controllers []Controller, debug bool) *gin.Engine {
+func NewAdminAPI(controllers []Controller, settings ServerSettings) *gin.Engine {
 	r := gin.Default()
 	for _, controller := range controllers {
-		controller.registerRoutes(r)
+		controller.registerRoutes(r, settings)
 	}
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -25,7 +52,7 @@ func NewAdminAPI(controllers []Controller, debug bool) *gin.Engine {
 		})
 	})
 
-	if debug {
+	if settings.Debug {
 		pprof.Register(r)
 	}
 	return r
