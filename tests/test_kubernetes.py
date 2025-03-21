@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from retry import retry
 
@@ -283,3 +285,58 @@ def test_client_metadata(
         assert "testBar" in response_body
 
     _ensure_that_peers_v2_contains_client_metadata()
+
+
+def test_peer_deletion(
+    kubectl,
+    k8s_server,
+    k8s_client,
+    helm,
+    curl,
+):
+
+    @retry(tries=DEFAULT_RETRY_TRIES, delay=DEFAULT_RETRY_DELAY)
+    def _ensure_state_changing_endpoint_is_disabled():
+        response_body = curl.call_with_network_policy(
+            [
+                "-X",
+                "DELETE",
+                "http://wormhole-server-api.server:8082/api/peers/v1/client"
+            ],
+            max_time_seconds=10,
+        ).stdout.decode()
+        assert "Basic authentication is required but not enabled" in response_body
+
+    _ensure_state_changing_endpoint_is_disabled()
+
+    username = "kajtek"
+    password = "kajtek"
+    helm.install(
+        "server",
+        {
+            "server.basicAuth.username": username,
+            "server.basicAuth.password": password,
+        },
+        reuse_values=True,
+    )
+
+    @retry(tries=DEFAULT_RETRY_TRIES / 5, delay=DEFAULT_RETRY_DELAY)
+    def _ensure_peer_was_removed():
+        curl.call_with_network_policy(
+            [
+                "-X",
+                "DELETE",
+                "http://wormhole-server-api.server:8082/api/peers/v1/client",
+                "--user",
+                f"{username}:{password}"
+            ],
+            max_time_seconds=10,
+        )
+        assert json.loads(curl.call_with_network_policy(
+            [
+                "http://wormhole-server-api.server:8082/api/peers/v1"
+            ],
+            max_time_seconds=10,
+        ).stdout.decode()) == []
+
+    _ensure_peer_was_removed()

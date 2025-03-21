@@ -29,5 +29,7 @@ metadata:
 stringData:
   INVITE_TOKEN: {{ quote .Values.peering.psk }}
   CLIENT_METADATA: {{ $.Values.client.syncMetadata | toJson | quote }}
+  BASIC_AUTH_USERNAME: {{ .Values.client.basicAuth.username | quote }}
+  BASIC_AUTH_PASSWORD: {{ .Values.client.basicAuth.password | quote }}
 
 {{ end }}

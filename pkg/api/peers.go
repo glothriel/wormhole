@@ -13,8 +13,7 @@ type PeerController struct {
 	wgConfig *wg.Config
 	watcher  *wg.Watcher
 
-	metadata           syncing.MetadataStorage
-	enablePeerDeletion bool
+	metadata syncing.MetadataStorage
 }
 
 func (p *PeerController) deletePeer(name string) error {
@@ -40,7 +39,7 @@ type PeersV2ListItem struct {
 	Metadata syncing.Metadata `json:"metadata"`
 }
 
-func (p *PeerController) registerRoutes(r *gin.Engine) {
+func (p *PeerController) registerRoutes(r *gin.Engine, s ServerSettings) {
 	r.GET("/api/peers/v1", func(c *gin.Context) {
 		peerList, err := p.peers.List()
 		if err != nil {
@@ -80,14 +79,10 @@ func (p *PeerController) registerRoutes(r *gin.Engine) {
 		}
 		c.JSON(200, peerListItems)
 	})
+	protected := r.Group("/api/peers")
+	protected.Use(RequireBasicAuth(s))
 
-	r.DELETE("/api/peers/v1/:name", func(c *gin.Context) {
-		if !p.enablePeerDeletion {
-			c.JSON(403, gin.H{
-				"error": "Peer deletion is disabled",
-			})
-			return
-		}
+	protected.DELETE("v1/:name", func(c *gin.Context) {
 		name := c.Param("name")
 		err := p.deletePeer(name)
 		if err != nil {
@@ -103,29 +98,18 @@ func (p *PeerController) registerRoutes(r *gin.Engine) {
 // PeerControllerSettings is a type for setting up the PeerController
 type PeerControllerSettings func(*PeerController)
 
-// EnablePeerDeletion enables peer deletion
-func EnablePeerDeletion(controller *PeerController) {
-	controller.enablePeerDeletion = true
-}
-
 // NewPeersController allows querying and manipulation of the connected peers
 func NewPeersController(
 	peers pairing.PeerStorage,
 	wgConfig *wg.Config,
 	watcher *wg.Watcher,
 	metadata syncing.MetadataStorage,
-	settings ...PeerControllerSettings,
 ) Controller {
 	theController := &PeerController{
 		peers:    peers,
 		wgConfig: wgConfig,
 		watcher:  watcher,
 		metadata: metadata,
-		// We currently don't have authorization in place, disabling peer deletion
-		enablePeerDeletion: false,
-	}
-	for _, setting := range settings {
-		setting(theController)
 	}
 	return theController
 }

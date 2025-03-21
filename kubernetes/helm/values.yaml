@@ -3,6 +3,12 @@ client:
   debug: false
   name: ""
 
+  # Basic auth protects state-changing endpoints. 
+  # If no credentials are provided, the endpoints are disabled
+  basicAuth:
+    username: ""
+    password: ""
+
   syncMetadata: {}
 
   serverDsn: ""
@@ -44,6 +50,12 @@ server:
   enabled: false
   debug: false
   name: server
+
+  # Basic auth protects state-changing endpoints. 
+  # If no credentials are provided, the endpoints are disabled
+  basicAuth:
+    username: ""
+    password: ""
 
   service:
     annotations: null

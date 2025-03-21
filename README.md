@@ -139,7 +139,7 @@ Effectively this means, that the permission to communicate is granted per applic
 
 ## HTTP API
 
-Wormhole exposes API, that allows querying apps exposed by remote apps. The API does not require authentication. The API by default listens on port 8082.
+Wormhole exposes API, that allows querying apps exposed by remote apps. The GET requests do not require authentication. The non-get peer endpoints require basicAuth (`server|client.basicAuth.username|password` helm variables) to be configured, otherwise it will refuse to work. The API by default listens on port 8082.
 
 ### GET /api/apps/v1
 
@@ -211,7 +211,7 @@ No body or query parameters are required.
 
 ### DELETE /api/peers/v1/{name}
 
-This endpoint is only available on the server. It allows removing a peer from the server. The peer will be disconnected and all the apps exposed by the peer will be removed.
+This endpoint is only available on the server. It allows removing a peer from the server. The peer will be disconnected and all the apps exposed by the peer will be removed. **This endpoint requires basicAuth to be configured**, see helm values.
 
 #### Request
 
