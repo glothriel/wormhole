@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/glothriel/wormhole/pkg/pairing"
 	"github.com/glothriel/wormhole/pkg/syncing"
@@ -59,7 +61,7 @@ func (p *PeerController) registerRoutes(r *gin.Engine, s ServerSettings) {
 		peerList, err := p.peers.List()
 		if err != nil {
 			c.JSON(500, gin.H{
-				"error": err.Error(),
+				"error": fmt.Sprintf("failed to get peer list: %v", err),
 			})
 			return
 		}
@@ -67,10 +69,13 @@ func (p *PeerController) registerRoutes(r *gin.Engine, s ServerSettings) {
 		for _, peer := range peerList {
 			metadata, err := p.metadata.Get(peer.Name)
 			if err != nil {
-				c.JSON(500, gin.H{
-					"error": err.Error(),
-				})
-				return
+				if err != syncing.ErrPeerNotFound {
+					c.JSON(500, gin.H{
+						"error": fmt.Sprintf("failed to get metadata for peer %s: %v", peer.Name, err),
+					})
+					return
+				}
+				metadata = syncing.Metadata{}
 			}
 			peerListItems = append(peerListItems, PeersV2ListItem{
 				Name:     peer.Name,
@@ -87,7 +92,7 @@ func (p *PeerController) registerRoutes(r *gin.Engine, s ServerSettings) {
 		err := p.deletePeer(name)
 		if err != nil {
 			c.JSON(500, gin.H{
-				"error": err.Error(),
+				"error": fmt.Sprintf("failed to delete peer %s: %v", name, err),
 			})
 			return
 		}
