@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.22.0
+ARG GO_VERSION=1.25.0
 
 # Base stage
 FROM golang:${GO_VERSION}-bookworm AS base
