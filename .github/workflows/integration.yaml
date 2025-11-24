@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install Go
         uses: actions/setup-go@v4
@@ -19,20 +19,21 @@ jobs:
           go-version: "1.22.x"
 
       - name: Install Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.13"
 
-      - name: Install setuptools
-        shell: bash
-        run: pip install setuptools
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Install packages required for tests
         shell: bash
-        run: cd tests && python setup.py develop
+        run: cd tests && uv sync --no-install-project
 
       - name: Run integration tests
-        run: py.test -v --tb=short
+        run: uv run --project tests pytest -v --tb=short tests/
 
   lint:
     runs-on: ubuntu-latest

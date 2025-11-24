@@ -1,0 +1,17 @@
+[project]
+name = "wormhole-tests"
+version = "1.0.0"
+description = "Integration tests for wormhole"
+requires-python = ">=3.10"
+authors = [
+    { name = "Konstanty Karagiorgis", email = "use.my.github@for.contact" }
+]
+
+dependencies = [
+    "cryptography>=43.0.0",
+    "pytest>=8.0.0",
+    "psutil>=6.0.0",
+    "requests>=2.32.0",
+    "retry>=0.9.2",
+]
+
