@@ -15,11 +15,11 @@ type KeyStorage interface {
 	Load() (private, public string, err error)
 }
 
-type boltDbKeyStorage struct {
+type boltDBKeyStorage struct {
 	db *bolt.DB
 }
 
-func (s *boltDbKeyStorage) Store(private, public string) error {
+func (s *boltDBKeyStorage) Store(private, public string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("keys"))
 		if err := b.Put([]byte("private"), []byte(private)); err != nil {
@@ -29,7 +29,7 @@ func (s *boltDbKeyStorage) Store(private, public string) error {
 	})
 }
 
-func (s *boltDbKeyStorage) Load() (private, public string, err error) {
+func (s *boltDBKeyStorage) Load() (private, public string, err error) {
 	err = s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("keys"))
 		private = string(b.Get([]byte("private")))
@@ -54,7 +54,7 @@ func NewBoltKeyStorage(path string) KeyStorage {
 	}); updateErr != nil {
 		logrus.Panicf("failed to create bucket: %v", updateErr)
 	}
-	return &boltDbKeyStorage{db}
+	return &boltDBKeyStorage{db}
 }
 
 type inMemoryKeyStorage struct {

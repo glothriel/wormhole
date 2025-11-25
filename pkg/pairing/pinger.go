@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/go-ping/ping"
+	"github.com/go-ping/ping" //nolint:staticcheck // deprecated package, but still functional
 )
 
 type pinger interface {
