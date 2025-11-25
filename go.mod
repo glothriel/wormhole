@@ -2,6 +2,8 @@ module github.com/glothriel/wormhole
 
 go 1.25
 
+toolchain go1.25.4
+
 require (
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/gin-contrib/pprof v1.5.3

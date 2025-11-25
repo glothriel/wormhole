@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,7 +54,7 @@ func (repository defaultServiceRepository) list() ([]serviceWrapper, error) {
 		Group:    "",
 		Version:  "v1",
 		Resource: "services",
-	}).List(context.Background(), v1.ListOptions{})
+	}).List(context.Background(), metav1.ListOptions{})
 	if listErr != nil {
 		return []serviceWrapper{}, listErr
 	}

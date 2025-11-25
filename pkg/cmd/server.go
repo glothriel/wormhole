@@ -96,7 +96,7 @@ var serverCommand *cli.Command = &cli.Command{
 			nginx.NewRangePortAllocator(25001, 30000),
 			nginx.NewAllAcceptWireguardListener(),
 		)
-		var effectiveExposer listeners.Exposer = remoteNginxExposer
+		effectiveExposer := remoteNginxExposer
 
 		if c.Bool(kubernetesFlag.Name) {
 			namespace := c.String(kubernetesNamespaceFlag.Name)

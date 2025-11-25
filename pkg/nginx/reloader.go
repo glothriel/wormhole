@@ -18,8 +18,8 @@ type lowestMatchingProcessIDReloader struct {
 }
 
 func (r *lowestMatchingProcessIDReloader) Reload() error {
-	max := 1999999999
-	nginxMasterPid := max
+	maxPid := 1999999999
+	nginxMasterPid := maxPid
 	p, processListErr := ps.Processes()
 	if processListErr != nil {
 		return fmt.Errorf("could not list processes: %v", processListErr)
@@ -29,7 +29,7 @@ func (r *lowestMatchingProcessIDReloader) Reload() error {
 			nginxMasterPid = process.Pid()
 		}
 	}
-	if nginxMasterPid == max {
+	if nginxMasterPid == maxPid {
 		return errors.New("no nginx process found")
 	}
 
@@ -45,11 +45,15 @@ type retryingReloader struct {
 }
 
 func (r *retryingReloader) Reload() error {
+	attempts := r.tries
+	if attempts < 0 {
+		attempts = 0
+	}
 	return retry.Do(
 		func() error {
 			return r.child.Reload()
 		},
-		retry.Attempts(uint(r.tries)),
+		retry.Attempts(uint(attempts)), //nolint:gosec // attempts is validated to be non-negative
 		retry.DelayType(retry.BackOffDelay),
 	)
 }

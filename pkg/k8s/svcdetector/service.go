@@ -23,11 +23,11 @@ type defaultServiceWrapper struct {
 }
 
 func (wrapper defaultServiceWrapper) id() string {
-	return fmt.Sprintf("%s-%s", wrapper.k8sSvc.ObjectMeta.Namespace, wrapper.k8sSvc.ObjectMeta.Name)
+	return fmt.Sprintf("%s-%s", wrapper.k8sSvc.Namespace, wrapper.k8sSvc.Name)
 }
 
 func (wrapper defaultServiceWrapper) shouldBeExposed() bool {
-	annotation, annotationOK := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/exposed"]
+	annotation, annotationOK := wrapper.k8sSvc.GetAnnotations()["wormhole.glothriel.github.com/exposed"]
 	if !annotationOK {
 		return false
 	}
@@ -38,7 +38,7 @@ func (wrapper defaultServiceWrapper) shouldBeExposed() bool {
 }
 
 func (wrapper defaultServiceWrapper) name() string {
-	exposeName, exposeOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/name"]
+	exposeName, exposeOk := wrapper.k8sSvc.GetAnnotations()["wormhole.glothriel.github.com/name"]
 	if !exposeOk {
 		return wrapper.id()
 	}
@@ -46,7 +46,7 @@ func (wrapper defaultServiceWrapper) name() string {
 }
 
 func (wrapper defaultServiceWrapper) targetLabels() string {
-	labels, labelsOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/labels"]
+	labels, labelsOk := wrapper.k8sSvc.GetAnnotations()["wormhole.glothriel.github.com/labels"]
 	if !labelsOk {
 		return ""
 	}
@@ -54,7 +54,7 @@ func (wrapper defaultServiceWrapper) targetLabels() string {
 }
 
 func (wrapper defaultServiceWrapper) ports() []corev1.ServicePort {
-	ports, portsOk := wrapper.k8sSvc.ObjectMeta.GetAnnotations()["wormhole.glothriel.github.com/ports"]
+	ports, portsOk := wrapper.k8sSvc.GetAnnotations()["wormhole.glothriel.github.com/ports"]
 	if !portsOk {
 		return wrapper.k8sSvc.Spec.Ports
 	}
@@ -113,8 +113,8 @@ func (wrapper defaultServiceWrapper) apps() []apps.App {
 			Name: portName,
 			Address: fmt.Sprintf(
 				"%s.%s:%d",
-				wrapper.k8sSvc.ObjectMeta.Name,
-				wrapper.k8sSvc.ObjectMeta.Namespace,
+				wrapper.k8sSvc.Name,
+				wrapper.k8sSvc.Namespace,
 				portDefinition.Port,
 			),
 			TargetLabels: wrapper.targetLabels(),
