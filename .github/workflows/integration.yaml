@@ -53,13 +53,7 @@ jobs:
           enable-cache: true
 
       - name: Install packages required for linting
-        run: uv sync --project tests --no-install-project --all-extras
+        run: uv sync --project tests --no-install-project
 
       - name: Run ruff check
-        run: uv run --project tests ruff check tests/
-
-      - name: Run black check
-        run: uv run --project tests black --check tests/
-
-      - name: Run isort check
-        run: uv run --project tests isort --check-only tests/
+        run: uv run --project tests ruff check .

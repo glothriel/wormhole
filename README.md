@@ -324,7 +324,5 @@ uv run --project tests pytest tests/
 **Linting test code:**
 
 ```bash
-uv run --project tests ruff check tests/
-uv run --project tests black --check tests/
-uv run --project tests isort --check-only tests/
+uv run --project tests ruff check .
 ```

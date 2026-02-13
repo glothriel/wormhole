@@ -2,9 +2,7 @@ import json
 import os
 import shutil
 import subprocess
-from contextlib import contextmanager
 
-import psutil
 import requests
 from retry import retry
 
