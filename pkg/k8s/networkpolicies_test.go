@@ -40,7 +40,7 @@ func TestConsumesNpLabelKey(t *testing.T) {
 				if len(labelPart) > 63 {
 					return false
 				}
-				parts := result[len(consumesNpLabelPrefix):len(result)]
+				parts := result[len(consumesNpLabelPrefix):]
 				hyphenPos := len(parts) - 9
 				if hyphenPos < 0 || parts[hyphenPos] != '-' {
 					return false
