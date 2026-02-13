@@ -25,3 +25,18 @@ spec:
   - name: curl-container
     image: curlimages/curl
     command: ["sleep", "999999"]
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-with-new-labels
+  namespace: default
+  labels:
+    consumes.wormhole.glothriel.github.com/nginx-nginx: "true"
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+  - name: curl-container
+    image: curlimages/curl
+    command: ["sleep", "999999"]

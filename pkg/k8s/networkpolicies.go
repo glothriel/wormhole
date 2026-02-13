@@ -2,7 +2,10 @@ package k8s
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -19,6 +22,31 @@ type managedK8sNetworkPolicy struct {
 }
 
 const consumesNpLabel = "wormhole.glothriel.github.com/network-policy-consumes-app"
+const consumesNpLabelPrefix = "consumes.wormhole.glothriel.github.com/"
+
+func consumesNpLabelKey(appName string) string {
+	labelName := appName
+	if len(labelName) > 63 {
+		// Apply same hashing approach as capName for label key segment limit
+		hasher := sha256.New()
+		hasher.Write([]byte(labelName))
+		hash := hex.EncodeToString(hasher.Sum(nil))[:8]
+
+		searchStart := 32
+		searchEnd := 54
+
+		substring := labelName[searchStart:searchEnd]
+		hyphenIndex := strings.LastIndex(substring, "-")
+
+		if hyphenIndex != -1 {
+			actualIndex := searchStart + hyphenIndex
+			labelName = labelName[:actualIndex] + "-" + hash
+		} else {
+			labelName = labelName[:54] + "-" + hash
+		}
+	}
+	return consumesNpLabelPrefix + labelName
+}
 
 func (m *managedK8sNetworkPolicy) Add(metadata k8sResourceMetadata, clientset *kubernetes.Clientset) error {
 	networkPoliciesClient := clientset.NetworkingV1().NetworkPolicies(m.namespace)
@@ -68,6 +96,16 @@ func (m *managedK8sNetworkPolicy) npDefinition(port int, metadata k8sResourceMet
 						},
 					},
 					From: []networkingv1.NetworkPolicyPeer{
+						// New format: app name in label key
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									consumesNpLabelKey(metadata.originalApp.Name): "true",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{},
+						},
+						// Old format: backward compatibility
 						{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{

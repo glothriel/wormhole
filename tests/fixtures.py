@@ -52,6 +52,9 @@ class Curl:
     def call_with_network_policy(self, command, max_time_seconds=None):
         return self._call("curl-with-labels", command, max_time_seconds)
 
+    def call_with_new_network_policy(self, command, max_time_seconds=None):
+        return self._call("curl-with-new-labels", command, max_time_seconds)
+
     def call_without_network_policy(self, command, max_time_seconds=None):
         return self._call("curl-no-labels", command, max_time_seconds)
 

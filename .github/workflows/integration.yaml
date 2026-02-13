@@ -29,8 +29,7 @@ jobs:
           enable-cache: true
 
       - name: Install packages required for tests
-        shell: bash
-        run: cd tests && uv sync --no-install-project
+        run: uv sync --project tests --no-install-project
 
       - name: Run integration tests
         run: uv run --project tests pytest -v --tb=short tests/
@@ -40,9 +39,27 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Run linters
-        uses: PiwikPRO/actions/python/lint@master
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          use-black: true
-          use-flake: true
-          use-isort: true
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install packages required for linting
+        run: uv sync --project tests --no-install-project --all-extras
+
+      - name: Run ruff check
+        run: uv run --project tests ruff check tests/
+
+      - name: Run black check
+        run: uv run --project tests black --check tests/
+
+      - name: Run isort check
+        run: uv run --project tests isort --check-only tests/

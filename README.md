@@ -111,6 +111,47 @@ You can enable network policies by setting `--set networkPolicies.enabled=true` 
 
 When wormhole is deployed with network policies support, each time it exposes a remote service it also creates a matching network policy. The network policy is created in the same namespace as the service and allows filtering of the traffic from other workloads in the cluster to the remote service.
 
+Pods can declare which Wormhole-exposed applications they can access using labels. There are two supported label formats:
+
+**Recommended format (supports multiple apps per pod):**
+
+Use labels where the app name is embedded in the label **key**, allowing a single pod to access multiple Wormhole-exposed applications:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  namespace: default
+  labels:
+    consumes.wormhole.glothriel.github.com/nginx-nginx: "true"
+    consumes.wormhole.glothriel.github.com/default-postgres: "true"
+spec:
+  containers:
+  - name: app
+    image: myapp:latest
+```
+
+**Legacy format (backward compatible):**
+
+Older configurations using the single-key format are still supported:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  namespace: default
+  labels:
+    wormhole.glothriel.github.com/network-policy-consumes-app: nginx-nginx
+spec:
+  containers:
+  - name: app
+    image: myapp:latest
+```
+
+The corresponding NetworkPolicy that gets created looks like:
+
 ```
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -120,9 +161,13 @@ spec:
     ingress:
     - from:
         - namespaceSelector: {}
-            podSelector:
-                matchLabels:
-                    wormhole.glothriel.github.com/network-policy-consumes-app: <<APP-NAME>>
+          podSelector:
+              matchLabels:
+                  consumes.wormhole.glothriel.github.com/nginx-nginx: "true"
+        - namespaceSelector: {}
+          podSelector:
+              matchLabels:
+                  wormhole.glothriel.github.com/network-policy-consumes-app: nginx-nginx
         ports:
         - port: 25001
             protocol: TCP
@@ -133,9 +178,9 @@ spec:
     - Ingress
 ```
 
-Such policies allow communication from any pod in any namespace, providing, that the pod that tries to communicate has a label `wormhole.glothriel.github.com/network-policy-consumes-app` with the value of the name of the service that is exposed. The app name (unless override by `wormhole.glothriel.github.com/name=my-custom-name`) is `<service-namespace-name>-<service-name>` (for example `default-nginx`) of the service exposed from remote cluster.
+The app name (unless overridden by `wormhole.glothriel.github.com/name=my-custom-name`) is `<service-namespace-name>-<service-name>` (for example `default-nginx`) of the service exposed from remote cluster.
 
-Effectively this means, that the permission to communicate is granted per application, not per peer. Having permission to communicate with app having given name, allows the pod to communicate with all the apps with given name, no matter the peer the app is exposed from. This is especially important in the context of the server, as it may have multiple clients, all exposing the same app.
+Permission to communicate is granted per application, not per peer. Having permission to communicate with an app having a given name allows the pod to communicate with all apps with that name, regardless of which peer the app is exposed from. This is especially important in the context of the server, as it may have multiple clients all exposing the same app.
 
 ## HTTP API
 
@@ -230,9 +275,12 @@ No body or query parameters are required.
 
 Requirements:
 
+* Go 1.25+
 * Helm
 * Tilt
 * K3d
+* Python 3.10+
+* uv (for test dependencies)
 
 ```
 k3d cluster create wormhole --registry-create wormhole
@@ -252,15 +300,31 @@ The additional services should be immediately created. Please note, that all thr
 
 ### Integration tests
 
-```
-cd tests && uv sync --no-install-project && cd -
+Install test dependencies:
 
+```bash
+uv sync --project tests --no-install-project
+```
+
+Run integration tests:
+
+```bash
 uv run --project tests pytest tests/
 ```
 
-If you are re-running the tests multiple times, you may want to reuse the K3d cluster, you can do this by setting the `REUSE_CLUSTER` environment variable to a truthy value. It will then abstain from removing the cluster after the tests are done and reuse it for the next run.
+**Reusing the K3d cluster between test runs:**
 
-```
+If you are re-running the tests multiple times, you can set the `REUSE_CLUSTER` environment variable to avoid recreating the cluster each time:
+
+```bash
 export REUSE_CLUSTER=1
 uv run --project tests pytest tests/
+```
+
+**Linting test code:**
+
+```bash
+uv run --project tests ruff check tests/
+uv run --project tests black --check tests/
+uv run --project tests isort --check-only tests/
 ```

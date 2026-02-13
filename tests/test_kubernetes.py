@@ -229,6 +229,51 @@ def test_connection_via_the_tunnel(
         )
 
 
+def test_connection_via_tunnel_with_new_network_policy_labels(
+    kubectl,
+    k8s_server,
+    k8s_client,
+    mock_server,
+    curl,
+):
+    annotator = Annotator(mock_server, kubectl)
+    amount_of_services_before_annotation = Services.count(kubectl, "server")
+    annotator.do("wormhole.glothriel.github.com/exposed", "yes")
+
+    @retry(tries=DEFAULT_RETRY_TRIES, delay=DEFAULT_RETRY_DELAY)
+    def _ensure_that_proxied_service_is_created():
+        assert Services.count(kubectl, "server") == amount_of_services_before_annotation + 1
+
+    _ensure_that_proxied_service_is_created()
+
+    @retry(tries=int(DEFAULT_RETRY_TRIES / 10), delay=DEFAULT_RETRY_DELAY)
+    def _ensure_that_proxied_service_is_reachable_with_old_format():
+        # Old format labels should still work
+        curl.call_with_network_policy(
+            "http://server-nginx-nginx.client.svc.cluster.local",
+            max_time_seconds=10,
+        )
+
+    _ensure_that_proxied_service_is_reachable_with_old_format()
+
+    @retry(tries=int(DEFAULT_RETRY_TRIES / 10), delay=DEFAULT_RETRY_DELAY)
+    def _ensure_that_proxied_service_is_reachable_with_new_format():
+        # New format labels should also work
+        curl.call_with_new_network_policy(
+            "http://server-nginx-nginx.client.svc.cluster.local",
+            max_time_seconds=10,
+        )
+
+    _ensure_that_proxied_service_is_reachable_with_new_format()
+
+    # Calling CURL from non-annotated pod should fail
+    with pytest.raises(Exception):
+        curl.call_without_network_policy(
+            "http://server-nginx-nginx.client.svc.cluster.local",
+            max_time_seconds=10,
+        )
+
+
 def test_reconnecting_clients_with_keys(
     kubectl,
     k8s_server,
