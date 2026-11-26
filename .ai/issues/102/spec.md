@@ -63,7 +63,7 @@
 - Performance: one k8s API call per managed resource per app, run in the background. DELETE latency is not a requirement (deletions happen about every 6 months in production; more often in testing).
 
 ## Acceptance criteria
-- [ ] AC1 (R1): A peer has synced apps `a` and `b`. After the DELETE returns 204, `GET /api/apps/v1` contains no entry with that peer within a few seconds, polled with a timeout.
+- [ ] AC1 (R1): A peer has synced apps `a` and `b`. After the DELETE returns 204 and the asynchronous cleanup has finished, `GET /api/apps/v1` contains no entry with that peer.
 - [ ] AC2 (R2): In Kubernetes mode with network policies enabled, after deleting a peer that exposed apps, polling the server namespace shows no Service and no NetworkPolicy named `<peer>-<app>` for any of its apps, and no `remote-<peer>-*.conf` file exists in the nginx conf.d path.
 - [ ] AC3 (R3): After deleting a peer that has synced metadata, `Get(<peer>)` on the server's metadata storage returns not-found, for both the BoltDB and the caching storage. A new `MetadataStorage` instance opened on the same BoltDB file also returns not-found.
 - [ ] AC4 (R4): Delete a peer that had synced app `a`, then let a peer with the same name pair and sync `a` again without a server restart. `GET /api/apps/v1` then lists `a` for that peer, and its Service exists in Kubernetes mode.
