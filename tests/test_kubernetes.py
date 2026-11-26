@@ -385,3 +385,83 @@ def test_peer_deletion(
         ).stdout.decode()) == []
 
     _ensure_peer_was_removed()
+
+
+def test_peer_deletion_withdraws_its_apps(
+    kubectl,
+    k8s_server,
+    k8s_client,
+    mock_server,
+    helm,
+    curl,
+):
+    peer_selector = "wormhole.glothriel.github.com/exposed-peer=client"
+    annotator = Annotator(mock_server, kubectl)
+    annotator.do("wormhole.glothriel.github.com/exposed", "yes")
+
+    username = "kajtek"
+    password = "kajtek"
+    helm.install(
+        "server",
+        {
+            "server.basicAuth.username": username,
+            "server.basicAuth.password": password,
+        },
+        reuse_values=True,
+    )
+    kubectl.run(["-n", "server", "rollout", "status", "deployment/wormhole-server"])
+
+    def _peer_resources(kind):
+        return kubectl.json(["-n", "server", "get", kind, "-l", peer_selector])["items"]
+
+    def _peer_apps():
+        return [
+            app
+            for app in json.loads(
+                curl.call_with_network_policy(
+                    "http://wormhole-server-api.server:8082/api/apps/v1",
+                    max_time_seconds=10,
+                ).stdout.decode()
+            )
+            if app["peer"] == "client"
+        ]
+
+    @retry(tries=DEFAULT_RETRY_TRIES, delay=DEFAULT_RETRY_DELAY)
+    def _ensure_that_peer_resources_are_created():
+        assert _peer_resources("svc")
+        assert _peer_resources("networkpolicy")
+
+    _ensure_that_peer_resources_are_created()
+
+    # Otherwise the client re-pairs and exposes its apps again
+    kubectl.run(["-n", "client", "scale", "deployment/wormhole-client", "--replicas=0"])
+    kubectl.run(
+        [
+            "-n",
+            "client",
+            "wait",
+            "--for=delete",
+            "pod",
+            "-l",
+            "application=wormhole-client",
+            "--timeout=120s",
+        ]
+    )
+
+    @retry(tries=DEFAULT_RETRY_TRIES / 5, delay=DEFAULT_RETRY_DELAY)
+    def _ensure_that_peer_apps_are_withdrawn():
+        curl.call_with_network_policy(
+            [
+                "-X",
+                "DELETE",
+                "http://wormhole-server-api.server:8082/api/peers/v1/client",
+                "--user",
+                f"{username}:{password}",
+            ],
+            max_time_seconds=10,
+        )
+        assert not _peer_resources("svc")
+        assert not _peer_resources("networkpolicy")
+        assert not _peer_apps()
+
+    _ensure_that_peer_apps_are_withdrawn()
