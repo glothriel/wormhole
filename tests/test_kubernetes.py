@@ -396,9 +396,6 @@ def test_peer_deletion_withdraws_its_apps(
     curl,
 ):
     peer_selector = "wormhole.glothriel.github.com/exposed-peer=client"
-    annotator = Annotator(mock_server, kubectl)
-    annotator.do("wormhole.glothriel.github.com/exposed", "yes")
-
     username = "kajtek"
     password = "kajtek"
     helm.install(
@@ -410,6 +407,9 @@ def test_peer_deletion_withdraws_its_apps(
         reuse_values=True,
     )
     kubectl.run(["-n", "server", "rollout", "status", "deployment/wormhole-server"])
+
+    annotator = Annotator(mock_server, kubectl)
+    annotator.do("wormhole.glothriel.github.com/exposed", "yes")
 
     def _peer_resources(kind):
         return kubectl.json(["-n", "server", "get", kind, "-l", peer_selector])["items"]
@@ -430,6 +430,8 @@ def test_peer_deletion_withdraws_its_apps(
     def _ensure_that_peer_resources_are_created():
         assert _peer_resources("svc")
         assert _peer_resources("networkpolicy")
+        # The running server must know the apps, otherwise deleting the peer has nothing to withdraw
+        assert _peer_apps()
 
     _ensure_that_peer_resources_are_created()
 
