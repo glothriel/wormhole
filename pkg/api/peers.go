@@ -16,6 +16,12 @@ type PeerController struct {
 	watcher  *wg.Watcher
 
 	metadata syncing.MetadataStorage
+	deleter  PeerDeleter
+}
+
+// PeerDeleter removes a peer, running deleteRecord to drop its stored record first
+type PeerDeleter interface {
+	DeletePeer(peer string, deleteRecord func() error) error
 }
 
 func (p *PeerController) deletePeer(name string) error {
@@ -89,7 +95,9 @@ func (p *PeerController) registerRoutes(r *gin.Engine, s ServerSettings) {
 
 	protected.DELETE("v1/:name", func(c *gin.Context) {
 		name := c.Param("name")
-		err := p.deletePeer(name)
+		err := p.deleter.DeletePeer(name, func() error {
+			return p.deletePeer(name)
+		})
 		if err != nil {
 			c.JSON(500, gin.H{
 				"error": fmt.Sprintf("failed to delete peer %s: %v", name, err),
@@ -109,12 +117,14 @@ func NewPeersController(
 	wgConfig *wg.Config,
 	watcher *wg.Watcher,
 	metadata syncing.MetadataStorage,
+	deleter PeerDeleter,
 ) Controller {
 	theController := &PeerController{
 		peers:    peers,
 		wgConfig: wgConfig,
 		watcher:  watcher,
 		metadata: metadata,
+		deleter:  deleter,
 	}
 	return theController
 }

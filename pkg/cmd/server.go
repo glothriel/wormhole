@@ -197,7 +197,7 @@ var serverCommand *cli.Command = &cli.Command{
 		go func() {
 			err := api.NewAdminAPI([]api.Controller{
 				api.NewAppsController(appsExposedFromRemote),
-				api.NewPeersController(peerStorage, wgConfig, watcher, metadataStorage),
+				api.NewPeersController(peerStorage, wgConfig, watcher, metadataStorage, ss),
 			}, configureAPIServer(c)).Run(":8082")
 			if err != nil {
 				logrus.Fatalf("Failed to start admin API: %v", err)
