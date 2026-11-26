@@ -80,6 +80,20 @@ func (s *AppStateChangeGenerator) UpdateForPeer(peer string, theApps []apps.App)
 	s.peerApps[peer] = theApps
 }
 
+// RemovePeer withdraws all apps last synced by the peer and forgets the peer
+func (s *AppStateChangeGenerator) RemovePeer(peer string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	for _, app := range s.peerApps[peer] {
+		logrus.Infof("App %s.%s removed", app.Peer, app.Name)
+		s.changes <- svcdetector.AppStateChange{
+			App:   app,
+			State: svcdetector.AppStateChangeWithdrawn,
+		}
+	}
+	delete(s.peerApps, peer)
+}
+
 // Changes returns the channel where changes are sent
 func (s *AppStateChangeGenerator) Changes() chan svcdetector.AppStateChange {
 	return s.changes
