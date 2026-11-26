@@ -26,6 +26,7 @@ type MetadataStorage interface {
 	List() ([]MetadataListItem, error)
 	Set(peer string, metadata Metadata) error
 	Get(peer string) (Metadata, error)
+	Delete(peer string) error
 }
 
 // MetadataFactory is an interface for creating metadata, can be used for
@@ -76,6 +77,13 @@ func (s *inMemoryMetadataStorage) Get(peer string) (Metadata, error) {
 		return nil, ErrPeerNotFound
 	}
 	return metadata, nil
+}
+
+func (s *inMemoryMetadataStorage) Delete(peer string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	delete(s.data, peer)
+	return nil
 }
 
 // NewInMemoryMetadataStorage creates a new in-memory metadata storage
@@ -134,6 +142,12 @@ func (s *boltMetadataStorage) Get(peer string) (Metadata, error) {
 	return metadata, err
 }
 
+func (s *boltMetadataStorage) Delete(peer string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("metadata")).Delete([]byte(peer))
+	})
+}
+
 // NewBoltMetadataStorage creates a new metadata storage that stores metadata in a BoltDB database
 func NewBoltMetadataStorage(path string) (MetadataStorage, error) {
 	db, err := bolt.Open(path, 0600, nil)
@@ -183,6 +197,14 @@ func (s *cachingMetadataStorage) Get(peer string) (Metadata, error) {
 		logrus.Errorf("failed to cache metadata for peer %s: %v", peer, setErr)
 	}
 	return metadata, nil
+}
+
+func (s *cachingMetadataStorage) Delete(peer string) error {
+	childErr := s.storage.Delete(peer)
+	if childErr != nil {
+		return childErr
+	}
+	return s.cache.Delete(peer)
 }
 
 // NewCachingMetadataStorage creates a new metadata storage that caches metadata in memory
